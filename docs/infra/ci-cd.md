@@ -6,4 +6,5 @@
 - Flags/config: changes reviewed; audited; shipped separately from binaries when possible.
 - Environments: dev/stage/prod; blue/green for backend; feature flags for staged rollout.
 - Release: checklist-driven; automated tagging and changelog; store submission steps tracked.
+- PR hygiene: use template; link issues/ADRs; include test evidence; note flags/config changes and telemetry impacts.
 
