@@ -1,0 +1,34 @@
+{
+  "missions": {
+    "mission_01_name": "Fair Wind",
+    "mission_01_obj_primary": "Win the battle",
+    "mission_01_obj_bonus_1": "Take less than 20% hull damage",
+    "mission_01_obj_bonus_2": "Finish within 6 turns",
+
+    "mission_02_name": "Weather Gage",
+    "mission_02_obj_primary": "Win the battle",
+    "mission_02_obj_bonus_1": "Hold upwind for 3 turns",
+    "mission_02_obj_bonus_2": "Finish within 7 turns",
+
+    "mission_03_name": "Raking Shot",
+    "mission_03_obj_primary": "Win the battle",
+    "mission_03_obj_bonus_1": "Land 2 raking hits",
+    "mission_03_obj_bonus_2": "Finish within 8 turns",
+
+    "mission_04_name": "Boarding Party",
+    "mission_04_obj_primary": "Win the battle",
+    "mission_04_obj_bonus_1": "Complete a successful boarding",
+    "mission_04_obj_bonus_2": "Lose no ships",
+
+    "mission_05_name": "Line Break",
+    "mission_05_obj_primary": "Win the battle",
+    "mission_05_obj_bonus_1": "Sink the flagship first",
+    "mission_05_obj_bonus_2": "Finish within 9 turns",
+
+    "mission_06_name": "Dreadnought Siege",
+    "mission_06_obj_primary": "Win the battle",
+    "mission_06_obj_bonus_1": "Lose no ships",
+    "mission_06_obj_bonus_2": "Win within 12 turns"
+  }
+}
+
