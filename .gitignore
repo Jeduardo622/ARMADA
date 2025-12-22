@@ -1,0 +1,22 @@
+# Local env and secrets
+.env
+docs/.env
+.env.local
+
+# Local data/tools
+.data/
+.tools/
+
+# Node/JS common
+node_modules/
+dist/
+build/
+coverage/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.cursor/
+.vscode/
+*.log
+

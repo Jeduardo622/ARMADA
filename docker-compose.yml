@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: armada-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: armada
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: armada-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./.data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: armada-minio
+    ports:
+      - "9000:9000"
+      - "9100:9090"  # console
+    environment:
+      MINIO_ROOT_USER: minio-access
+      MINIO_ROOT_PASSWORD: minio-secret
+    command: server /data --console-address :9090
+    volumes:
+      - ./.data/minio:/data
+
+  unleash:
+    image: unleashorg/unleash-server:latest
+    container_name: armada-unleash
+    depends_on:
+      - postgres
+    ports:
+      - "4242:4242"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/armada
+      DATABASE_SSL: "false"
+      LOG_LEVEL: info
+      INIT_ADMIN_USERNAME: admin
+      INIT_ADMIN_PASSWORD: admin
+      INIT_ADMIN_EMAIL: admin@example.com
+      PORT: 4242
+
+networks:
+  default:
+    name: armada-net
+
