@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MissionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model Player {
+  id          String           @id @default(uuid())
+  externalId  String?          @unique
+  displayName String?
+  region      String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  inventory   InventoryItem[]
+  missions    MissionProgress[]
+  telemetry   TelemetryEvent[]
+}
+
+model InventoryItem {
+  id        String   @id @default(uuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  itemKey   String
+  quantity  Int      @default(0)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, itemKey])
+  @@index([playerId])
+}
+
+model Mission {
+  id            String            @id @default(uuid())
+  code          String            @unique
+  name          String
+  description   String?
+  configVersion Int               @default(1)
+  isActive      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  progress      MissionProgress[]
+}
+
+model MissionProgress {
+  id          String        @id @default(uuid())
+  playerId    String
+  missionId   String
+  status      MissionStatus @default(NOT_STARTED)
+  bestScore   Int?
+  lastResult  Json?
+  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime      @default(now())
+  player      Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  mission     Mission       @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, missionId])
+  @@index([missionId])
+}
+
+model ConfigSnapshot {
+  id        Int      @id @default(autoincrement())
+  namespace String
+  version   Int
+  content   Json
+  checksum  String
+  createdAt DateTime @default(now())
+
+  @@unique([namespace, version], map: "namespace_version")
+  @@index([namespace])
+}
+
+model FeatureFlag {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  description  String?
+  enabled      Boolean  @default(false)
+  defaultState String?  // e.g., variant name or rollout description
+  createdAt    DateTime @default(now())
+}
+
+model TelemetryEvent {
+  id            BigInt   @id @default(autoincrement())
+  playerId      String?
+  missionCode   String?
+  schemaVersion Int
+  payload       Json
+  receivedAt    DateTime @default(now())
+  player        Player?  @relation(fields: [playerId], references: [id])
+}
+

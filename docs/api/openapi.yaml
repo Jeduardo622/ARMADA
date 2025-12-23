@@ -1,0 +1,857 @@
+openapi: 3.0.1
+info:
+  title: Armada Backend API (MVP stub)
+  version: 0.1.0
+servers:
+  - url: http://localhost:4500
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+    Player:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        externalId:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+        region:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    GuestAuthRequest:
+      type: object
+      properties:
+        externalId:
+          type: string
+        displayName:
+          type: string
+        region:
+          type: string
+    GuestAuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        player:
+          $ref: '#/components/schemas/Player'
+    CreatePlayerRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 3
+          maxLength: 32
+        region:
+          type: string
+          maxLength: 10
+        externalId:
+          type: string
+    Mission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+        rewards:
+          type: object
+          additionalProperties: true
+        objectives:
+          type: object
+          additionalProperties: true
+    MissionProgress:
+      type: object
+      properties:
+        playerId:
+          type: string
+          format: uuid
+        missionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        bestScore:
+          type: integer
+          nullable: true
+        lastResult:
+          type: object
+          additionalProperties: true
+          nullable: true
+    MissionCompleteRequest:
+      type: object
+      required: [playerId]
+      properties:
+        playerId:
+          type: string
+          format: uuid
+        result:
+          type: object
+          additionalProperties: true
+        bestScore:
+          type: integer
+          minimum: 1
+    InventoryItem:
+      type: object
+      properties:
+        playerId:
+          type: string
+          format: uuid
+        itemKey:
+          type: string
+        quantity:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+    InventoryGrantRequest:
+      type: object
+      required: [itemKey]
+      properties:
+        itemKey:
+          type: string
+          minLength: 1
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+          default: 1
+        metadata:
+          type: object
+          additionalProperties: true
+    TelemetryIngestRequest:
+      type: object
+      required: [schemaVersion, payload]
+      properties:
+        schemaVersion:
+          type: integer
+          minimum: 1
+        playerId:
+          type: string
+          format: uuid
+        missionCode:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+    Vector2:
+      type: object
+      required: [x, y]
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+    Wind:
+      type: object
+      required: [direction, speed]
+      properties:
+        direction:
+          type: integer
+          minimum: 0
+          maximum: 359
+        speed:
+          type: integer
+          minimum: 0
+    SimShipStatus:
+      type: object
+      properties:
+        onFire:
+          type: boolean
+        slowed:
+          type: boolean
+    SimShip:
+      type: object
+      required:
+        [id, side, position, heading, speed, hp, sail, crew]
+      properties:
+        id:
+          type: string
+        side:
+          type: string
+          enum: [player, enemy]
+        position:
+          $ref: '#/components/schemas/Vector2'
+        heading:
+          type: integer
+          minimum: 0
+          maximum: 359
+        speed:
+          type: integer
+          minimum: 0
+          maximum: 10
+        hp:
+          type: integer
+          minimum: 0
+          maximum: 1000
+        sail:
+          type: integer
+          minimum: 0
+          maximum: 1000
+        crew:
+          type: integer
+          minimum: 0
+          maximum: 1000
+        status:
+          $ref: '#/components/schemas/SimShipStatus'
+        cooldowns:
+          type: object
+          properties:
+            boarding:
+              type: integer
+              minimum: 0
+              maximum: 10
+    SimState:
+      type: object
+      required: [turn, wind, ships]
+      properties:
+        turn:
+          type: integer
+          minimum: 1
+        wind:
+          $ref: '#/components/schemas/Wind'
+        ships:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimShip'
+          minItems: 1
+    SimOrder:
+      type: object
+      required: [shipId, action]
+      properties:
+        shipId:
+          type: string
+        action:
+          type: string
+          enum: [maneuver, broadside, boarding, pass]
+        targetShipId:
+          type: string
+        turnDelta:
+          type: integer
+          minimum: -90
+          maximum: 90
+          default: 0
+        speedDelta:
+          type: integer
+          minimum: -2
+          maximum: 2
+          default: 0
+        side:
+          type: string
+          enum: [port, starboard]
+    SimEvent:
+      oneOf:
+        - type: object
+          required: [type, shipId, heading, speed, turnDelta, speedDelta]
+          properties:
+            type:
+              type: string
+              enum: [maneuver]
+            shipId:
+              type: string
+            heading:
+              type: integer
+            speed:
+              type: integer
+            turnDelta:
+              type: integer
+            speedDelta:
+              type: integer
+        - type: object
+          required:
+            [type, shipId, targetShipId, side, hit, roll, hitChance, damage, targetRemaining]
+          properties:
+            type:
+              type: string
+              enum: [broadside]
+            shipId:
+              type: string
+            targetShipId:
+              type: string
+            side:
+              type: string
+              enum: [port, starboard]
+            hit:
+              type: boolean
+            roll:
+              type: integer
+            hitChance:
+              type: integer
+            damage:
+              type: object
+              properties:
+                hull:
+                  type: integer
+                sail:
+                  type: integer
+                crew:
+                  type: integer
+            targetRemaining:
+              type: object
+              properties:
+                hp:
+                  type: integer
+                sail:
+                  type: integer
+                crew:
+                  type: integer
+        - type: object
+          required:
+            [type, shipId, targetShipId, success, roll, crewLoss, targetCrewLoss, targetRemaining]
+          properties:
+            type:
+              type: string
+              enum: [boarding]
+            shipId:
+              type: string
+            targetShipId:
+              type: string
+            success:
+              type: boolean
+            roll:
+              type: integer
+            crewLoss:
+              type: integer
+            targetCrewLoss:
+              type: integer
+            targetRemaining:
+              type: object
+              properties:
+                hp:
+                  type: integer
+                sail:
+                  type: integer
+                crew:
+                  type: integer
+        - type: object
+          required: [type, shipId, status]
+          properties:
+            type:
+              type: string
+              enum: [status]
+            shipId:
+              type: string
+            status:
+              $ref: '#/components/schemas/SimShipStatus'
+    SimSummary:
+      type: object
+      required: [playerRemaining, enemyRemaining, sunk]
+      properties:
+        playerRemaining:
+          type: integer
+        enemyRemaining:
+          type: integer
+        sunk:
+          type: array
+          items:
+            type: string
+    SimPreviewRequest:
+      type: object
+      required: [schemaVersion, seed, state, orders]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turn:
+          type: integer
+          minimum: 1
+          default: 1
+        state:
+          $ref: '#/components/schemas/SimState'
+        orders:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/SimOrder'
+    SimPreviewResult:
+      type: object
+      required: [turn, nextState, events, summary, hash]
+      properties:
+        turn:
+          type: integer
+        nextState:
+          $ref: '#/components/schemas/SimState'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimEvent'
+        summary:
+          $ref: '#/components/schemas/SimSummary'
+        hash:
+          type: string
+    ConfigSnapshot:
+      type: object
+      properties:
+        namespace:
+          type: string
+        version:
+          type: integer
+        checksum:
+          type: string
+        content:
+          type: object
+          additionalProperties: true
+    ConfigResponse:
+      type: object
+      properties:
+        config:
+          $ref: '#/components/schemas/ConfigSnapshot'
+        signature:
+          type: string
+        algorithm:
+          type: string
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        '200':
+          description: OK
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        '200':
+          description: Ready
+  /auth/guest:
+    post:
+      summary: Guest auth placeholder
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestAuthRequest'
+      responses:
+        '200':
+          description: Guest token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestAuthResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /players:
+    post:
+      summary: Create player
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlayerRequest'
+      responses:
+        '201':
+          description: Player created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  player:
+                    $ref: '#/components/schemas/Player'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /players/{id}:
+    get:
+      summary: Fetch player
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Player found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  player:
+                    $ref: '#/components/schemas/Player'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (ownership)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /inventory/{playerId}:
+    get:
+      summary: List inventory items
+      parameters:
+        - in: path
+          name: playerId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InventoryItem'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden or feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /inventory/{playerId}/grant:
+    post:
+      summary: Grant inventory item (server-authoritative)
+      parameters:
+        - in: path
+          name: playerId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryGrantRequest'
+      responses:
+        '200':
+          description: Granted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  item:
+                    $ref: '#/components/schemas/InventoryItem'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden or feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions:
+    get:
+      summary: List active missions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Missions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  missions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Mission'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/{code}/complete:
+    post:
+      summary: Mark mission completion
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MissionCompleteRequest'
+      responses:
+        '200':
+          description: Progress saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  progress:
+                    $ref: '#/components/schemas/MissionProgress'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden or feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Mission or player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /sim/preview:
+    post:
+      summary: Deterministic combat sim preview
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimPreviewRequest'
+      responses:
+        '200':
+          description: Stub result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    $ref: '#/components/schemas/SimPreviewResult'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /telemetry/ingest:
+    post:
+      summary: Accept telemetry payload (schema validated, stored only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryIngestRequest'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: queued
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /config/{namespace}:
+    get:
+      summary: Fetch versioned config snapshot
+      parameters:
+        - in: path
+          name: namespace
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: version
+          schema:
+            type: integer
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Config
+          headers:
+            ETag:
+              description: Checksum of the config content
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+

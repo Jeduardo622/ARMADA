@@ -6,4 +6,5 @@
 - Validation: server-side schema validation; reject unknown/extra fields in strict modes.
 - Deprecation: mark old fields; sunset plan with dates; dual-write/dual-read when needed.
 - Testing: contract tests in CI; mock servers for client integration.
+- Sim: `/sim/preview` uses strict typed schemas (`SimState`, `SimOrder`, `SimPreviewResult`) for deterministic parity with Unity; any contract changes must bump `schemaVersion`.
 
