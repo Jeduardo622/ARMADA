@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using Armada.Client.Core;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -18,7 +18,7 @@ namespace Armada.Client.Services
         private readonly int _maxBatch;
         private readonly int _maxPayloadBytes;
         private readonly string _playerId;
-        private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        private readonly JsonSerializerSettings _jsonSettings = new() { ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver() };
         private CancellationTokenSource _cts;
 
         public TelemetryService(ApiClient client, TelemetryQueue queue, float flushSeconds, int maxBatch, int maxPayloadBytes, string playerId)
@@ -89,7 +89,7 @@ namespace Armada.Client.Services
             };
 
             // Keep under payload size guard.
-            var json = JsonSerializer.Serialize(payload, _jsonOptions);
+            var json = JsonConvert.SerializeObject(payload, _jsonSettings);
             var byteCount = Encoding.UTF8.GetByteCount(json);
             while (byteCount > _maxPayloadBytes && batch.Count > 1)
             {
@@ -97,7 +97,7 @@ namespace Armada.Client.Services
                 batch.RemoveAt(batch.Count - 1);
                 _queue.Enqueue(trimmed);
                 payload.Payload["events"] = batch;
-                json = JsonSerializer.Serialize(payload, _jsonOptions);
+                json = JsonConvert.SerializeObject(payload, _jsonSettings);
                 byteCount = Encoding.UTF8.GetByteCount(json);
             }
 

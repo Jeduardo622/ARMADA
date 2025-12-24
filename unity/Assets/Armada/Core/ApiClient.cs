@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Armada.Client.Core
 {
@@ -18,17 +19,19 @@ namespace Armada.Client.Core
     {
         private readonly string _baseUrl;
         private readonly IAuthProvider _authProvider;
-        private readonly JsonSerializerOptions _jsonOptions;
+        private JsonSerializerSettings _jsonSettings = new()
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        };
 
-        public ApiClient(string baseUrl, IAuthProvider authProvider, JsonSerializerOptions jsonOptions = null)
+        public ApiClient(string baseUrl, IAuthProvider authProvider, JsonSerializerSettings jsonSettings = null)
         {
             _baseUrl = baseUrl?.TrimEnd('/') ?? throw new ArgumentNullException(nameof(baseUrl));
             _authProvider = authProvider;
-            _jsonOptions = jsonOptions ?? new JsonSerializerOptions
+            if (jsonSettings != null)
             {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = false
-            };
+                _jsonSettings = jsonSettings;
+            }
         }
 
         public async Task<ApiResponse<T>> SendAsync<T>(string path, string method, object body = null, Dictionary<string, string> headers = null, bool requiresAuth = true)
@@ -44,7 +47,7 @@ namespace Armada.Client.Core
 
             if (body != null)
             {
-                var json = JsonSerializer.Serialize(body, _jsonOptions);
+                var json = JsonConvert.SerializeObject(body, _jsonSettings);
                 var payload = Encoding.UTF8.GetBytes(json);
                 request.uploadHandler = new UploadHandlerRaw(payload);
                 request.SetRequestHeader("Content-Type", "application/json");
@@ -83,12 +86,12 @@ namespace Armada.Client.Core
 
             if (request.result == UnityWebRequest.Result.ConnectionError)
             {
-                return ApiResponse<T>.Failure(status, raw, etag, "offline");
+                return ApiResponse<T>.CreateFailure(status, raw, etag, "offline");
             }
 
             if (typeof(T) == typeof(string))
             {
-                return ApiResponse<T>.Success((T)(object)raw, status, etag);
+                return ApiResponse<T>.CreateSuccess((T)(object)raw, status, etag);
             }
 
             T data = default;
@@ -96,7 +99,7 @@ namespace Armada.Client.Core
             {
                 if (!string.IsNullOrWhiteSpace(raw))
                 {
-                    data = JsonSerializer.Deserialize<T>(raw, _jsonOptions);
+                    data = JsonConvert.DeserializeObject<T>(raw, _jsonSettings);
                 }
             }
             catch (Exception ex)
@@ -106,10 +109,10 @@ namespace Armada.Client.Core
 
             if (status is >= HttpStatusCode.OK and < HttpStatusCode.MultipleChoices)
             {
-                return ApiResponse<T>.Success(data, status, etag, raw);
+                return ApiResponse<T>.CreateSuccess(data, status, etag, raw);
             }
 
-            return ApiResponse<T>.Failure(status, raw, etag);
+            return ApiResponse<T>.CreateFailure(status, raw, etag);
         }
 
         private static bool IsHealthPath(string path)
@@ -138,12 +141,12 @@ namespace Armada.Client.Core
             ErrorReason = errorReason;
         }
 
-        public static ApiResponse<T> Success(T data, HttpStatusCode statusCode, string etag, string rawBody = null)
+        public static ApiResponse<T> CreateSuccess(T data, HttpStatusCode statusCode, string etag, string rawBody = null)
         {
             return new ApiResponse<T>(true, statusCode, data, etag, rawBody, null);
         }
 
-        public static ApiResponse<T> Failure(HttpStatusCode statusCode, string rawBody, string etag, string reason = null)
+        public static ApiResponse<T> CreateFailure(HttpStatusCode statusCode, string rawBody, string etag, string reason = null)
         {
             return new ApiResponse<T>(false, statusCode, default, etag, rawBody, reason);
         }

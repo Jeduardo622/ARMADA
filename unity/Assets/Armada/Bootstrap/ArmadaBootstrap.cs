@@ -1,9 +1,10 @@
 using System;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Armada.Client.Core;
 using Armada.Client.Services;
 using Armada.Client.UI;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using UnityEngine;
 
 namespace Armada.Client.Bootstrap
@@ -27,7 +28,7 @@ namespace Armada.Client.Bootstrap
         private SimService _simService;
         private TelemetryService _telemetry;
         private TelemetryQueue _telemetryQueue;
-        private JsonSerializerOptions _json;
+        private JsonSerializerSettings _json;
 
         private void Awake()
         {
@@ -43,7 +44,7 @@ namespace Armada.Client.Bootstrap
                 return;
             }
 
-            _json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+            _json = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
             _flags = new FeatureFlags(clientConfig.FeatureToggles);
 
             AuthService authServiceRef = null;

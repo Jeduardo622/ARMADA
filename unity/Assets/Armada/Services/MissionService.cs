@@ -49,8 +49,8 @@ namespace Armada.Client.Services
                 featureDisabled = true;
             }
 
-            resp.Data ??= new Dictionary<string, MissionProgress>();
-            resp.Data.TryGetValue("progress", out var progress);
+            var progressDict = resp.Data ?? new Dictionary<string, MissionProgress>();
+            progressDict.TryGetValue("progress", out var progress);
 
             return new ServiceResult<MissionProgress>
             {

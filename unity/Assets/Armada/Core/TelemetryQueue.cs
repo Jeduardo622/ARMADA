@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace Armada.Client.Core
 {
@@ -15,10 +15,10 @@ namespace Armada.Client.Core
     public sealed class TelemetryQueue
     {
         private readonly Queue<TelemetryEvent> _events = new();
-        private readonly JsonSerializerOptions _options;
+        private readonly JsonSerializerSettings _options;
         private readonly int _maxPayloadBytes;
 
-        public TelemetryQueue(JsonSerializerOptions options, int maxPayloadBytes)
+        public TelemetryQueue(JsonSerializerSettings options, int maxPayloadBytes)
         {
             _options = options;
             _maxPayloadBytes = maxPayloadBytes;
@@ -29,7 +29,7 @@ namespace Armada.Client.Core
         public bool Enqueue(TelemetryEvent evt)
         {
             if (evt == null) return false;
-            var asJson = JsonSerializer.Serialize(evt, _options);
+            var asJson = JsonConvert.SerializeObject(evt, _options);
             var size = Encoding.UTF8.GetByteCount(asJson);
             if (size > _maxPayloadBytes)
             {

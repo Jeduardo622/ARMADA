@@ -3,13 +3,13 @@ using System.Threading.Tasks;
 using Armada.Client.Core;
 using Armada.Client.Services;
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro;
 
 namespace Armada.Client.UI
 {
     public sealed class InventoryUIController : MonoBehaviour
     {
-        [SerializeField] private Text statusLabel;
+        [SerializeField] private TMP_Text statusLabel;
         [SerializeField] private InventoryService inventoryService;
         [SerializeField] private AuthService authService;
 

@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace Armada.Client.Core
 {
     [Serializable]
     public sealed class ErrorResponse
     {
-        [JsonPropertyName("error")] public string Error { get; set; }
+        [JsonProperty("error")] public string Error { get; set; }
     }
 
     [Serializable]
@@ -107,8 +107,8 @@ namespace Armada.Client.Core
     [Serializable]
     public sealed class SimShipStatus
     {
-        [JsonPropertyName("onFire")] public bool? OnFire { get; set; }
-        [JsonPropertyName("slowed")] public bool? Slowed { get; set; }
+        [JsonProperty("onFire")] public bool? OnFire { get; set; }
+        [JsonProperty("slowed")] public bool? Slowed { get; set; }
     }
 
     [Serializable]
@@ -198,7 +198,7 @@ namespace Armada.Client.Core
     [Serializable]
     public sealed class SimPreviewRequest
     {
-        [JsonPropertyName("schemaVersion")] public int SchemaVersion { get; set; } = 1;
+        [JsonProperty("schemaVersion")] public int SchemaVersion { get; set; } = 1;
         public int Seed { get; set; }
         public int Turn { get; set; } = 1;
         public SimState State { get; set; }

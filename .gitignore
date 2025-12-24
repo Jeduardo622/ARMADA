@@ -13,6 +13,12 @@ dist/
 build/
 coverage/
 
+# Unity
+unity/Library/
+unity/Temp/
+unity/Logs/
+unity/obj/
+unity/UserSettings/
 # OS/editor
 .DS_Store
 Thumbs.db

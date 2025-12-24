@@ -1,6 +1,6 @@
 using System;
-using System.Text.Json;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -15,11 +15,11 @@ namespace Armada.Client.Core
     public sealed class AuthService : IAuthProvider
     {
         private readonly ApiClient _apiClient;
-        private readonly JsonSerializerOptions _options;
+        private readonly JsonSerializerSettings _options;
         private AuthState _state;
         private bool _isRequestInFlight;
 
-        public AuthService(ApiClient apiClient, JsonSerializerOptions options)
+        public AuthService(ApiClient apiClient, JsonSerializerSettings options)
         {
             _apiClient = apiClient;
             _options = options;

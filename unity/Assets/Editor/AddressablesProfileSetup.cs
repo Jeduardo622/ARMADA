@@ -25,10 +25,10 @@ public static class AddressablesProfileSetup
 
     private static void EnsureRemoteProfile(AddressableAssetSettings settings)
     {
-        var profileId = settings.FindProfile(RemoteProfileName);
+        var profileId = settings.profileSettings.GetProfileId(RemoteProfileName);
         if (string.IsNullOrEmpty(profileId))
         {
-            profileId = settings.AddProfile(RemoteProfileName, settings.profileSettings.GetProfileId("Default"));
+            profileId = settings.profileSettings.AddProfile(RemoteProfileName, settings.profileSettings.GetProfileId("Default"));
         }
 
         settings.profileSettings.SetValue(profileId, "RemoteBuildPath", "ServerData/[BuildTarget]");

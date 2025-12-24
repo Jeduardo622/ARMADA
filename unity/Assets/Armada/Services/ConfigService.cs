@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json;
 using System.Threading.Tasks;
 using Armada.Client.Core;
 using UnityEngine;
@@ -14,10 +14,10 @@ namespace Armada.Client.Services
     {
         private readonly ApiClient _client;
         private readonly string _signingKey;
-        private readonly JsonSerializerOptions _json;
+        private readonly JsonSerializerSettings _json;
         private readonly Dictionary<string, (ConfigSnapshot snapshot, string etag)> _cache = new();
 
-        public ConfigService(ApiClient client, string signingKey, JsonSerializerOptions json)
+        public ConfigService(ApiClient client, string signingKey, JsonSerializerSettings json)
         {
             _client = client;
             _signingKey = signingKey;
@@ -45,7 +45,7 @@ namespace Armada.Client.Services
                 return null;
             }
 
-            var payloadJson = JsonSerializer.Serialize(response.Data.Config.Content, _json);
+            var payloadJson = JsonConvert.SerializeObject(response.Data.Config.Content, _json);
             if (!VerifySignature(payloadJson, response.Data.Signature, _signingKey))
             {
                 Debug.LogError($"[Config] Signature verification failed for {ns}");
