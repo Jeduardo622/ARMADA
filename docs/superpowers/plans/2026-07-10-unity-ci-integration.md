@@ -104,5 +104,5 @@
 - [x] Run focused Vitest tests, Unity EditMode, Unity PlayMode, lint, typecheck, and static Unity validation.
 - [x] Run `npm run verify:local` from the final head using the licensed local Editor.
 - [x] Complete Engineering/Security/Unity review and resolve findings.
-- [ ] Commit, push, open the PR, and inspect live checks.
+- [x] Commit, push, open the PR, and inspect live checks.
 - [ ] Confirm GitHub secrets and licensed GameCI checks are green before marking the integration complete.
