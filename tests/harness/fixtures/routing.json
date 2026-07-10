@@ -12,6 +12,18 @@
     }
   },
   {
+    "id": "pathless-advisory",
+    "input": { "description": "Review the code and report risks", "changedPaths": [] },
+    "expected": {
+      "classification": "A",
+      "reasons": ["advisory intent"],
+      "protectedAreas": [],
+      "allowedActions": ["analyze", "read", "report"],
+      "requiredReviewers": [],
+      "requiredChecks": ["harness_policy"]
+    }
+  },
+  {
     "id": "backend-standard",
     "input": { "description": "Fix deterministic sim summary formatting", "changedPaths": ["src/sim/engine.ts", "tests/app.test.ts"] },
     "expected": {

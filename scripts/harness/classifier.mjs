@@ -72,7 +72,7 @@ export function classifyTask({ description = '', changedPaths = [] }) {
   }
 
   const docsOnly = paths.length > 0 && paths.every((path) => path.startsWith('docs/'));
-  if (docsOnly && matchesAny(text, policy.advisoryPatterns)) {
+  if ((paths.length === 0 || docsOnly) && matchesAny(text, policy.advisoryPatterns)) {
     return {
       classification: 'A',
       reasons: ['advisory intent'],
