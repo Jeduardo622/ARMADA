@@ -16,6 +16,17 @@ const requiredFiles = [
   '.codex/skills/release-readiness/SKILL.md'
 ];
 
+const importableHarnessModules = [
+  'scripts/harness/run-evals.mjs',
+  'scripts/harness/verify-contracts.mjs',
+  'scripts/harness/verify-dependencies.mjs',
+  'scripts/harness/verify-local.mjs',
+  'scripts/harness/verify-policy.mjs',
+  'scripts/harness/verify-secrets.mjs',
+  'scripts/harness/verify-structure.mjs',
+  'scripts/harness/verify-unity.mjs'
+];
+
 describe('engineering harness structure', () => {
   it.each(requiredFiles)('%s exists and is non-empty', (path) => {
     expect(readFileSync(path, 'utf8').trim().length).toBeGreaterThan(40);
@@ -26,7 +37,7 @@ describe('engineering harness structure', () => {
   });
 
   it('uses one least-privilege CI workflow for the local verification contract', () => {
-    const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+    const workflow = readFileSync('.github/workflows/ci.yml', 'utf8').replace(/\r\n/g, '\n');
     expect(workflow.match(/^name:/gm)).toHaveLength(1);
     expect(workflow.match(/^jobs:/gm)).toHaveLength(1);
     expect(workflow).toContain('permissions:\n  contents: read');
@@ -35,6 +46,14 @@ describe('engineering harness structure', () => {
     expect(workflow).toContain('actions/upload-artifact@v4');
     expect(workflow).not.toMatch(/placeholder/i);
     expect(workflow).not.toContain('npm install');
+  });
+
+  it.each(importableHarnessModules)('%s is portable when imported after CRLF checkout', (path) => {
+    expect(readFileSync(path, 'utf8')).not.toMatch(/^#!/);
+  });
+
+  it('excludes local worktrees from Vitest discovery', () => {
+    expect(readFileSync('vitest.config.ts', 'utf8')).toContain('.worktrees');
   });
 
   it('requires harness evidence in the pull request template', () => {
