@@ -6,6 +6,7 @@ docs/.env
 # Local data/tools
 .data/
 .tools/
+.worktrees/
 
 # Node/JS common
 node_modules/
