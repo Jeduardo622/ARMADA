@@ -3,6 +3,7 @@ import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateCompletionReport } from './verify-policy.mjs';
+import { classifyTask } from './classifier.mjs';
 
 export const CHECK_DEFINITIONS = [
   { id: 'harness_structure', command: 'npm run verify:structure' },
@@ -17,9 +18,19 @@ export const CHECK_DEFINITIONS = [
     id: 'unity_compilation',
     command: 'npm run verify:unity:compile',
     whenEnv: 'UNITY_EDITOR_PATH',
+    alternativeEnv: 'UNITY_CI_EVIDENCE_PATH',
     requiredWhenEnv: 'UNITY_COMPILATION_REQUIRED',
     notApplicable: 'UNITY_EDITOR_PATH not configured',
-    timeoutMs: 330_000
+    timeoutMs: 750_000
+  },
+  {
+    id: 'unity_tests',
+    command: 'npm run verify:unity:tests',
+    whenEnv: 'UNITY_EDITOR_PATH',
+    alternativeEnv: 'UNITY_CI_EVIDENCE_PATH',
+    requiredWhenEnv: 'UNITY_TESTS_REQUIRED',
+    notApplicable: 'UNITY_EDITOR_PATH and UNITY_CI_EVIDENCE_PATH not configured',
+    timeoutMs: 1_350_000
   },
   { id: 'dependencies', command: 'npm run verify:dependencies' },
   { id: 'secrets', command: 'npm run verify:secrets' },
@@ -65,10 +76,14 @@ function writeReport(root, report) {
   renameSync(temporaryPath, reportPath);
 }
 
-const UNITY_TOOLING_PATH = /^(?:unity\/Packages\/(?:manifest|packages-lock)\.json|\.codex\/config\.toml)$/;
+const UNITY_RUNTIME_PATH = /^(?:unity\/(?:Assets|Packages|ProjectSettings)\/|\.codex\/config\.toml$)/;
 
 export function requiresUnityCompilation(changedPaths, env = process.env) {
-  return Boolean(env.UNITY_COMPILATION_REQUIRED) || changedPaths.some((path) => UNITY_TOOLING_PATH.test(path));
+  return Boolean(env.UNITY_COMPILATION_REQUIRED) || changedPaths.some((path) => UNITY_RUNTIME_PATH.test(path));
+}
+
+export function requiresUnityTests(changedPaths, env = process.env) {
+  return Boolean(env.UNITY_TESTS_REQUIRED) || changedPaths.some((path) => UNITY_RUNTIME_PATH.test(path));
 }
 
 export function readChangedPaths(root, env = process.env) {
@@ -92,13 +107,18 @@ export function readChangedPaths(root, env = process.env) {
 }
 
 export function resolveConditionalCheck(definition, env = process.env) {
-  if (!definition.whenEnv || env[definition.whenEnv]) return null;
+  if (!definition.whenEnv || env[definition.whenEnv] || (definition.alternativeEnv && env[definition.alternativeEnv])) {
+    return null;
+  }
   if (definition.requiredWhenEnv && env[definition.requiredWhenEnv]) {
+    const requirement = definition.alternativeEnv
+      ? `${definition.whenEnv} or ${definition.alternativeEnv}`
+      : definition.whenEnv;
     return {
       id: definition.id,
       executed: false,
       status: 'failed',
-      summary: `${definition.whenEnv} is required for this verification scope`,
+      summary: `${requirement} is required for this verification scope`,
       durationMs: 0,
       details: {}
     };
@@ -113,12 +133,41 @@ export function resolveConditionalCheck(definition, env = process.env) {
   };
 }
 
+export function resolveVerificationMetadata(changedPaths, env = process.env) {
+  const routing = classifyTask({
+    description: env.HARNESS_TASK_DESCRIPTION ?? 'Verify current repository changes',
+    changedPaths
+  });
+  const rollback = routing.classification === 'C'
+    ? env.HARNESS_ROLLBACK ?? 'Restore the protected paths from the reviewed base commit and rerun npm run verify:local.'
+    : undefined;
+  return { routing, rollback };
+}
+
+export function appendMissingRequiredChecks(checks, routing) {
+  const present = new Set(checks.map((check) => check.id));
+  for (const id of routing.requiredChecks) {
+    if (present.has(id)) continue;
+    checks.push({
+      id,
+      executed: false,
+      status: 'failed',
+      summary: `required check ${id} has no verification definition`,
+      durationMs: 0,
+      details: {}
+    });
+  }
+  return checks;
+}
+
 export function runVerification(root = process.cwd()) {
   const checks = [];
   const byId = new Map();
-  const verificationEnv = requiresUnityCompilation(readChangedPaths(root))
-    ? { ...process.env, UNITY_COMPILATION_REQUIRED: '1' }
-    : process.env;
+  const changedPaths = readChangedPaths(root);
+  const metadata = resolveVerificationMetadata(changedPaths);
+  const verificationEnv = { ...process.env };
+  if (requiresUnityCompilation(changedPaths)) verificationEnv.UNITY_COMPILATION_REQUIRED = '1';
+  if (requiresUnityTests(changedPaths)) verificationEnv.UNITY_TESTS_REQUIRED = '1';
   for (const definition of CHECK_DEFINITIONS) {
     let result = resolveConditionalCheck(definition, verificationEnv);
     if (!result) {
@@ -140,13 +189,18 @@ export function runVerification(root = process.cwd()) {
     checks.push(result);
     byId.set(result.id, result);
   }
-  validateCompletionReport({ classification: 'B', checks });
+  appendMissingRequiredChecks(checks, metadata.routing);
+  validateCompletionReport({ classification: metadata.routing.classification, rollback: metadata.rollback, checks });
   const overallStatus = checks.some((check) => check.status === 'failed' || check.status === 'blocked')
     ? 'failed'
     : 'passed';
   const report = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
+    classification: metadata.routing.classification,
+    routing: metadata.routing,
+    changedPaths,
+    rollback: metadata.rollback ?? null,
     overallStatus,
     checks
   };

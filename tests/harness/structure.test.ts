@@ -25,6 +25,10 @@ const importableHarnessModules = [
   'scripts/harness/verify-secrets.mjs',
   'scripts/harness/verify-structure.mjs',
   'scripts/harness/verify-unity-compile.mjs',
+  'scripts/harness/verify-unity-tests.mjs',
+  'scripts/harness/unity-ci-evidence.mjs',
+  'scripts/harness/unity-project-sandbox.mjs',
+  'scripts/harness/unity-test-results.mjs',
   'scripts/harness/launch-unity-mcp.mjs',
   'scripts/harness/verify-unity.mjs'
 ];
@@ -46,10 +50,21 @@ describe('engineering harness structure', () => {
     expect(workflow).toContain('npm ci');
     expect(workflow).toContain('fetch-depth: 0');
     expect(workflow).toContain('HARNESS_BASE_REF:');
+    expect(workflow).toContain('game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1');
+    expect(workflow).not.toContain('game-ci/unity-test-runner@v4');
+    expect(workflow).toContain('testMode: editmode');
+    expect(workflow).toContain('testMode: playmode');
+    expect(workflow).toContain('ubuntu-2022.3.62f3-base-3.2.2@sha256:');
+    expect(workflow).toContain('UNITY_CI_EVIDENCE_PATH:');
+    expect(workflow).toContain('UNITY_LICENSE:');
+    expect(workflow).toContain('UNITY_EMAIL:');
+    expect(workflow).toContain('UNITY_PASSWORD:');
     expect(workflow).toContain('npm run verify:local');
     expect(workflow).toContain('actions/upload-artifact@v4');
     expect(workflow).not.toMatch(/placeholder/i);
     expect(workflow).not.toContain('npm install');
+    expect(workflow).not.toContain('pull_request_target');
+    expect(workflow).not.toContain('self-hosted');
   });
 
   it.each(importableHarnessModules)('%s is portable when imported after CRLF checkout', (path) => {

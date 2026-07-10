@@ -12,7 +12,7 @@ jobs:
   verify:
     name: Verify local contract
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -28,10 +28,73 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Verify Unity CI credentials
+        shell: bash
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          missing=()
+          for name in UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD; do
+            if [ -z "${!name}" ]; then missing+=("$name"); fi
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing required Unity CI secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Run Unity EditMode tests
+        id: unity-editmode
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity
+          unityVersion: 2022.3.62f3
+          customImage: unityci/editor:ubuntu-2022.3.62f3-base-3.2.2@sha256:5d7a21ca16b52434b3d7a761d15a48def4cc38fc41fada82145f87c5e92c09c3
+          testMode: editmode
+          artifactsPath: reports/unity/editmode
+          customParameters: -assemblyNames Armada.Client.EditModeTests
+
+      - name: Run Unity PlayMode tests
+        id: unity-playmode
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity
+          unityVersion: 2022.3.62f3
+          customImage: unityci/editor:ubuntu-2022.3.62f3-base-3.2.2@sha256:5d7a21ca16b52434b3d7a761d15a48def4cc38fc41fada82145f87c5e92c09c3
+          testMode: playmode
+          artifactsPath: reports/unity/playmode
+          customParameters: -assemblyNames Armada.Client.PlayModeTests
+
+      - name: Record Unity CI evidence
+        run: node scripts/harness/unity-ci-evidence.mjs
+        env:
+          UNITY_CI_EVIDENCE_PATH: reports/harness/unity-ci-evidence.json
+          UNITY_EDITMODE_RESULTS: reports/unity/editmode
+          UNITY_PLAYMODE_RESULTS: reports/unity/playmode
+
       - name: Run engineering harness
+        if: always()
         run: npm run verify:local
         env:
           HARNESS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          UNITY_CI_EVIDENCE_PATH: reports/harness/unity-ci-evidence.json
+
+      - name: Upload Unity test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-test-results
+          path: reports/unity
+          if-no-files-found: warn
 
       - name: Upload harness report
         if: always()

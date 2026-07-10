@@ -16,9 +16,12 @@ export interface UnityCompilationResult {
   };
 }
 
-export function buildUnityCompileArgs(root: string, logPath: string): string[];
+export function buildUnityCompileArgs(root: string, logPath: string, projectPath?: string): string[];
 export function classifyUnityCompilation(exitCode: number, log: string): UnityCompilationStatus;
 export function parseUnityProjectVersion(projectVersionText: string): string | null;
 export function parseUnityEditorVersion(output: string): string | null;
 export function resolveUvxExecutable(env?: NodeJS.ProcessEnv): string | null;
-export function runUnityCompilation(root?: string, editorPath?: string): UnityCompilationResult;
+export function preflightUnityEditor(root: string, editorPath?: string): {
+  status: 'passed' | 'failed'; summary: string; details: Record<string, unknown>;
+};
+export function runUnityCompilation(root?: string, editorPath?: string, env?: NodeJS.ProcessEnv): UnityCompilationResult;

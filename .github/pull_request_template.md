@@ -17,7 +17,9 @@ used to produce it.
 - Failed checks:
 - Blocked checks:
 - Harness report artifact:
-- Unity compilation: `not_applicable - licensed Unity runner unavailable` unless a licensed runner actually executed it.
+- Unity compilation: local Editor or commit-bound GameCI evidence.
+- Unity EditMode tests: result count and artifact.
+- Unity PlayMode tests: result count and artifact.
 
 ## Protected Change Evidence
 

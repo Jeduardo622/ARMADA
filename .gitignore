@@ -14,6 +14,7 @@ dist/
 build/
 coverage/
 reports/harness/
+reports/unity/
 
 # Unity
 unity/Library/

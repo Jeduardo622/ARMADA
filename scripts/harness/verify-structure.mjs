@@ -15,7 +15,11 @@ export const REQUIRED_HARNESS_FILES = [
   '.codex/skills/security-review/SKILL.md',
   '.codex/skills/release-readiness/SKILL.md',
   'scripts/harness/policy.json',
-  'scripts/harness/launch-unity-mcp.mjs'
+  'scripts/harness/launch-unity-mcp.mjs',
+  'scripts/harness/unity-ci-evidence.mjs',
+  'scripts/harness/unity-project-sandbox.mjs',
+  'scripts/harness/unity-test-results.mjs',
+  'scripts/harness/verify-unity-tests.mjs'
 ];
 
 const ROOT_REQUIREMENTS = [
@@ -36,6 +40,7 @@ const REQUIRED_PACKAGE_SCRIPTS = [
   'verify:contracts',
   'verify:unity',
   'verify:unity:compile',
+  'verify:unity:tests',
   'verify:dependencies',
   'verify:secrets',
   'verify:policy',

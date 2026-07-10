@@ -6,6 +6,11 @@ const REQUIRED_UNITY_FILES = [
   '.codex/config.toml',
   'unity/ProjectSettings/ProjectVersion.txt',
   'unity/Packages/manifest.json',
+  'unity/Assets/Armada/Armada.Client.asmdef',
+  'unity/Assets/Tests/EditMode/Armada.Client.EditModeTests.asmdef',
+  'unity/Assets/Tests/EditMode/ArmadaEditModeTests.cs',
+  'unity/Assets/Tests/PlayMode/Armada.Client.PlayModeTests.asmdef',
+  'unity/Assets/Tests/PlayMode/ArmadaPlayModeTests.cs',
   'unity/Assets/Armada/Core/ApiClient.cs',
   'unity/Assets/Armada/Core/DeterministicSimHooks.cs',
   'unity/Assets/Armada/Services/SimService.cs'
@@ -13,6 +18,15 @@ const REQUIRED_UNITY_FILES = [
 
 const UNITY_MCP_PACKAGE = 'https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v10.0.0';
 const UNITY_MCP_COMMIT = 'd49ae2953580f3481beb1e084a1da2682f0b5610';
+
+const UNITY_TEST_ASSEMBLIES = {
+  'unity/Assets/Tests/EditMode/Armada.Client.EditModeTests.asmdef': {
+    name: 'Armada.Client.EditModeTests', platform: 'Editor'
+  },
+  'unity/Assets/Tests/PlayMode/Armada.Client.PlayModeTests.asmdef': {
+    name: 'Armada.Client.PlayModeTests', platform: null
+  }
+};
 
 export function validateUnityMcpConfig(config) {
   const details = [];
@@ -79,6 +93,24 @@ export function verifyUnity(root) {
       }
     } catch {
       details.push('Unity package lock is invalid JSON');
+    }
+  }
+  for (const [path, expected] of Object.entries(UNITY_TEST_ASSEMBLIES)) {
+    const absolutePath = resolve(root, path);
+    if (!existsSync(absolutePath)) continue;
+    try {
+      const assembly = JSON.parse(readFileSync(absolutePath, 'utf8'));
+      if (assembly.name !== expected.name || !assembly.references?.includes('Armada.Client')) {
+        details.push(`${path} must reference the Armada.Client runtime assembly`);
+      }
+      if (!assembly.optionalUnityReferences?.includes('TestAssemblies')) {
+        details.push(`${path} must be a Unity test assembly`);
+      }
+      if (expected.platform && !assembly.includePlatforms?.includes(expected.platform)) {
+        details.push(`${path} must be restricted to ${expected.platform}`);
+      }
+    } catch {
+      details.push(`${path} is invalid JSON`);
     }
   }
   const mcpConfigPath = resolve(root, '.codex/config.toml');

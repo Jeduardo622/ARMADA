@@ -2,17 +2,19 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resultFromUnityCiEvidence } from './unity-ci-evidence.mjs';
+import { createUnityProjectSandbox } from './unity-project-sandbox.mjs';
 
 const COMPILER_ERROR = /error CS\d+|compilation failed|scripts have compiler errors/i;
 const SUCCESSFUL_BATCH_EXIT = /Exiting batchmode successfully|Batchmode quit successfully invoked/i;
 
-export function buildUnityCompileArgs(root, logPath) {
+export function buildUnityCompileArgs(root, logPath, projectPath = resolve(root, 'unity')) {
   return [
     '-batchmode',
     '-nographics',
     '-quit',
     '-projectPath',
-    resolve(root, 'unity'),
+    projectPath,
     '-logFile',
     logPath
   ];
@@ -48,17 +50,14 @@ export function resolveUvxExecutable(env = process.env) {
   return existsSync(candidate) ? candidate : null;
 }
 
-export function runUnityCompilation(root = process.cwd(), editorPath = process.env.UNITY_EDITOR_PATH) {
+export function preflightUnityEditor(root, editorPath) {
   if (!editorPath || !existsSync(editorPath)) {
     return {
-      id: 'unity_compilation',
-      executed: false,
       status: 'failed',
       summary: 'UNITY_EDITOR_PATH does not reference an installed Unity Editor',
-      details: []
+      details: { editorPath: editorPath ?? null, expectedVersion: null, actualVersion: null }
     };
   }
-
   const projectVersionPath = resolve(root, 'unity/ProjectSettings/ProjectVersion.txt');
   const expectedVersion = existsSync(projectVersionPath)
     ? parseUnityProjectVersion(readFileSync(projectVersionPath, 'utf8'))
@@ -70,15 +69,30 @@ export function runUnityCompilation(root = process.cwd(), editorPath = process.e
     windowsHide: true
   });
   const actualVersion = parseUnityEditorVersion(`${versionResult.stdout ?? ''}\n${versionResult.stderr ?? ''}`);
-  if (!expectedVersion || versionResult.status !== 0 || actualVersion !== expectedVersion) {
+  const status = expectedVersion && versionResult.status === 0 && actualVersion === expectedVersion ? 'passed' : 'failed';
+  return {
+    status,
+    summary: status === 'passed'
+      ? `Unity Editor ${actualVersion} matches the project`
+      : 'Unity Editor version does not match the project before execution',
+    details: { editorPath, expectedVersion, actualVersion, error: versionResult.error?.message ?? null }
+  };
+}
+
+export function runUnityCompilation(root = process.cwd(), editorPath = process.env.UNITY_EDITOR_PATH, env = process.env) {
+  if (env.UNITY_CI_EVIDENCE_PATH) return resultFromUnityCiEvidence(root, 'unity_compilation', env);
+  const preflight = preflightUnityEditor(root, editorPath);
+  if (preflight.status !== 'passed') {
     return {
       id: 'unity_compilation',
       executed: false,
       status: 'failed',
-      summary: 'Unity Editor version does not match the project before compilation',
-      details: { editorPath, expectedVersion, actualVersion, error: versionResult.error?.message ?? null }
+      summary: preflight.summary,
+      details: preflight.details
     };
   }
+
+  const { expectedVersion, actualVersion } = preflight.details;
 
   const uvxPath = resolveUvxExecutable();
   if (!uvxPath) {
@@ -94,12 +108,18 @@ export function runUnityCompilation(root = process.cwd(), editorPath = process.e
   const logPath = resolve(root, 'reports/harness/unity-compilation.log');
   mkdirSync(dirname(logPath), { recursive: true });
   rmSync(logPath, { force: true });
-  const result = spawnSync(editorPath, buildUnityCompileArgs(root, logPath), {
-    cwd: root,
-    encoding: 'utf8',
-    timeout: 300_000,
-    windowsHide: true
-  });
+  const sandbox = createUnityProjectSandbox(root);
+  let result;
+  try {
+    result = spawnSync(editorPath, buildUnityCompileArgs(root, logPath, sandbox.projectPath), {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 600_000,
+      windowsHide: true
+    });
+  } finally {
+    sandbox.cleanup();
+  }
   const log = existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';
   const exitCode = result.status ?? 1;
   const status = classifyUnityCompilation(exitCode, log);

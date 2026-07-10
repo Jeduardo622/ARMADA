@@ -13,3 +13,5 @@ These rules apply to `unity/` and supplement the root guide.
   licensed batch compilation gate when an Editor is available. Protected Unity
   tooling paths make compilation required automatically.
 - Run `npm run verify:local` before PR handoff.
+- Run repository-owned EditMode and PlayMode tests with
+  `npm run verify:unity:tests`; package or stub tests are not sufficient.

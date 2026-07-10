@@ -51,6 +51,9 @@ destructive cleanup without a separate explicit request and applicable review.
   Protected Unity tooling paths make compilation required automatically;
   `UNITY_COMPILATION_REQUIRED=1` can force the same gate for an explicit scope.
   Otherwise, report compilation as not applicable; never infer a static pass.
+- Unity runtime changes require both `npm run verify:unity:compile` and
+  `npm run verify:unity:tests`. CI may satisfy them only with commit-bound
+  EditMode and PlayMode GameCI evidence for the exact project version.
 - Protected changes require rollback evidence and the focused checks selected by
   `route-task` in addition to full verification.
 
