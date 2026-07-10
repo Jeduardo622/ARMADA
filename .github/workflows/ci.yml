@@ -1,48 +1,38 @@
-name: backend-ci
+name: Engineering verification
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
-  lint-test:
-    if: hashFiles('package.json') != ''
+  verify:
+    name: Verify local contract
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm install
-      - run: npm run lint --if-present
-      - run: npm test --if-present
-name: CI
 
-on:
-  pull_request:
-  push:
-    branches: [main]
+      - name: Install locked dependencies
+        run: npm ci
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Run engineering harness
+        run: npm run verify:local
+
+      - name: Upload harness report
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          node-version: '20'
-      - name: Install deps
-        run: |
-          if [ -f package.json ]; then npm ci; else echo "No package.json"; fi
-      - name: Lint
-        run: |
-          if [ -f package.json ]; then npm run lint --if-present; else echo "No lint"; fi
-      - name: Tests
-        run: |
-          if [ -f package.json ]; then npm test --if-present; else echo "No tests"; fi
-      - name: Placeholder sim/replay/contract checks
-        run: echo "Add sim/replay/contract checks when available"
-
+          name: harness-report
+          path: reports/harness/latest.json
+          if-no-files-found: warn
