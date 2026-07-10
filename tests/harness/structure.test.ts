@@ -57,6 +57,13 @@ describe('engineering harness structure', () => {
     expect(workflow).not.toContain('game-ci/unity-test-runner@v4');
     expect(workflow).toContain('testMode: editmode');
     expect(workflow).toContain('testMode: playmode');
+    const ownershipStep = workflow.indexOf('name: Restore Unity artifact ownership');
+    expect(ownershipStep).toBeGreaterThan(workflow.indexOf('testMode: playmode'));
+    expect(ownershipStep).toBeLessThan(workflow.indexOf('name: Record Unity CI evidence'));
+    expect(workflow.slice(ownershipStep, workflow.indexOf('name: Record Unity CI evidence')))
+      .toContain('if: always()');
+    expect(workflow).toContain('if [ -d reports ]; then');
+    expect(workflow).toContain('sudo chown -R "$(id -u):$(id -g)" reports');
     expect(workflow).toContain('ubuntu-2022.3.62f3-base-3.2.2@sha256:');
     expect(workflow).toContain('UNITY_CI_EVIDENCE_PATH:');
     expect(workflow).toContain('UNITY_LICENSE:');

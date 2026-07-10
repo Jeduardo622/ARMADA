@@ -74,6 +74,14 @@ jobs:
           artifactsPath: reports/unity/playmode
           customParameters: -assemblyNames Armada.Client.PlayModeTests
 
+      - name: Restore Unity artifact ownership
+        if: always()
+        shell: bash
+        run: |
+          if [ -d reports ]; then
+            sudo chown -R "$(id -u):$(id -g)" reports
+          fi
+
       - name: Record Unity CI evidence
         run: node scripts/harness/unity-ci-evidence.mjs
         env:
