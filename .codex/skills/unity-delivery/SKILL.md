@@ -17,7 +17,9 @@ Use for changes under `unity/` or backend contracts consumed by Unity.
 4. Add or update deterministic fixtures and contract checks before behavior edits.
 5. Preserve stable ordering, explicit seeds, schema versions, and `.meta` files.
 6. Run Unity metadata checks, backend contract checks, and full verification.
-7. Report Unity compilation as unavailable unless a licensed runner actually ran.
+7. Set `UNITY_EDITOR_PATH` and run licensed batch compilation when an Editor is
+   available. Protected Unity tooling paths make compilation required
+   automatically; otherwise report compilation as not applicable.
 
 ## Stop Conditions
 

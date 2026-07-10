@@ -47,8 +47,10 @@ destructive cleanup without a separate explicit request and applicable review.
 - Never describe a skipped, blocked, placeholder, or synthetic check as passed.
 - Record each check as passed, failed, blocked, or not applicable.
 - `npm run verify:local` is the local and CI source of truth.
-- Unity compilation is unavailable until a licensed runner exists. Report it as
-  not applicable; never infer a pass from static checks.
+- Set `UNITY_EDITOR_PATH` to run licensed Unity batch compilation locally.
+  Protected Unity tooling paths make compilation required automatically;
+  `UNITY_COMPILATION_REQUIRED=1` can force the same gate for an explicit scope.
+  Otherwise, report compilation as not applicable; never infer a static pass.
 - Protected changes require rollback evidence and the focused checks selected by
   `route-task` in addition to full verification.
 

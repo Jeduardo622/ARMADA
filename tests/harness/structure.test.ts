@@ -24,6 +24,8 @@ const importableHarnessModules = [
   'scripts/harness/verify-policy.mjs',
   'scripts/harness/verify-secrets.mjs',
   'scripts/harness/verify-structure.mjs',
+  'scripts/harness/verify-unity-compile.mjs',
+  'scripts/harness/launch-unity-mcp.mjs',
   'scripts/harness/verify-unity.mjs'
 ];
 
@@ -42,6 +44,8 @@ describe('engineering harness structure', () => {
     expect(workflow.match(/^jobs:/gm)).toHaveLength(1);
     expect(workflow).toContain('permissions:\n  contents: read');
     expect(workflow).toContain('npm ci');
+    expect(workflow).toContain('fetch-depth: 0');
+    expect(workflow).toContain('HARNESS_BASE_REF:');
     expect(workflow).toContain('npm run verify:local');
     expect(workflow).toContain('actions/upload-artifact@v4');
     expect(workflow).not.toMatch(/placeholder/i);
@@ -54,6 +58,24 @@ describe('engineering harness structure', () => {
 
   it('excludes local worktrees from Vitest discovery', () => {
     expect(readFileSync('vitest.config.ts', 'utf8')).toContain('.worktrees');
+  });
+
+  it('pins the project-scoped Unity MCP integration with write approvals', () => {
+    const manifest = JSON.parse(readFileSync('unity/Packages/manifest.json', 'utf8'));
+    expect(manifest.dependencies?.['com.coplaydev.unity-mcp']).toBe(
+      'https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v10.0.0'
+    );
+    const packageLock = JSON.parse(readFileSync('unity/Packages/packages-lock.json', 'utf8'));
+    expect(packageLock.dependencies?.['com.coplaydev.unity-mcp']?.hash).toBe(
+      'd49ae2953580f3481beb1e084a1da2682f0b5610'
+    );
+
+    const config = readFileSync('.codex/config.toml', 'utf8');
+    expect(config).toContain('[mcp_servers.unityMCP]');
+    expect(config).toContain('command = "node"');
+    expect(config).toContain('args = ["scripts/harness/launch-unity-mcp.mjs"]');
+    expect(config).toContain('default_tools_approval_mode = "writes"');
+    expect(config).toContain('required = false');
   });
 
   it('requires harness evidence in the pull request template', () => {

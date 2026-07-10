@@ -16,7 +16,9 @@
 - Humans retain merge approval; production deployment and production-data mutation are prohibited.
 - Class C changes require explicit scope, rollback evidence, focused tests, full verification, and human merge.
 - Existing lint and typecheck defects must be fixed, not suppressed.
-- Unity compilation must be reported as unavailable until a licensed runner exists and must never be reported as passed.
+- Unity compilation requires `UNITY_EDITOR_PATH`; without it the check is not
+  applicable and must never be represented as passed. Protected Unity tooling
+  paths make the check required automatically so omission fails the gate.
 - Dependency exceptions require advisory ID, package, rationale, owner, introduction date, and an expiration no more than 90 days later.
 
 ---
@@ -304,8 +306,9 @@ failure.
 Contract verification must confirm documented OpenAPI route/method pairs exist in
 the route source and that schema version 1 is represented in both sim types and
 OpenAPI. Unity verification must confirm `ProjectVersion.txt`, `manifest.json`,
-determinism hooks, and API client files exist, then return `unity_compilation` as
-`not_applicable` with reason `licensed Unity runner unavailable`.
+determinism hooks, and API client files exist. Licensed batch compilation runs
+when `UNITY_EDITOR_PATH` is configured and is otherwise explicitly not applicable.
+Protected Unity tooling paths automatically require the licensed run.
 
 - [ ] **Step 4: Repair lint without suppression**
 
@@ -349,8 +352,10 @@ checks pass.
 - [ ] **Step 9: Run the full contract**
 
 Run: `npm run verify:local`
-Expected: exit 0 and `reports/harness/latest.json` with overall status `passed`,
-all required checks passed, and Unity compilation explicitly not applicable.
+Expected: exit 0 and `reports/harness/latest.json` with overall status `passed`.
+Unity compilation is executed when `UNITY_EDITOR_PATH` is configured and is
+otherwise explicitly not applicable. Protected Unity tooling paths require the
+check and fail if the Editor path is absent.
 
 - [ ] **Step 10: Commit unified verification**
 

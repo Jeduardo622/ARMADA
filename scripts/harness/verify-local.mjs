@@ -13,7 +13,14 @@ export const CHECK_DEFINITIONS = [
   { id: 'build', command: 'npm run build', dependsOn: ['typecheck'] },
   { id: 'contracts', command: 'npm run verify:contracts' },
   { id: 'unity_static', command: 'npm run verify:unity' },
-  { id: 'unity_compilation', notApplicable: 'licensed Unity runner unavailable' },
+  {
+    id: 'unity_compilation',
+    command: 'npm run verify:unity:compile',
+    whenEnv: 'UNITY_EDITOR_PATH',
+    requiredWhenEnv: 'UNITY_COMPILATION_REQUIRED',
+    notApplicable: 'UNITY_EDITOR_PATH not configured',
+    timeoutMs: 330_000
+  },
   { id: 'dependencies', command: 'npm run verify:dependencies' },
   { id: 'secrets', command: 'npm run verify:secrets' },
   { id: 'harness_policy', command: 'npm run verify:policy' }
@@ -31,7 +38,7 @@ function runCommand(root, definition) {
     encoding: 'utf8',
     env: process.env,
     shell: true,
-    timeout: 180_000
+    timeout: definition.timeoutMs ?? 180_000
   });
   const durationMs = Date.now() - started;
   const exitCode = result.status ?? 1;
@@ -58,21 +65,63 @@ function writeReport(root, report) {
   renameSync(temporaryPath, reportPath);
 }
 
+const UNITY_TOOLING_PATH = /^(?:unity\/Packages\/(?:manifest|packages-lock)\.json|\.codex\/config\.toml)$/;
+
+export function requiresUnityCompilation(changedPaths, env = process.env) {
+  return Boolean(env.UNITY_COMPILATION_REQUIRED) || changedPaths.some((path) => UNITY_TOOLING_PATH.test(path));
+}
+
+export function readChangedPaths(root, env = process.env) {
+  const status = spawnSync('git', ['status', '--porcelain=v1'], { cwd: root, encoding: 'utf8', windowsHide: true });
+  const workingPaths = String(status.stdout ?? '')
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => line.slice(3).split(' -> ').at(-1));
+  const configuredBase = env.HARNESS_BASE_REF || (env.GITHUB_BASE_REF ? `origin/${env.GITHUB_BASE_REF}` : 'origin/main');
+  const baseExists = spawnSync('git', ['rev-parse', '--verify', configuredBase], {
+    cwd: root,
+    encoding: 'utf8',
+    windowsHide: true
+  }).status === 0;
+  const baseArgs = baseExists
+    ? ['diff', '--name-only', `${configuredBase}...HEAD`]
+    : ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'];
+  const diff = spawnSync('git', baseArgs, { cwd: root, encoding: 'utf8', windowsHide: true });
+  const committedPaths = String(diff.stdout ?? '').split(/\r?\n/).filter(Boolean);
+  return [...new Set([...workingPaths, ...committedPaths])];
+}
+
+export function resolveConditionalCheck(definition, env = process.env) {
+  if (!definition.whenEnv || env[definition.whenEnv]) return null;
+  if (definition.requiredWhenEnv && env[definition.requiredWhenEnv]) {
+    return {
+      id: definition.id,
+      executed: false,
+      status: 'failed',
+      summary: `${definition.whenEnv} is required for this verification scope`,
+      durationMs: 0,
+      details: {}
+    };
+  }
+  return {
+    id: definition.id,
+    executed: false,
+    status: 'not_applicable',
+    summary: definition.notApplicable,
+    durationMs: 0,
+    details: {}
+  };
+}
+
 export function runVerification(root = process.cwd()) {
   const checks = [];
   const byId = new Map();
+  const verificationEnv = requiresUnityCompilation(readChangedPaths(root))
+    ? { ...process.env, UNITY_COMPILATION_REQUIRED: '1' }
+    : process.env;
   for (const definition of CHECK_DEFINITIONS) {
-    let result;
-    if (definition.notApplicable) {
-      result = {
-        id: definition.id,
-        executed: false,
-        status: 'not_applicable',
-        summary: definition.notApplicable,
-        durationMs: 0,
-        details: {}
-      };
-    } else {
+    let result = resolveConditionalCheck(definition, verificationEnv);
+    if (!result) {
       const failedDependency = definition.dependsOn?.find((id) => byId.get(id)?.status !== 'passed');
       if (failedDependency) {
         result = {

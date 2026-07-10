@@ -48,6 +48,36 @@
     }
   },
   {
+    "id": "unity-tooling-protected",
+    "input": {
+      "description": "Install and configure a Unity MCP server",
+      "changedPaths": ["unity/Packages/manifest.json", "unity/Packages/packages-lock.json", ".codex/config.toml"]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: unity_tooling", "protected intent: unity_tooling"],
+      "protectedAreas": ["unity_tooling"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Security", "Unity"],
+      "requiredChecks": ["contracts", "dependencies", "harness_policy", "security", "unity_compilation", "unity_static"]
+    }
+  },
+  {
+    "id": "engineering-harness-protected",
+    "input": {
+      "description": "Require Unity compilation for protected verification harness changes",
+      "changedPaths": ["scripts/harness/verify-local.mjs", "tests/harness/verifiers.test.ts"]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: engineering_harness", "protected intent: engineering_harness"],
+      "protectedAreas": ["engineering_harness"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Engineering", "Security"],
+      "requiredChecks": ["harness_policy", "harness_structure", "lint", "test", "typecheck"]
+    }
+  },
+  {
     "id": "auth-protected",
     "input": { "description": "Change bearer token verification", "changedPaths": ["src/plugins/auth.ts"] },
     "expected": {

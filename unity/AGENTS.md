@@ -9,6 +9,7 @@ These rules apply to `unity/` and supplement the root guide.
   settings, package manifests, or deployment are Class C.
 - Keep runtime code out of editor-only assemblies and preserve `.meta` files.
 - Validate project metadata and deterministic fixtures with `npm run verify:unity`.
-- A static check is not Unity compilation. Report compilation as unavailable until
-  a licensed runner executes it.
+- A static check is not Unity compilation. Set `UNITY_EDITOR_PATH` and run the
+  licensed batch compilation gate when an Editor is available. Protected Unity
+  tooling paths make compilation required automatically.
 - Run `npm run verify:local` before PR handoff.

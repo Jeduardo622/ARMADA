@@ -266,10 +266,13 @@ The workflow has least-privilege read permissions and no production credentials.
 No check is represented by an echo placeholder. A required but unavailable check
 returns a named blocked status and fails for affected changes.
 
-Unity compilation is not a required v1 gate because the repository has no
-licensed Unity runner. V1 validates Unity source conventions, project metadata,
-API contracts, and deterministic fixtures. The report explicitly names Unity
-compilation as unavailable rather than passed.
+Unity compilation is conditional on `UNITY_EDITOR_PATH`. When configured, the
+harness executes licensed Unity batch compilation and records the result. CI or
+local environments without an Editor report the check as not applicable rather
+than passed. Static validation still covers Unity source conventions, project
+metadata, API contracts, and deterministic fixtures.
+Protected Unity tooling paths automatically turn a missing Editor path into a
+failed check rather than not applicable.
 
 ## Completion Report
 
@@ -329,5 +332,7 @@ The harness is complete when:
    dependency policy, secret scan, and harness evals are real commands.
 7. CI runs the same verification contract with no secret and uploads artifacts.
 8. Existing dependency exceptions are explicit, owned, justified, and expiring.
-9. Unity compilation is reported as unavailable and never represented as passed.
+9. Unity compilation passes only after a licensed batch run; without an Editor it
+   is reported as not applicable, or failed when protected tooling makes it
+   required.
 10. The current branch has a minimal, reviewable diff and no unrelated changes.

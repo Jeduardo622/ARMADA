@@ -15,6 +15,7 @@
     "verify:structure": "node scripts/harness/verify-structure.mjs",
     "verify:contracts": "node scripts/harness/verify-contracts.mjs",
     "verify:unity": "node scripts/harness/verify-unity.mjs",
+    "verify:unity:compile": "node scripts/harness/verify-unity-compile.mjs",
     "verify:dependencies": "node scripts/harness/verify-dependencies.mjs",
     "verify:secrets": "node scripts/harness/verify-secrets.mjs",
     "verify:policy": "node scripts/harness/verify-policy.mjs",

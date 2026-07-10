@@ -7,7 +7,8 @@ export interface UnityResult {
     id: 'unity_compilation';
     executed: false;
     status: 'not_applicable';
-    summary: 'licensed Unity runner unavailable';
+    summary: 'set UNITY_EDITOR_PATH to execute licensed Unity compilation';
   };
 }
+export function validateUnityMcpConfig(config: string): string[];
 export function verifyUnity(root: string): UnityResult;

@@ -4,7 +4,7 @@
     "rollback": "Revert the focused commit and rerun npm run verify:local.",
     "checks": [
       { "id": "lint", "executed": true, "status": "passed" },
-      { "id": "unity_compilation", "executed": false, "status": "not_applicable", "summary": "licensed Unity runner unavailable" }
+      { "id": "unity_compilation", "executed": false, "status": "not_applicable", "summary": "UNITY_EDITOR_PATH not configured" }
     ]
   },
   "invalidFalsePassReport": {
