@@ -1,11 +1,12 @@
 import fp from 'fastify-plugin';
-import { initialize, Variant } from 'unleash-client';
+import { Context, initialize, Variant } from 'unleash-client';
 import { env } from '../config.js';
 import { logger } from '../logger.js';
 
 export interface FlagClient {
-  isEnabled: (flagName: string, context?: Record<string, unknown>) => boolean;
-  getVariant: (flagName: string, context?: Record<string, unknown>) => Variant;
+  isEnabled: (flagName: string, context?: Context) => boolean;
+  getVariant: (flagName: string, context?: Context) => Variant;
+  ready: () => boolean;
 }
 
 declare module 'fastify' {
@@ -47,10 +48,10 @@ export const flagPlugin = fp(async (fastify) => {
     logger.error({ err }, 'Unleash client error');
   });
 
-  const safeIsEnabled = (flagName: string, context?: Record<string, unknown>) =>
+  const safeIsEnabled = (flagName: string, context?: Context) =>
     ready ? client.isEnabled(flagName, context) : false;
 
-  const safeGetVariant = (flagName: string, context?: Record<string, unknown>) =>
+  const safeGetVariant = (flagName: string, context?: Context) =>
     ready ? client.getVariant(flagName, context) : { name: 'disabled', enabled: false };
 
   fastify.decorate('flags', {
@@ -60,7 +61,7 @@ export const flagPlugin = fp(async (fastify) => {
   });
 
   fastify.addHook('onClose', async () => {
-    await client.stop();
+    client.destroy();
   });
 });
 

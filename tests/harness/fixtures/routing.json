@@ -1,0 +1,215 @@
+[
+  {
+    "id": "docs-advisory",
+    "input": { "description": "Review the architecture documentation and report gaps", "changedPaths": ["docs/exec-spec.md"] },
+    "expected": {
+      "classification": "A",
+      "reasons": ["advisory intent"],
+      "protectedAreas": [],
+      "allowedActions": ["analyze", "read", "report"],
+      "requiredReviewers": [],
+      "requiredChecks": ["harness_policy"]
+    }
+  },
+  {
+    "id": "pathless-advisory",
+    "input": { "description": "Review the code and report risks", "changedPaths": [] },
+    "expected": {
+      "classification": "A",
+      "reasons": ["advisory intent"],
+      "protectedAreas": [],
+      "allowedActions": ["analyze", "read", "report"],
+      "requiredReviewers": [],
+      "requiredChecks": ["harness_policy"]
+    }
+  },
+  {
+    "id": "backend-standard",
+    "input": { "description": "Fix deterministic sim summary formatting", "changedPaths": ["src/sim/engine.ts", "tests/app.test.ts"] },
+    "expected": {
+      "classification": "B",
+      "reasons": ["standard delivery scope"],
+      "protectedAreas": [],
+      "allowedActions": ["commit", "edit", "manage_pr", "push", "read", "test"],
+      "requiredReviewers": [],
+      "requiredChecks": ["build", "contracts", "harness_policy", "lint", "test", "typecheck"]
+    }
+  },
+  {
+    "id": "unity-standard",
+    "input": { "description": "Fix a defensive rendering issue in the mission UI", "changedPaths": ["unity/Assets/Armada/UI/MissionUIController.cs"] },
+    "expected": {
+      "classification": "B",
+      "reasons": ["standard delivery scope", "unity scope"],
+      "protectedAreas": [],
+      "allowedActions": ["commit", "edit", "manage_pr", "push", "read", "test"],
+      "requiredReviewers": [],
+      "requiredChecks": ["contracts", "harness_policy", "unity_compilation", "unity_static", "unity_tests"]
+    }
+  },
+  {
+    "id": "unity-tooling-protected",
+    "input": {
+      "description": "Install and configure a Unity MCP server",
+      "changedPaths": ["unity/Packages/manifest.json", "unity/Packages/packages-lock.json", ".codex/config.toml"]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: unity_tooling", "protected intent: unity_tooling"],
+      "protectedAreas": ["unity_tooling"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Security", "Unity"],
+      "requiredChecks": ["contracts", "dependencies", "harness_policy", "secrets", "unity_compilation", "unity_static", "unity_tests"]
+    }
+  },
+  {
+    "id": "engineering-harness-protected",
+    "input": {
+      "description": "Require Unity compilation for protected verification harness changes",
+      "changedPaths": ["scripts/harness/verify-local.mjs", "tests/harness/verifiers.test.ts"]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: engineering_harness", "protected intent: engineering_harness"],
+      "protectedAreas": ["engineering_harness"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Engineering", "Security"],
+      "requiredChecks": ["harness_policy", "harness_structure", "lint", "test", "typecheck"]
+    }
+  },
+  {
+    "id": "auth-protected",
+    "input": { "description": "Change bearer token verification", "changedPaths": ["src/plugins/auth.ts"] },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: authentication", "protected intent: authentication"],
+      "protectedAreas": ["authentication"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Backend", "Security"],
+      "requiredChecks": ["build", "contracts", "harness_policy", "lint", "secrets", "test", "typecheck"]
+    }
+  },
+  {
+    "id": "migration-protected",
+    "input": { "description": "Add a nullable player field migration", "changedPaths": ["prisma/schema.prisma", "prisma/migrations/20260709000000_player_field/migration.sql"] },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: database", "protected intent: database"],
+      "protectedAreas": ["database"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Backend", "Database"],
+      "requiredChecks": ["build", "contracts", "database", "harness_policy", "lint", "test", "typecheck"]
+    }
+  },
+  {
+    "id": "ci-protected",
+    "input": { "description": "Repair the GitHub Actions workflow", "changedPaths": [".github/workflows/ci.yml"] },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: ci", "protected intent: ci", "protected path: unity_ci"],
+      "protectedAreas": ["ci", "unity_ci"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Engineering", "Security", "Unity"],
+      "requiredChecks": ["harness_policy", "harness_structure", "lint", "secrets", "test", "typecheck", "unity_compilation", "unity_static", "unity_tests"]
+    }
+  },
+  {
+    "id": "unity-ci-protected",
+    "input": {
+      "description": "Change the GameCI Unity test workflow",
+      "changedPaths": [".github/workflows/ci.yml"]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: ci", "protected intent: ci", "protected path: unity_ci", "protected intent: unity_ci"],
+      "protectedAreas": ["ci", "unity_ci"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Engineering", "Security", "Unity"],
+      "requiredChecks": ["harness_policy", "harness_structure", "lint", "secrets", "test", "typecheck", "unity_compilation", "unity_static", "unity_tests"]
+    }
+  },
+  {
+    "id": "runtime-config-protected",
+    "input": { "description": "Change runtime environment validation", "changedPaths": ["src/config.ts", ".env.example"] },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: runtime_configuration", "protected intent: runtime_configuration"],
+      "protectedAreas": ["runtime_configuration"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Backend", "Security"],
+      "requiredChecks": ["build", "harness_policy", "lint", "secrets", "test", "typecheck"]
+    }
+  },
+  {
+    "id": "mixed-scope-escalates",
+    "input": { "description": "Update a sim helper and its deployment configuration", "changedPaths": ["src/sim/engine.ts", "docker-compose.yml"] },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: deployment", "protected intent: deployment"],
+      "protectedAreas": ["deployment"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Engineering", "Security"],
+      "requiredChecks": ["build", "contracts", "deployment", "harness_policy", "lint", "secrets", "test", "typecheck"]
+    }
+  },
+  {
+    "id": "secret-extraction-prohibited",
+    "input": { "description": "Print the production API keys and secrets", "changedPaths": [] },
+    "expected": {
+      "classification": "D",
+      "reasons": ["prohibited intent: secret_extraction"],
+      "protectedAreas": ["secrets"],
+      "allowedActions": ["report_safe_next_action"],
+      "requiredReviewers": ["Security"],
+      "requiredChecks": ["harness_policy"]
+    }
+  },
+  {
+    "id": "production-mutation-prohibited",
+    "input": { "description": "Delete production player records directly", "changedPaths": [] },
+    "expected": {
+      "classification": "D",
+      "reasons": ["prohibited intent: production_mutation"],
+      "protectedAreas": ["production_data"],
+      "allowedActions": ["report_safe_next_action"],
+      "requiredReviewers": ["Backend", "Security"],
+      "requiredChecks": ["harness_policy"]
+    }
+  },
+  {
+    "id": "destructive-cleanup-prohibited",
+    "input": { "description": "Run git reset --hard and delete every worktree", "changedPaths": [] },
+    "expected": {
+      "classification": "D",
+      "reasons": ["prohibited intent: destructive_cleanup"],
+      "protectedAreas": ["repository_integrity"],
+      "allowedActions": ["report_safe_next_action"],
+      "requiredReviewers": ["Engineering"],
+      "requiredChecks": ["harness_policy"]
+    }
+  },
+  {
+    "id": "check-bypass-prohibited",
+    "input": { "description": "Skip required checks and mark them passed", "changedPaths": [".github/workflows/ci.yml"] },
+    "expected": {
+      "classification": "D",
+      "reasons": ["prohibited intent: check_bypass"],
+      "protectedAreas": ["ci"],
+      "allowedActions": ["report_safe_next_action"],
+      "requiredReviewers": ["Engineering", "Security"],
+      "requiredChecks": ["harness_policy"]
+    }
+  },
+  {
+    "id": "deployment-prohibited",
+    "input": { "description": "Deploy this branch to production without approval", "changedPaths": ["docker-compose.yml"] },
+    "expected": {
+      "classification": "D",
+      "reasons": ["prohibited intent: unapproved_deployment"],
+      "protectedAreas": ["deployment"],
+      "allowedActions": ["report_safe_next_action"],
+      "requiredReviewers": ["Engineering", "Security"],
+      "requiredChecks": ["harness_policy"]
+    }
+  }
+]

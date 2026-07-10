@@ -7,7 +7,7 @@ import Redis from 'ioredis';
 import { Client as MinioClient } from 'minio';
 import { randomUUID } from 'crypto';
 import { env } from './config.js';
-import { logger } from './logger.js';
+import { loggerOptions } from './logger.js';
 import { prismaPlugin } from './plugins/prisma.js';
 import { redisPlugin } from './plugins/redis.js';
 import { storagePlugin } from './plugins/storage.js';
@@ -28,7 +28,7 @@ type BuildOptions = {
 
 export function buildServer(options?: BuildOptions) {
   const app = Fastify({
-    logger,
+    logger: loggerOptions,
     disableRequestLogging: env.NODE_ENV === 'test',
     bodyLimit: env.BODY_LIMIT_BYTES,
     genReqId: (request) => {

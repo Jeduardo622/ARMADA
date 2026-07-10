@@ -1,26 +1,39 @@
-<!-- Link issue/ADR -->
-- Issue/ADR link:
+## Scope
+
+- Issue/ADR:
+- Task classification:
+- Classification reasons:
+- Changed paths:
+- Required reviewers:
 
 ## Summary
 
-## Testing
-- [ ] unit
-- [ ] sim/replay
-- [ ] contract/schema
-- [ ] device smoke
-- [ ] other:
-Evidence:
+Describe the user-visible or operational outcome and the smallest coherent change
+used to produce it.
 
-## Risks/Impact
-- Risk areas:
-- Rollback plan:
+## Verification
 
-## Flags/Config
-- New/changed flags? defaults? rollout/rollback plan? audit log link?
+- Executed checks:
+- Failed checks:
+- Blocked checks:
+- Harness report artifact:
+- Unity compilation: local Editor or commit-bound GameCI evidence.
+- Unity EditMode tests: result count and artifact.
+- Unity PlayMode tests: result count and artifact.
 
-## Telemetry
-- Events added/changed? schema impact?
+## Protected Change Evidence
 
-## Security/Secrets
-- New secrets/keys? handled via vault? none?
+- Protected areas:
+- Rollback evidence:
+- Production or tenant impact:
+- New secrets or permissions: none / describe approved handling
 
+## Supply Chain
+
+- Dependency exceptions: none / list advisory IDs and expiration dates
+- Package or action changes:
+
+## Risk
+
+- Residual risk:
+- Follow-up work:

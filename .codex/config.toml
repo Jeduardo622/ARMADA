@@ -1,0 +1,10 @@
+[mcp_servers.unityMCP]
+command = "node"
+args = ["scripts/harness/launch-unity-mcp.mjs"]
+env_vars = ["SystemRoot"]
+startup_timeout_sec = 60
+tool_timeout_sec = 120
+enabled = true
+# Codex may start while Unity is closed; protected verification requires the Editor separately.
+required = false
+default_tools_approval_mode = "writes"

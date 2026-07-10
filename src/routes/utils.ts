@@ -1,10 +1,11 @@
 import { FastifyInstance, FastifyReply } from 'fastify';
+import type { Context } from 'unleash-client';
 
 export async function ensureFlag(
   app: FastifyInstance,
   reply: FastifyReply,
   flagName: string,
-  context?: Record<string, unknown>
+  context?: Context
 ) {
   const enabled = app.flags.isEnabled(flagName, context);
   if (enabled) {

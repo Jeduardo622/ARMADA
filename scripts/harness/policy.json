@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "classes": {
+    "A": { "allowedActions": ["read", "analyze", "report"] },
+    "B": { "allowedActions": ["read", "edit", "test", "commit", "push", "manage_pr"] },
+    "C": { "allowedActions": ["read", "plan", "report_required_approval"] },
+    "D": { "allowedActions": ["report_safe_next_action"] }
+  },
+  "checkScopes": [
+    { "pathPattern": "^src/", "checks": ["lint", "typecheck", "test", "build", "harness_policy"] },
+    { "pathPattern": "^tests/", "checks": ["test", "harness_policy"] },
+    { "pathPattern": "^src/(routes|sim)/|^src/types\\.d?\\.ts$", "checks": ["contracts"] },
+    { "pathPattern": "^unity/", "checks": ["unity_static", "unity_compilation", "unity_tests", "contracts", "harness_policy"] },
+    { "pathPattern": "^docs/", "checks": ["harness_policy"] },
+    { "pathPattern": "^\\.github/", "checks": ["harness_structure", "lint", "typecheck", "test", "harness_policy"] }
+  ],
+  "protectedAreas": [
+    {
+      "id": "authentication",
+      "pathPatterns": ["^src/plugins/auth\\.ts$", "^src/routes/auth\\.ts$"],
+      "intentPatterns": ["auth(entication|orization)?", "bearer token", "jwt"],
+      "reviewers": ["Security", "Backend"],
+      "checks": ["lint", "typecheck", "test", "build", "contracts", "secrets", "harness_policy"]
+    },
+    {
+      "id": "database",
+      "pathPatterns": ["^prisma/(?:schema\\.prisma|migrations/)"],
+      "intentPatterns": ["database", "schema", "migration"],
+      "reviewers": ["Backend", "Database"],
+      "checks": ["lint", "typecheck", "test", "build", "contracts", "database", "harness_policy"]
+    },
+    {
+      "id": "ci",
+      "pathPatterns": ["^\\.github/"],
+      "intentPatterns": ["github actions", "\\bci\\b", "workflow"],
+      "reviewers": ["Engineering", "Security"],
+      "checks": ["harness_structure", "lint", "typecheck", "test", "harness_policy"]
+    },
+    {
+      "id": "unity_ci",
+      "pathPatterns": ["^\\.github/workflows/ci\\.yml$"],
+      "intentPatterns": ["unity ci", "game-?ci", "unity test workflow", "licensed unity"],
+      "reviewers": ["Engineering", "Security", "Unity"],
+      "checks": ["harness_structure", "lint", "typecheck", "test", "unity_static", "unity_compilation", "unity_tests", "secrets", "harness_policy"]
+    },
+    {
+      "id": "runtime_configuration",
+      "pathPatterns": ["^src/config\\.ts$", "^\\.env"],
+      "intentPatterns": ["runtime (environment|config)", "environment validation", "env var"],
+      "reviewers": ["Backend", "Security"],
+      "checks": ["lint", "typecheck", "test", "build", "secrets", "harness_policy"]
+    },
+    {
+      "id": "unity_tooling",
+      "pathPatterns": ["^unity/Packages/(manifest|packages-lock)\\.json$", "^\\.codex/config\\.toml$"],
+      "intentPatterns": ["unity mcp", "unity package", "mcp server"],
+      "reviewers": ["Unity", "Security"],
+      "checks": ["unity_static", "unity_compilation", "unity_tests", "contracts", "dependencies", "secrets", "harness_policy"]
+    },
+    {
+      "id": "engineering_harness",
+      "pathPatterns": ["^scripts/harness/", "^tests/harness/", "^package\\.json$", "^AGENTS\\.md$", "^unity/AGENTS\\.md$", "^\\.codex/skills/", "^docs/superpowers/(plans|specs)/.*engineering-harness"],
+      "intentPatterns": ["engineering harness", "verification harness", "harness policy"],
+      "reviewers": ["Engineering", "Security"],
+      "checks": ["harness_structure", "harness_policy", "test", "lint", "typecheck"]
+    },
+    {
+      "id": "deployment",
+      "pathPatterns": ["^docker-compose\\.yml$"],
+      "intentPatterns": ["deploy(ment)?", "production rollout"],
+      "reviewers": ["Engineering", "Security"],
+      "checks": ["lint", "typecheck", "test", "build", "deployment", "secrets", "harness_policy"]
+    }
+  ],
+  "prohibitedIntents": [
+    {
+      "id": "secret_extraction",
+      "patterns": ["(print|show|extract|reveal).*(secret|api key|credential|token)"],
+      "areas": ["secrets"],
+      "reviewers": ["Security"]
+    },
+    {
+      "id": "production_mutation",
+      "patterns": ["(delete|update|mutate|truncate).*(production|prod).*(record|data|player)"],
+      "areas": ["production_data"],
+      "reviewers": ["Backend", "Security"]
+    },
+    {
+      "id": "destructive_cleanup",
+      "patterns": ["git reset --hard", "delete every worktree", "remove all worktrees"],
+      "areas": ["repository_integrity"],
+      "reviewers": ["Engineering"]
+    },
+    {
+      "id": "check_bypass",
+      "patterns": ["skip required checks", "mark (them|checks) passed", "bypass.*check"],
+      "areas": ["ci"],
+      "reviewers": ["Engineering", "Security"]
+    },
+    {
+      "id": "unapproved_deployment",
+      "patterns": ["deploy.*production.*without approval", "unapproved deploy"],
+      "areas": ["deployment"],
+      "reviewers": ["Engineering", "Security"]
+    }
+  ],
+  "advisoryPatterns": ["\\breview\\b", "\\banaly[sz]e\\b", "\\baudit\\b", "\\bplan\\b", "report gaps"]
+}

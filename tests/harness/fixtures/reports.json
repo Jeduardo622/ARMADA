@@ -1,0 +1,32 @@
+[
+  {
+    "id": "valid-standard-report",
+    "valid": true,
+    "report": {
+      "classification": "B",
+      "checks": [
+        { "id": "test", "executed": true, "status": "passed" },
+        { "id": "unity_compilation", "executed": false, "status": "not_applicable", "summary": "UNITY_EDITOR_PATH not configured" }
+      ]
+    }
+  },
+  {
+    "id": "duplicate-check-id",
+    "valid": false,
+    "report": {
+      "classification": "B",
+      "checks": [
+        { "id": "test", "executed": true, "status": "passed" },
+        { "id": "test", "executed": true, "status": "passed" }
+      ]
+    }
+  },
+  {
+    "id": "unknown-status",
+    "valid": false,
+    "report": {
+      "classification": "B",
+      "checks": [{ "id": "test", "executed": true, "status": "skipped" }]
+    }
+  }
+]
