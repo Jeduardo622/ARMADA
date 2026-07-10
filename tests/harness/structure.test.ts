@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { verifyStructure } from '../../scripts/harness/verify-structure.mjs';
 
 const requiredFiles = [
   'AGENTS.md',
@@ -18,5 +19,9 @@ const requiredFiles = [
 describe('engineering harness structure', () => {
   it.each(requiredFiles)('%s exists and is non-empty', (path) => {
     expect(readFileSync(path, 'utf8').trim().length).toBeGreaterThan(40);
+  });
+
+  it('validates instruction and skill structure from the repository root', () => {
+    expect(verifyStructure(process.cwd())).toMatchObject({ status: 'passed' });
   });
 });

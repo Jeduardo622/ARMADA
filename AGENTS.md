@@ -6,6 +6,9 @@ agent roles.
 
 ## Required Lifecycle
 
+Canonical lifecycle: inspect, classify, plan when needed, implement, verify,
+review, prepare a PR, and hand off for human merge.
+
 1. Read this file and every applicable nested `AGENTS.md` before acting.
 2. Inspect repository status, recent history, relevant source, docs, and tests.
 3. Classify the task with `node scripts/harness/route-task.mjs` when available.
@@ -26,7 +29,7 @@ agent roles.
   deployment, economy, or production-data paths. Implementation requires an
   explicitly bounded request, minimal diff, focused tests, full verification,
   rollback instructions, named risk, and human merge.
-- **D, prohibited:** secret extraction, production-data mutation, disabling
+- **Class D, prohibited:** secret extraction, production-data mutation, disabling
   controls, destructive cleanup, unapproved deployment, check bypass, or
   fabricated evidence. Stop and report the safe next action.
 

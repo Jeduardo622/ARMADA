@@ -1,0 +1,18 @@
+{
+  "validProtectedReport": {
+    "classification": "C",
+    "rollback": "Revert the focused commit and rerun npm run verify:local.",
+    "checks": [
+      { "id": "lint", "executed": true, "status": "passed" },
+      { "id": "unity_compilation", "executed": false, "status": "not_applicable", "summary": "licensed Unity runner unavailable" }
+    ]
+  },
+  "invalidFalsePassReport": {
+    "classification": "B",
+    "checks": [{ "id": "lint", "executed": false, "status": "passed" }]
+  },
+  "invalidProtectedReport": {
+    "classification": "C",
+    "checks": [{ "id": "lint", "executed": true, "status": "passed" }]
+  }
+}
