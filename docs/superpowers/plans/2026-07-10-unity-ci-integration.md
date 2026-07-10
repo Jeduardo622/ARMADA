@@ -105,4 +105,4 @@
 - [x] Run `npm run verify:local` from the final head using the licensed local Editor.
 - [x] Complete Engineering/Security/Unity review and resolve findings.
 - [x] Commit, push, open the PR, and inspect live checks.
-- [ ] Confirm GitHub secrets and licensed GameCI checks are green before marking the integration complete.
+- [x] Confirm GitHub secrets and licensed GameCI checks are green before marking the integration complete.
