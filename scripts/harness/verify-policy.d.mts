@@ -22,5 +22,5 @@ export interface DependencyException {
   expires: string;
 }
 
-export function validateCompletionReport<T extends CompletionReport>(report: T): T;
-export function validateDependencyExceptions<T extends DependencyException[]>(exceptions: T, now?: Date): T;
+export function validateCompletionReport(report: unknown): asserts report is CompletionReport;
+export function validateDependencyExceptions(exceptions: unknown, now?: Date): asserts exceptions is DependencyException[];

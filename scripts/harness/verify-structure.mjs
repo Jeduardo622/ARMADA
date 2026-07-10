@@ -26,6 +26,22 @@ const ROOT_REQUIREMENTS = [
   'Completion Report'
 ];
 
+const REQUIRED_PACKAGE_SCRIPTS = [
+  'lint',
+  'typecheck',
+  'test',
+  'build',
+  'test:harness',
+  'verify:structure',
+  'verify:contracts',
+  'verify:unity',
+  'verify:dependencies',
+  'verify:secrets',
+  'verify:policy',
+  'verify:harness',
+  'verify:local'
+];
+
 export function verifyStructure(root) {
   const failures = [];
   for (const path of REQUIRED_HARNESS_FILES) {
@@ -52,6 +68,16 @@ export function verifyStructure(root) {
     const content = readFileSync(absolutePath, 'utf8');
     if (!/^---\r?\nname: [a-z0-9-]+\r?\ndescription: .+\r?\n---/m.test(content)) {
       failures.push(`invalid skill frontmatter: ${path}`);
+    }
+  }
+
+  const packagePath = resolve(root, 'package.json');
+  if (!existsSync(packagePath)) {
+    failures.push('missing package.json');
+  } else {
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+    for (const script of REQUIRED_PACKAGE_SCRIPTS) {
+      if (typeof packageJson.scripts?.[script] !== 'string') failures.push(`missing npm script: ${script}`);
     }
   }
 

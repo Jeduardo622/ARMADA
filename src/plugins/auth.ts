@@ -1,4 +1,5 @@
 import fp from 'fastify-plugin';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { env } from '../config.js';
 import type { AuthUser } from '../types.js';
@@ -28,7 +29,7 @@ export const authPlugin = fp(async (fastify) => {
       return;
     }
 
-    const guard = async (request: any, reply: any) => {
+    const guard = async (request: FastifyRequest, reply: FastifyReply) => {
       const token = extractToken(request.headers.authorization);
       if (!token) {
         reply.status(401).send({ error: 'unauthorized' });
@@ -37,7 +38,7 @@ export const authPlugin = fp(async (fastify) => {
 
       try {
         request.user = verifyToken(token);
-      } catch (err) {
+      } catch {
         reply.status(401).send({ error: 'unauthorized' });
         return;
       }
