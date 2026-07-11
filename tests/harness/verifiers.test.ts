@@ -118,6 +118,7 @@ describe('repository verifiers', () => {
       unityRequired: true
     });
     expect(determineCiScope(['.codex/config.toml'], {})).toMatchObject({ unityRequired: true });
+    expect(determineCiScope(['.github/workflows/ci.yml'], {})).toMatchObject({ unityRequired: true });
     expect(determineCiScope([], { FORCE_UNITY: '1' })).toMatchObject({ unityRequired: true });
     expect(formatGitHubOutput({ unityRequired: true })).toBe('unity_required=true\n');
   });

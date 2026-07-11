@@ -21,9 +21,11 @@
 - Personal licenses require the GameCI manual activation flow to produce the
   license file stored as `UNITY_LICENSE`. Do not upload a Unity license file as
   a workflow artifact or commit it to the repository.
-- Fork pull requests do not receive Unity secrets and fail the named credential
-  preflight. Do not use `pull_request_target` or attach a self-hosted runner to
-  this public repository to work around that boundary.
+- Non-Unity pull requests run the secret-free core and aggregate jobs without
+  Unity credentials. Fork pull requests that change Unity or Unity CI paths do
+  not receive Unity secrets and fail the named credential preflight. Do not use
+  `pull_request_target` or attach a self-hosted runner to this public repository
+  to work around that boundary.
 - Successful EditMode and PlayMode XML files are hashed into
   `reports/harness/unity-ci-evidence.json`. `npm run verify:local` accepts that
   evidence only when its commit SHA and Unity version match the current run.

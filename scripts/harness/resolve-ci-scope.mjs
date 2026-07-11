@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 import {
   readChangedPaths,
   requiresUnityCompilation,
-  requiresUnityTests
+  requiresUnityTests,
+  resolveVerificationMetadata
 } from './verify-local.mjs';
 
 function isEnabled(value) {
@@ -12,7 +13,10 @@ function isEnabled(value) {
 
 export function determineCiScope(changedPaths, env = process.env) {
   const paths = [...new Set(changedPaths.map((path) => String(path).replaceAll('\\', '/')))];
+  const { routing } = resolveVerificationMetadata(paths, env);
   const unityRequired = isEnabled(env.FORCE_UNITY) ||
+    routing.requiredChecks.includes('unity_compilation') ||
+    routing.requiredChecks.includes('unity_tests') ||
     requiresUnityCompilation(paths, env) ||
     requiresUnityTests(paths, env);
   return { changedPaths: paths, unityRequired };
