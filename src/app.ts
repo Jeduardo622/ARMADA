@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { LogController } from 'fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
@@ -29,7 +29,7 @@ type BuildOptions = {
 export function buildServer(options?: BuildOptions) {
   const app = Fastify({
     logger: loggerOptions,
-    disableRequestLogging: env.NODE_ENV === 'test',
+    logController: new LogController({ disableRequestLogging: env.NODE_ENV === 'test' }),
     bodyLimit: env.BODY_LIMIT_BYTES,
     genReqId: (request) => {
       const headerId = request.headers['x-request-id'];

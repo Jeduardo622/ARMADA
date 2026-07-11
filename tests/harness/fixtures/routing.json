@@ -102,6 +102,21 @@
     }
   },
   {
+    "id": "database-deployment-verifiers-protected",
+    "input": {
+      "description": "Change protected verifier implementation files",
+      "changedPaths": ["scripts/harness/verify-database.mjs", "scripts/harness/verify-deployment.d.mts"]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: database", "protected path: engineering_harness", "protected path: deployment"],
+      "protectedAreas": ["database", "deployment", "engineering_harness"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Backend", "Database", "Engineering", "Security"],
+      "requiredChecks": ["build", "contracts", "database", "deployment", "harness_policy", "harness_structure", "lint", "secrets", "test", "typecheck"]
+    }
+  },
+  {
     "id": "ci-protected",
     "input": { "description": "Repair the GitHub Actions workflow", "changedPaths": [".github/workflows/ci.yml"] },
     "expected": {

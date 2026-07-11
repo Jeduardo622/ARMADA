@@ -24,7 +24,7 @@
     },
     {
       "id": "database",
-      "pathPatterns": ["^prisma/(?:schema\\.prisma|migrations/)"],
+      "pathPatterns": ["^prisma/(?:schema\\.prisma|migrations/)", "^scripts/harness/verify-database(?:\\.d)?\\.m(?:js|ts)$"],
       "intentPatterns": ["database", "schema", "migration"],
       "reviewers": ["Backend", "Database"],
       "checks": ["lint", "typecheck", "test", "build", "contracts", "database", "harness_policy"]
@@ -66,7 +66,7 @@
     },
     {
       "id": "deployment",
-      "pathPatterns": ["^docker-compose\\.yml$"],
+      "pathPatterns": ["^docker-compose\\.yml$", "^scripts/harness/verify-deployment(?:\\.d)?\\.m(?:js|ts)$"],
       "intentPatterns": ["deploy(ment)?", "production rollout"],
       "reviewers": ["Engineering", "Security"],
       "checks": ["lint", "typecheck", "test", "build", "deployment", "secrets", "harness_policy"]

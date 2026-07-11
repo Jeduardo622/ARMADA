@@ -13,6 +13,8 @@ export const CHECK_DEFINITIONS = [
   { id: 'test', command: 'npm test' },
   { id: 'build', command: 'npm run build', dependsOn: ['typecheck'] },
   { id: 'contracts', command: 'npm run verify:contracts' },
+  { id: 'database', command: 'npm run verify:database' },
+  { id: 'deployment', command: 'npm run verify:deployment' },
   { id: 'unity_static', command: 'npm run verify:unity' },
   {
     id: 'unity_compilation',
