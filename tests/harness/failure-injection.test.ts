@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDatabaseVerifier } from '../../scripts/harness/verify-database.mjs';
+import { createDeploymentVerifier } from '../../scripts/harness/verify-deployment.mjs';
 
 type CommandResult = {
   status: number;
@@ -98,5 +99,67 @@ describe('database verifier failure injection', () => {
     expect(verification.status).toBe('failed');
     expect(verification.details.join('\n')).toContain('Ephemeral PostgreSQL cleanup failed');
     expect(runner.calls.filter((stage) => stage === 'cleanup')).toHaveLength(1);
+  });
+});
+
+const validCompose = {
+  services: {
+    postgres: {
+      image: 'postgres:16-alpine',
+      environment: { POSTGRES_USER: 'postgres', POSTGRES_PASSWORD: 'postgres', POSTGRES_DB: 'armada' },
+      ports: [{ target: 5432, published: '15432' }],
+      healthcheck: { test: ['CMD-SHELL', 'pg_isready -U postgres'] }
+    }
+  }
+};
+const validEnv = 'DATABASE_URL=postgres://postgres:postgres@localhost:15432/armada\n';
+
+describe('deployment verifier failure injection', () => {
+  it('includes process spawn errors when Compose cannot execute', () => {
+    const verify = createDeploymentVerifier({
+      runCommand: () => result(1, '', '', new Error('compose executable unavailable')),
+      readTextFile: () => validEnv
+    });
+    const verification = verify('C:/repo');
+    expect(verification.status).toBe('failed');
+    expect(verification.details.join('\n')).toContain('compose executable unavailable');
+  });
+
+  it('fails on malformed Compose JSON', () => {
+    const verify = createDeploymentVerifier({
+      runCommand: () => result(0, '{not-json'),
+      readTextFile: () => validEnv
+    });
+    const verification = verify('C:/repo');
+    expect(verification.status).toBe('failed');
+    expect(verification.details.join('\n')).toContain('unable to validate Compose model');
+  });
+
+  it('fails when the environment contract cannot be read', () => {
+    const verify = createDeploymentVerifier({
+      runCommand: () => result(0, JSON.stringify(validCompose)),
+      readTextFile: () => { throw new Error('.env.example missing'); }
+    });
+    const verification = verify('C:/repo');
+    expect(verification.status).toBe('failed');
+    expect(verification.details.join('\n')).toContain('.env.example missing');
+  });
+
+  it('fails when the rendered Compose model omits PostgreSQL', () => {
+    const verify = createDeploymentVerifier({
+      runCommand: () => result(0, JSON.stringify({ services: {} })),
+      readTextFile: () => validEnv
+    });
+    const verification = verify('C:/repo');
+    expect(verification.status).toBe('failed');
+    expect(verification.details).toContain('Compose must define a postgres service');
+  });
+
+  it('passes a fully matching injected deployment contract', () => {
+    const verify = createDeploymentVerifier({
+      runCommand: () => result(0, JSON.stringify(validCompose)),
+      readTextFile: () => validEnv
+    });
+    expect(verify('C:/repo')).toMatchObject({ id: 'deployment', status: 'passed' });
   });
 });
