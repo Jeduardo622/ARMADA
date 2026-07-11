@@ -21,7 +21,8 @@ describe('completion report policy', () => {
 
   it.each(reportFixtures)('$id', (fixture) => {
     const validate = () => validateCompletionReport(fixture.report);
-    fixture.valid ? expect(validate).not.toThrow() : expect(validate).toThrow();
+    if (fixture.valid) expect(validate).not.toThrow();
+    else expect(validate).toThrow();
   });
 });
 
