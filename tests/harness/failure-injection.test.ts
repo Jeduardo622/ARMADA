@@ -3,13 +3,13 @@ import { createDatabaseVerifier } from '../../scripts/harness/verify-database.mj
 import { createDeploymentVerifier } from '../../scripts/harness/verify-deployment.mjs';
 
 type CommandResult = {
-  status: number;
-  stdout: string;
-  stderr: string;
+  status: number | null;
+  stdout: string | null;
+  stderr: string | null;
   error?: Error;
 };
 
-function result(status = 0, stdout = '', stderr = '', error?: Error): CommandResult {
+function result(status: number | null = 0, stdout: string | null = '', stderr: string | null = '', error?: Error): CommandResult {
   return { status, stdout, stderr, error };
 }
 
@@ -61,6 +61,29 @@ describe('database verifier failure injection', () => {
     const verification = createDatabaseVerifier({ runCommand })('C:/repo');
     expect(verification.status).toBe('failed');
     expect(verification.details.join('\n')).toContain('health check');
+    expect(runner.calls.filter((stage) => stage === 'cleanup')).toHaveLength(1);
+  });
+
+  it('reports startup failure without attempting cleanup', () => {
+    const runner = databaseRunner('start');
+    const verification = createDatabaseVerifier({ runCommand: runner.runCommand })('C:/repo');
+    expect(verification.status).toBe('failed');
+    expect(verification.details.join('\n')).toContain('startup failed');
+    expect(runner.calls.filter((stage) => stage === 'cleanup')).toHaveLength(0);
+  });
+
+  it('reports port discovery spawn failure and cleans up exactly once', () => {
+    const runner = databaseRunner();
+    const runCommand = (command: string, args: string[]) => {
+      if (command === 'docker' && args[0] === 'port') {
+        runner.calls.push('port');
+        return result(null, null, null, new Error('port discovery unavailable'));
+      }
+      return runner.runCommand(command, args);
+    };
+    const verification = createDatabaseVerifier({ runCommand })('C:/repo');
+    expect(verification.status).toBe('failed');
+    expect(verification.details.join('\n')).toContain('port discovery unavailable');
     expect(runner.calls.filter((stage) => stage === 'cleanup')).toHaveLength(1);
   });
 

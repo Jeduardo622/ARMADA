@@ -108,7 +108,7 @@ export function createDatabaseVerifier(overrides = {}) {
     let databaseUrl;
     if (details.length === 0) {
       const port = dependencies.runCommand('docker', ['port', containerName, '5432/tcp']);
-      const match = port.stdout.trim().match(/:(\d+)$/);
+      const match = String(port.stdout ?? '').trim().match(/:(\d+)$/);
       if (port.status !== 0 || !match) details.push(commandFailure('Ephemeral PostgreSQL port discovery', port));
       else databaseUrl = `postgresql://${VERIFY_USER}:${VERIFY_PASSWORD}@127.0.0.1:${match[1]}/${VERIFY_DATABASE}`;
     }

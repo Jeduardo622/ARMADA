@@ -9,8 +9,8 @@ type DeploymentVerification = {
 
 type CommandResult = {
   status: number | null;
-  stdout?: string;
-  stderr?: string;
+  stdout?: string | null;
+  stderr?: string | null;
   error?: Error;
 };
 

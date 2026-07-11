@@ -1,8 +1,8 @@
 export function buildPostgresRunArgs(containerName: string): string[];
 export interface DatabaseCommandResult {
   status: number | null;
-  stdout?: string;
-  stderr?: string;
+  stdout?: string | null;
+  stderr?: string | null;
   error?: Error;
 }
 export interface DatabaseVerifierDependencies {
