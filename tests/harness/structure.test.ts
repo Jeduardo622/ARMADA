@@ -18,6 +18,7 @@ const requiredFiles = [
 
 const importableHarnessModules = [
   'scripts/harness/run-evals.mjs',
+  'scripts/harness/resolve-ci-scope.mjs',
   'scripts/harness/verify-contracts.mjs',
   'scripts/harness/verify-dependencies.mjs',
   'scripts/harness/verify-database.mjs',
