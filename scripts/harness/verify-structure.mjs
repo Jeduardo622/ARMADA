@@ -19,6 +19,8 @@ export const REQUIRED_HARNESS_FILES = [
   'scripts/harness/unity-ci-evidence.mjs',
   'scripts/harness/unity-project-sandbox.mjs',
   'scripts/harness/unity-test-results.mjs',
+  'scripts/harness/verify-database.mjs',
+  'scripts/harness/verify-deployment.mjs',
   'scripts/harness/verify-unity-tests.mjs'
 ];
 
@@ -38,6 +40,8 @@ const REQUIRED_PACKAGE_SCRIPTS = [
   'test:harness',
   'verify:structure',
   'verify:contracts',
+  'verify:database',
+  'verify:deployment',
   'verify:unity',
   'verify:unity:compile',
   'verify:unity:tests',

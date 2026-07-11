@@ -20,6 +20,8 @@ const importableHarnessModules = [
   'scripts/harness/run-evals.mjs',
   'scripts/harness/verify-contracts.mjs',
   'scripts/harness/verify-dependencies.mjs',
+  'scripts/harness/verify-database.mjs',
+  'scripts/harness/verify-deployment.mjs',
   'scripts/harness/verify-local.mjs',
   'scripts/harness/verify-policy.mjs',
   'scripts/harness/verify-secrets.mjs',

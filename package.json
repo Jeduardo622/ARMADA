@@ -14,6 +14,8 @@
     "test:harness": "vitest run tests/harness",
     "verify:structure": "node scripts/harness/verify-structure.mjs",
     "verify:contracts": "node scripts/harness/verify-contracts.mjs",
+    "verify:database": "node scripts/harness/verify-database.mjs",
+    "verify:deployment": "node scripts/harness/verify-deployment.mjs",
     "verify:unity": "node scripts/harness/verify-unity.mjs",
     "verify:unity:compile": "node scripts/harness/verify-unity-compile.mjs",
     "verify:unity:tests": "node scripts/harness/verify-unity-tests.mjs",
