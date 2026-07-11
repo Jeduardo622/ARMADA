@@ -389,5 +389,5 @@ default_tools_approval_mode = "never"
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });

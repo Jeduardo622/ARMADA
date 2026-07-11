@@ -55,27 +55,49 @@ export function validateDeploymentConfig(compose, envText) {
   return violations;
 }
 
-export function verifyDeployment(root = process.cwd()) {
-  const compose = spawnSync('docker', ['compose', 'config', '--format', 'json'], {
-    cwd: root,
+function runCommand(command, args, options = {}) {
+  return spawnSync(command, args, {
+    cwd: options.cwd,
     encoding: 'utf8',
     windowsHide: true
   });
-  const violations = [];
-  if (compose.status !== 0) {
-    violations.push(`docker compose config failed: ${String(compose.stderr ?? '').trim().slice(-2000)}`);
-  } else {
-    try {
-      const model = JSON.parse(compose.stdout);
-      const envText = readFileSync(resolve(root, '.env.example'), 'utf8');
-      violations.push(...validateDeploymentConfig(model, envText));
-    } catch (error) {
-      violations.push(`unable to validate Compose model: ${error.message}`);
+}
+
+function readTextFile(path) {
+  return readFileSync(path, 'utf8');
+}
+
+export function createDeploymentVerifier(overrides = {}) {
+  const dependencies = { runCommand, readTextFile, ...overrides };
+
+  return function verifyDeploymentWithDependencies(root = process.cwd()) {
+    const compose = dependencies.runCommand('docker', ['compose', 'config', '--format', 'json'], { cwd: root });
+    const violations = [];
+    if (compose.status !== 0) {
+      const output = [compose.stderr, compose.error?.message]
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .join('\n')
+        .slice(-2000);
+      violations.push(`docker compose config failed${output ? `: ${output}` : ''}`);
+    } else {
+      try {
+        const model = JSON.parse(compose.stdout);
+        const envText = dependencies.readTextFile(resolve(root, '.env.example'));
+        violations.push(...validateDeploymentConfig(model, envText));
+      } catch (error) {
+        violations.push(`unable to validate Compose model: ${error.message}`);
+      }
     }
-  }
-  return violations.length === 0
-    ? { id: 'deployment', status: 'passed', summary: 'Docker Compose deployment contract validated', details: [] }
-    : { id: 'deployment', status: 'failed', summary: `${violations.length} deployment verification failure(s)`, details: violations };
+    return violations.length === 0
+      ? { id: 'deployment', status: 'passed', summary: 'Docker Compose deployment contract validated', details: [] }
+      : { id: 'deployment', status: 'failed', summary: `${violations.length} deployment verification failure(s)`, details: violations };
+  };
+}
+
+export function verifyDeployment(root = process.cwd()) {
+  return createDeploymentVerifier()(root);
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
