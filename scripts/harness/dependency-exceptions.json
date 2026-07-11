@@ -1,13 +1,5 @@
 [
   {
-    "advisoryId": 1112877,
-    "package": "fastify",
-    "rationale": "Pre-existing finding requires a separately reviewed Fastify major upgrade.",
-    "owner": "Armada engineering",
-    "introduced": "2026-07-09",
-    "expires": "2026-10-07"
-  },
-  {
     "advisoryId": 1113465,
     "package": "minimatch",
     "rationale": "Pre-existing finding requires a separately reviewed TypeScript ESLint major upgrade.",
@@ -27,22 +19,6 @@
     "advisoryId": 1113552,
     "package": "minimatch",
     "rationale": "Pre-existing finding requires a separately reviewed TypeScript ESLint major upgrade.",
-    "owner": "Armada engineering",
-    "introduced": "2026-07-09",
-    "expires": "2026-10-07"
-  },
-  {
-    "advisoryId": 1117870,
-    "package": "fast-uri",
-    "rationale": "Pre-existing finding requires a separately reviewed Fastify major upgrade.",
-    "owner": "Armada engineering",
-    "introduced": "2026-07-09",
-    "expires": "2026-10-07"
-  },
-  {
-    "advisoryId": 1117884,
-    "package": "fast-uri",
-    "rationale": "Pre-existing finding requires a separately reviewed Fastify major upgrade.",
     "owner": "Armada engineering",
     "introduced": "2026-07-09",
     "expires": "2026-10-07"
