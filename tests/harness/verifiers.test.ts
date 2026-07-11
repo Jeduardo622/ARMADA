@@ -14,6 +14,8 @@ import {
 } from '../../scripts/harness/unity-ci-evidence.mjs';
 import { buildUnityTestArgs } from '../../scripts/harness/verify-unity-tests.mjs';
 import { createUnityProjectSandbox } from '../../scripts/harness/unity-project-sandbox.mjs';
+import { buildPostgresRunArgs, installSignalCleanup } from '../../scripts/harness/verify-database.mjs';
+import { validateDeploymentConfig } from '../../scripts/harness/verify-deployment.mjs';
 import {
   buildUnityCompileArgs,
   classifyUnityCompilation,
@@ -68,6 +70,8 @@ describe('repository verifiers', () => {
       'test',
       'build',
       'contracts',
+      'database',
+      'deployment',
       'unity_static',
       'unity_compilation',
       'unity_tests',
@@ -75,6 +79,69 @@ describe('repository verifiers', () => {
       'secrets',
       'harness_policy'
     ]);
+  });
+
+  it('uses an isolated PostgreSQL container for migration verification', () => {
+    expect(buildPostgresRunArgs('armada-db-verify-123')).toEqual([
+      'run',
+      '--detach',
+      '--rm',
+      '--name',
+      'armada-db-verify-123',
+      '--env',
+      'POSTGRES_USER=armada_verify',
+      '--env',
+      'POSTGRES_PASSWORD=armada_verify',
+      '--env',
+      'POSTGRES_DB=armada_verify',
+      '--health-cmd',
+      'pg_isready -U armada_verify -d armada_verify',
+      '--health-interval',
+      '1s',
+      '--health-timeout',
+      '5s',
+      '--health-retries',
+      '30',
+      '--publish',
+      '127.0.0.1::5432',
+      'postgres:16-alpine'
+    ]);
+  });
+
+  it('requires the documented database URL to match the Compose host port', () => {
+    const compose = {
+      services: {
+        postgres: {
+          image: 'postgres:16-alpine',
+          environment: { POSTGRES_USER: 'postgres', POSTGRES_PASSWORD: 'postgres', POSTGRES_DB: 'armada' },
+          ports: [{ target: 5432, published: '15432' }],
+          healthcheck: { test: ['CMD-SHELL', 'pg_isready -U postgres'] }
+        }
+      }
+    };
+    expect(validateDeploymentConfig(compose, 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/armada\n'))
+      .toContain('DATABASE_URL port 5432 does not match Compose PostgreSQL host port 15432');
+    expect(validateDeploymentConfig(compose, 'DATABASE_URL=postgres://postgres:postgres@localhost:15432/armada\n'))
+      .toEqual([]);
+    expect(validateDeploymentConfig(compose, 'DATABASE_URL=mysql://wrong:wrong@localhost:15432/not_armada\n'))
+      .toEqual(expect.arrayContaining([
+        '.env.example DATABASE_URL must use PostgreSQL',
+        'DATABASE_URL username does not match Compose POSTGRES_USER',
+        'DATABASE_URL password does not match Compose POSTGRES_PASSWORD',
+        'DATABASE_URL database does not match Compose POSTGRES_DB'
+      ]));
+  });
+
+  it('makes interruption cleanup idempotent', () => {
+    let cleanupCount = 0;
+    const signalCleanup = installSignalCleanup('armada-db-verify-test', () => cleanupCount++);
+    try {
+      signalCleanup.cleanup();
+      signalCleanup.cleanup();
+      expect(cleanupCount).toBe(1);
+    } finally {
+      signalCleanup.dispose();
+    }
   });
 
   it('preserves protected classification and rollback metadata in verification reports', () => {
