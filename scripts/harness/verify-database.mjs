@@ -22,7 +22,7 @@ export function buildPostgresRunArgs(containerName) {
   ];
 }
 
-function run(command, args, options = {}) {
+function defaultRun(command, args, options = {}) {
   return spawnSync(command, args, {
     cwd: options.cwd,
     encoding: 'utf8',
@@ -36,20 +36,20 @@ function commandFailure(label, result) {
   return `${label} failed${output ? `: ${output.slice(-2000)}` : ''}`;
 }
 
-function waitForHealthy(containerName, timeoutMs = 60_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const inspect = run('docker', ['inspect', '--format', '{{.State.Health.Status}}', containerName]);
+function waitForHealthy(containerName, dependencies, timeoutMs = 60_000) {
+  const deadline = dependencies.now() + timeoutMs;
+  while (dependencies.now() < deadline) {
+    const inspect = dependencies.runCommand('docker', ['inspect', '--format', '{{.State.Health.Status}}', containerName]);
     if (inspect.status === 0 && inspect.stdout.trim() === 'healthy') return null;
     if (inspect.status !== 0 || inspect.stdout.trim() === 'unhealthy') {
       return commandFailure('PostgreSQL container health check', inspect);
     }
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
+    dependencies.sleep(1000);
   }
   return `PostgreSQL container did not become healthy within ${timeoutMs}ms`;
 }
 
-export function installSignalCleanup(containerName, removeContainer = () => run('docker', ['rm', '--force', containerName])) {
+export function installSignalCleanup(containerName, removeContainer = () => defaultRun('docker', ['rm', '--force', containerName])) {
   let cleaned = false;
   const cleanup = () => {
     if (cleaned) return;
@@ -75,28 +75,39 @@ export function installSignalCleanup(containerName, removeContainer = () => run(
   };
 }
 
-export function verifyDatabase(root = process.cwd()) {
-  const containerName = `armada-db-verify-${process.pid}-${Date.now()}`;
-  const details = [];
-  let started = false;
-  let signalCleanup;
-  try {
-    const docker = run('docker', ['version', '--format', '{{.Server.Version}}']);
+export function createDatabaseVerifier(overrides = {}) {
+  const dependencies = {
+    runCommand: defaultRun,
+    now: () => Date.now(),
+    sleep: (milliseconds) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds),
+    ...overrides
+  };
+
+  return function verifyDatabaseWithDependencies(root = process.cwd()) {
+    const containerName = `armada-db-verify-${process.pid}-${dependencies.now()}`;
+    const details = [];
+    let started = false;
+    let signalCleanup;
+    try {
+      const docker = dependencies.runCommand('docker', ['version', '--format', '{{.Server.Version}}']);
     if (docker.status !== 0) details.push(commandFailure('Docker availability check', docker));
     if (details.length === 0) {
-      const start = run('docker', buildPostgresRunArgs(containerName));
+      const start = dependencies.runCommand('docker', buildPostgresRunArgs(containerName));
       started = start.status === 0;
-      if (started) signalCleanup = installSignalCleanup(containerName);
+      if (started) {
+        signalCleanup = installSignalCleanup(containerName, () =>
+          dependencies.runCommand('docker', ['rm', '--force', containerName]));
+      }
       if (!started) details.push(commandFailure('Ephemeral PostgreSQL startup', start));
     }
     if (details.length === 0) {
-      const healthFailure = waitForHealthy(containerName);
+      const healthFailure = waitForHealthy(containerName, dependencies);
       if (healthFailure) details.push(healthFailure);
     }
 
     let databaseUrl;
     if (details.length === 0) {
-      const port = run('docker', ['port', containerName, '5432/tcp']);
+      const port = dependencies.runCommand('docker', ['port', containerName, '5432/tcp']);
       const match = port.stdout.trim().match(/:(\d+)$/);
       if (port.status !== 0 || !match) details.push(commandFailure('Ephemeral PostgreSQL port discovery', port));
       else databaseUrl = `postgresql://${VERIFY_USER}:${VERIFY_PASSWORD}@127.0.0.1:${match[1]}/${VERIFY_DATABASE}`;
@@ -109,7 +120,11 @@ export function verifyDatabase(root = process.cwd()) {
         ['Prisma migration deployment', ['migrate', 'deploy']],
         ['Prisma migration status', ['migrate', 'status']]
       ]) {
-        const result = run(process.execPath, [resolve(root, 'node_modules/prisma/build/index.js'), ...args], { cwd: root, env });
+        const result = dependencies.runCommand(
+          process.execPath,
+          [resolve(root, 'node_modules/prisma/build/index.js'), ...args],
+          { cwd: root, env }
+        );
         if (result.status !== 0) {
           details.push(commandFailure(label, result));
           break;
@@ -119,14 +134,19 @@ export function verifyDatabase(root = process.cwd()) {
   } finally {
     if (started) {
       signalCleanup?.dispose();
-      const cleanup = run('docker', ['rm', '--force', containerName]);
+      const cleanup = dependencies.runCommand('docker', ['rm', '--force', containerName]);
       if (cleanup.status !== 0) details.push(commandFailure('Ephemeral PostgreSQL cleanup', cleanup));
     }
   }
 
-  return details.length === 0
-    ? { id: 'database', status: 'passed', summary: 'Prisma migrations verified against ephemeral PostgreSQL', details: [] }
-    : { id: 'database', status: 'failed', summary: `${details.length} database verification failure(s)`, details };
+    return details.length === 0
+      ? { id: 'database', status: 'passed', summary: 'Prisma migrations verified against ephemeral PostgreSQL', details: [] }
+      : { id: 'database', status: 'failed', summary: `${details.length} database verification failure(s)`, details };
+  };
+}
+
+export function verifyDatabase(root = process.cwd()) {
+  return createDatabaseVerifier()(root);
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
