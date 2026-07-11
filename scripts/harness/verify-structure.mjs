@@ -15,6 +15,7 @@ export const REQUIRED_HARNESS_FILES = [
   '.codex/skills/security-review/SKILL.md',
   '.codex/skills/release-readiness/SKILL.md',
   'scripts/harness/policy.json',
+  'scripts/harness/resolve-ci-scope.mjs',
   'scripts/harness/launch-unity-mcp.mjs',
   'scripts/harness/unity-ci-evidence.mjs',
   'scripts/harness/unity-project-sandbox.mjs',

@@ -16,6 +16,7 @@ import { buildUnityTestArgs } from '../../scripts/harness/verify-unity-tests.mjs
 import { createUnityProjectSandbox } from '../../scripts/harness/unity-project-sandbox.mjs';
 import { buildPostgresRunArgs, installSignalCleanup } from '../../scripts/harness/verify-database.mjs';
 import { validateDeploymentConfig } from '../../scripts/harness/verify-deployment.mjs';
+import { determineCiScope, formatGitHubOutput } from '../../scripts/harness/resolve-ci-scope.mjs';
 import {
   buildUnityCompileArgs,
   classifyUnityCompilation,
@@ -106,6 +107,31 @@ describe('repository verifiers', () => {
       '127.0.0.1::5432',
       'postgres:16-alpine'
     ]);
+  });
+
+  it('requires licensed Unity CI only for Unity scope or forced main verification', () => {
+    expect(determineCiScope(['src/app.ts'], {})).toEqual({
+      changedPaths: ['src/app.ts'],
+      unityRequired: false
+    });
+    expect(determineCiScope(['unity/Assets/Armada/UI/MissionUIController.cs'], {})).toMatchObject({
+      unityRequired: true
+    });
+    expect(determineCiScope(['.codex/config.toml'], {})).toMatchObject({ unityRequired: true });
+    expect(determineCiScope(['.github/workflows/ci.yml'], {})).toMatchObject({ unityRequired: true });
+    for (const path of [
+      'scripts/harness/resolve-ci-scope.mjs',
+      'scripts/harness/verify-local.mjs',
+      'scripts/harness/classifier.mjs',
+      'scripts/harness/policy.json',
+      'scripts/harness/unity-ci-evidence.mjs',
+      'scripts/harness/verify-unity-compile.mjs',
+      'scripts/harness/verify-unity-tests.mjs'
+    ]) {
+      expect(determineCiScope([path], {}), path).toMatchObject({ unityRequired: true });
+    }
+    expect(determineCiScope([], { FORCE_UNITY: '1' })).toMatchObject({ unityRequired: true });
+    expect(formatGitHubOutput({ unityRequired: true })).toBe('unity_required=true\n');
   });
 
   it('requires the documented database URL to match the Compose host port', () => {

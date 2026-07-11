@@ -38,7 +38,10 @@
     },
     {
       "id": "unity_ci",
-      "pathPatterns": ["^\\.github/workflows/ci\\.yml$"],
+      "pathPatterns": [
+        "^\\.github/workflows/ci\\.yml$",
+        "^scripts/harness/(?:(?:resolve-ci-scope|unity-ci-evidence|verify-local|classifier|verify-unity-(?:compile|tests))(?:\\.d)?\\.m(?:js|ts)|policy\\.json)$"
+      ],
       "intentPatterns": ["unity ci", "game-?ci", "unity test workflow", "licensed unity"],
       "reviewers": ["Engineering", "Security", "Unity"],
       "checks": ["harness_structure", "lint", "typecheck", "test", "unity_static", "unity_compilation", "unity_tests", "secrets", "harness_policy"]

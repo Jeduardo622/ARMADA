@@ -70,11 +70,11 @@
     },
     "expected": {
       "classification": "C",
-      "reasons": ["protected path: engineering_harness", "protected intent: engineering_harness"],
-      "protectedAreas": ["engineering_harness"],
+      "reasons": ["protected path: unity_ci", "protected path: engineering_harness", "protected intent: engineering_harness"],
+      "protectedAreas": ["engineering_harness", "unity_ci"],
       "allowedActions": ["plan", "read", "report_required_approval"],
-      "requiredReviewers": ["Engineering", "Security"],
-      "requiredChecks": ["harness_policy", "harness_structure", "lint", "test", "typecheck"]
+      "requiredReviewers": ["Engineering", "Security", "Unity"],
+      "requiredChecks": ["harness_policy", "harness_structure", "lint", "secrets", "test", "typecheck", "unity_compilation", "unity_static", "unity_tests"]
     }
   },
   {
