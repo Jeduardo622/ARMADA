@@ -103,6 +103,16 @@ describe('sim stub', () => {
 });
 
 describe('auth + ownership guards', () => {
+  it('rejects tab-suffixed JSON content types', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/telemetry/ingest',
+      headers: { 'content-type': 'application/json\ta' },
+      payload: JSON.stringify({ schemaVersion: 1, payload: { event: 'test' } })
+    });
+    expect(res.statusCode).toBe(415);
+  });
+
   it('blocks access when player id mismatches token subject', async () => {
     const res = await app.inject({
       method: 'GET',
