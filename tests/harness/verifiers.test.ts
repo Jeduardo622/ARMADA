@@ -57,7 +57,7 @@ describe('repository verifiers', () => {
     expect(runEvaluations(process.cwd())).toMatchObject({
       id: 'harness_evals',
       status: 'passed',
-      fixtureCount: 17
+      fixtureCount: 18
     });
   });
 
