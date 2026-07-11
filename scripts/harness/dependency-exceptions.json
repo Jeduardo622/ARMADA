@@ -46,21 +46,5 @@
     "owner": "Armada engineering",
     "introduced": "2026-07-09",
     "expires": "2026-10-07"
-  },
-  {
-    "advisoryId": 1120126,
-    "package": "vitest",
-    "rationale": "Pre-existing finding requires a separately reviewed Vitest major upgrade; the UI server is not used by required CI.",
-    "owner": "Armada engineering",
-    "introduced": "2026-07-09",
-    "expires": "2026-10-07"
-  },
-  {
-    "advisoryId": 1120789,
-    "package": "vite",
-    "rationale": "Pre-existing finding requires a separately reviewed Vitest major upgrade; required CI does not expose a Vite server.",
-    "owner": "Armada engineering",
-    "introduced": "2026-07-09",
-    "expires": "2026-10-07"
   }
 ]
