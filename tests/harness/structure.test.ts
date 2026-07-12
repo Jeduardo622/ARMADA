@@ -119,6 +119,7 @@ describe('engineering harness structure', () => {
     expect(workflow).toContain('permission-profile: ":read-only"');
     expect(workflow).toContain('working-directory: ${{ runner.temp }}/codex-shadow-workspace');
     expect(workflow).toContain('prompt-file: ${{ runner.temp }}/codex-shadow-workspace/shadow-evaluation-prompt.md');
+    expect(workflow).toContain('output-file: ${{ runner.temp }}/codex-shadow-workspace/codex-shadow-response.json');
     expect(workflow).toContain('output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json');
     expect(workflow).toContain("codex-args: '[\"--ephemeral\"]'");
     expect(workflow).toContain('if: always()');
@@ -149,13 +150,22 @@ describe('engineering harness structure', () => {
     expect(prompt).toContain('complete authoritative public context below');
     expect(prompt).toContain('Preserve the exact suite version and fixture IDs');
     expect(prompt).toContain('`rationaleSummary`');
-    expect(evaluateJob.trimEnd()).toMatch(/uses: openai\/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56[\s\S]*codex-args: '\["--ephemeral"\]'$/);
+    const actionStep = evaluateJob.indexOf('name: Run read-only shadow evaluation');
+    const transportStep = evaluateJob.indexOf('name: Encode bounded response for secret-safe transport');
+    expect(actionStep).toBeGreaterThan(-1);
+    expect(transportStep).toBeGreaterThan(actionStep);
+    expect(evaluateJob.slice(transportStep)).toContain('codex-shadow-transport.mjs" encode');
+    expect(evaluateJob.slice(transportStep)).not.toContain('secrets.');
+    expect(evaluateJob.trimEnd()).toMatch(/--github-output "\$GITHUB_OUTPUT"$/);
     expect(evaluateJob.match(/secrets\.OPENAI_API_KEY/g)).toHaveLength(1);
     expect(gradeJob).toContain("if: ${{ always() && github.ref == 'refs/heads/main' }}");
     expect(gradeJob.match(/ref: \$\{\{ github\.sha \}\}/g)).toHaveLength(1);
     expect(gradeJob.match(/persist-credentials: false/g)).toHaveLength(1);
     expect(gradeJob).not.toMatch(/^ {4}environment:/m);
     expect(gradeJob).not.toContain('secrets.');
+    expect(gradeJob).toContain('CODEX_SHADOW_RESPONSE_B64: ${{ needs.evaluate.outputs.response-b64 }}');
+    expect(gradeJob).toContain('codex-shadow-transport.mjs decode');
+    expect(gradeJob).not.toContain('needs.evaluate.outputs.response }}');
 
     const uploadStep = gradeJob.indexOf('name: Upload sanitized shadow report');
     const propagationStep = gradeJob.indexOf('name: Propagate infrastructure failure');

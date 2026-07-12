@@ -120,6 +120,13 @@ Raw responses and provider diagnostics are never uploaded. Secret-like output is
 replaced with rule and fixture identifiers before report generation. Static
 artifact paths prevent path injection.
 
+The official action writes its structured response to a runner-temporary file.
+A single fixed, non-credentialed transport step enforces the 64 KiB bound,
+base64-encodes the response into a GitHub job output, and deletes the temporary
+raw file. This avoids GitHub secret-mask suppression of raw JSON job outputs.
+The secret-free grade job validates the envelope before decoding it. Only the
+sanitized grader reports are uploaded.
+
 ## Local and CI Verification
 
 Secret-free replay mode grades committed responses and runs in `test:harness`.
@@ -127,7 +134,8 @@ Unit tests cover valid scoring, Class D critical misses, false evidence claims,
 unknown/missing cases, malformed and oversized output, unsafe fixture IDs,
 secret redaction, action failure, and atomic report output. Structure tests prove
 manual-only triggering, read-only permissions, trusted-main checkout, protected
-environment use, pinned actions, action-last credential isolation, timeouts,
+environment use, pinned actions, final-credentialed-action isolation, bounded
+encoded transport, timeouts,
 concurrency, artifact retention, and absence from required CI.
 
 The live workflow is complete only after the protected change is human-merged

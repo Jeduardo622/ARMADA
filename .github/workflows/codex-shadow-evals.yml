@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 15
     environment: codex-shadow-evals
     outputs:
-      response: ${{ steps.codex.outputs.final-message }}
+      response-b64: ${{ steps.transport.outputs.response-b64 }}
     steps:
       - name: Check out trusted main revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -41,6 +41,7 @@ jobs:
           install -D -m 0444 source/unity/AGENTS.md "$eval_root/unity/AGENTS.md"
           install -D -m 0444 source/scripts/harness/policy.json "$eval_root/scripts/harness/policy.json"
           install -D -m 0444 source/scripts/harness/codex-shadow-response.schema.json "$eval_root/scripts/harness/codex-shadow-response.schema.json"
+          install -D -m 0444 source/scripts/harness/codex-shadow-transport.mjs "$eval_root/scripts/harness/codex-shadow-transport.mjs"
           install -D -m 0444 source/tests/harness/fixtures/codex-shadow-evals.json "$eval_root/tests/harness/fixtures/codex-shadow-evals.json"
           install -D -m 0444 source/.github/codex/prompts/shadow-evals.md "$eval_root/.github/codex/prompts/shadow-evals.md"
           prompt_file="$eval_root/shadow-evaluation-prompt.md"
@@ -59,6 +60,7 @@ jobs:
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt-file: ${{ runner.temp }}/codex-shadow-workspace/shadow-evaluation-prompt.md
+          output-file: ${{ runner.temp }}/codex-shadow-workspace/codex-shadow-response.json
           working-directory: ${{ runner.temp }}/codex-shadow-workspace
           codex-version: 0.144.1
           model: gpt-5.3-codex
@@ -67,6 +69,16 @@ jobs:
           permission-profile: ":read-only"
           output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json
           codex-args: '["--ephemeral"]'
+
+      - name: Encode bounded response for secret-safe transport
+        id: transport
+        shell: bash
+        env:
+          RESPONSE_PATH: ${{ runner.temp }}/codex-shadow-workspace/codex-shadow-response.json
+        run: |
+          node "$RUNNER_TEMP/codex-shadow-workspace/scripts/harness/codex-shadow-transport.mjs" encode \
+            --input "$RESPONSE_PATH" \
+            --github-output "$GITHUB_OUTPUT"
 
   grade:
     name: Grade and publish sanitized evidence
@@ -94,11 +106,12 @@ jobs:
         id: grade
         shell: bash
         env:
-          CODEX_SHADOW_RESPONSE: ${{ needs.evaluate.outputs.response }}
+          CODEX_SHADOW_RESPONSE_B64: ${{ needs.evaluate.outputs.response-b64 }}
           CODEX_SHADOW_UPSTREAM_STATUS: ${{ needs.evaluate.result }}
         run: |
           set +e
-          node -e "require('node:fs').writeFileSync(process.argv[1], process.env.CODEX_SHADOW_RESPONSE || '')" "$RUNNER_TEMP/codex-shadow-response.json"
+          node scripts/harness/codex-shadow-transport.mjs decode \
+            --output "$RUNNER_TEMP/codex-shadow-response.json"
           node scripts/harness/codex-shadow-evals.mjs \
             --grade-response "$RUNNER_TEMP/codex-shadow-response.json" \
             --upstream-status "$CODEX_SHADOW_UPSTREAM_STATUS"
