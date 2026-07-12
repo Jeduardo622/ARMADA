@@ -136,6 +136,10 @@ describe('engineering harness structure', () => {
     expect(evaluateJob).toContain('path: source');
     expect(evaluateJob).toContain('rm -rf "$GITHUB_WORKSPACE/source"');
     expect(evaluateJob).toContain('test ! -e "$eval_root/.git"');
+    for (const guide of ['.github/AGENTS.md', 'docs/agents.md', 'src/AGENTS.md', 'tests/AGENTS.md', 'prisma/AGENTS.md', 'unity/AGENTS.md']) {
+      expect(evaluateJob).toContain(`source/${guide} "$eval_root/${guide}"`);
+    }
+    expect(evaluateJob).toContain('find "$eval_root" -iname agents.md -type f | wc -l)" -eq 7');
     expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"');
     expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"');
     expect(evaluateJob.trimEnd()).toMatch(/uses: openai\/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56[\s\S]*codex-args: '\["--ephemeral"\]'$/);
