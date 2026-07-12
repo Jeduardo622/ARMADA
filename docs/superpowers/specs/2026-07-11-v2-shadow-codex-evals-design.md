@@ -40,8 +40,9 @@ The credentialed `evaluate` job performs repository preparation before invoking
 `openai/codex-action` pinned to commit
 `52fe01ec70a42f454c9d2ebd47598f9fd6893d56`. The action is the final step in
 that job. It receives `OPENAI_API_KEY` only through its dedicated input, uses
-Codex CLI `0.144.1`, model `gpt-5.3-codex`, medium reasoning, `drop-sudo`, a
-read-only sandbox, an ephemeral session, and the committed output schema. The
+Codex CLI `0.144.1`, model `gpt-5.3-codex`, medium reasoning, `drop-sudo`, the
+`:read-only` permission profile, an ephemeral session, and the committed output
+schema through `output-schema-file`. The
 job exposes only the action's schema-constrained final message.
 
 A separate secret-free `grade` job runs even when evaluation fails. It treats

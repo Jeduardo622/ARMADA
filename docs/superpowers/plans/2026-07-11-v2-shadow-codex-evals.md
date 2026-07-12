@@ -15,7 +15,7 @@
 - The workflow is not part of `ci.yml`, `verify:local`, or branch protection.
 - Workflow permissions are `contents: read`; checkout credentials are not persisted.
 - The API key is supplied only to the Codex Action in the protected `codex-shadow-evals` environment.
-- Codex runs with `drop-sudo`, `sandbox: read-only`, an ephemeral session, and strict JSON Schema output.
+- Codex runs with `drop-sudo`, `permission-profile: :read-only`, an ephemeral session, and strict JSON Schema output through `output-schema-file`.
 - Quality misses are shadow evidence and exit zero; infrastructure or validation defects fail nonzero after artifact generation.
 - Reports contain no raw transcripts, chain-of-thought, environment values, provider headers, or unredacted secret-like output.
 - Case count is exactly 10, response size is at most 64 KiB, each rationale is at most 500 characters, and artifact retention is 14 days.
@@ -141,7 +141,7 @@ git commit -m "feat: grade shadow Codex evaluations"
 
 - [ ] **Step 1: Write failing workflow structure tests**
 
-Assert manual-only trigger, `contents: read`, concurrency, timeouts, `environment: codex-shadow-evals`, exact main-ref/SHA guard, checkout `persist-credentials: false`, pinned checkout/Codex/upload actions, CLI version `0.144.1`, model `gpt-5.3-codex`, medium effort, `drop-sudo`, read-only sandbox, output schema, no PR/push trigger, no write permissions, no `continue-on-error`, 14-day retention, and no reference from `ci.yml`.
+Assert manual-only trigger, `contents: read`, concurrency, timeouts, `environment: codex-shadow-evals`, exact main-ref/SHA guard, checkout `persist-credentials: false`, pinned checkout/Codex/upload actions, CLI version `0.144.1`, model `gpt-5.3-codex`, medium effort, `drop-sudo`, `permission-profile: :read-only`, `output-schema-file`, no PR/push trigger, no write permissions, no `continue-on-error`, 14-day retention, and no reference from `ci.yml`.
 
 - [ ] **Step 2: Run structure tests and verify red**
 
