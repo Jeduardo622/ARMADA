@@ -136,7 +136,7 @@ git commit -m "feat: grade shadow Codex evaluations"
 
 **Interfaces:**
 - Consumes: committed suite and JSON Schema from Tasks 1-2.
-- Produces: manual workflow with `evaluate` job output `response` and secret-free `grade` job.
+- Produces: manual workflow with bounded `evaluate` job output `response-b64` and secret-free `grade` job.
 - Produces: artifact `codex-shadow-eval-<sha>` containing only sanitized reports.
 
 - [ ] **Step 1: Write failing workflow structure tests**
@@ -151,7 +151,7 @@ Expected: FAIL because the V2 workflow and prompt are absent.
 
 - [ ] **Step 3: Implement prompt and two-job workflow**
 
-The prompt instructs Codex to read only `AGENTS.md`, nested guides, policy, and the fixture corpus; return the complete schema result array; avoid tools beyond repository reads; and never emit hidden reasoning. The action remains the final step in the credentialed job. The grade job receives the bounded final message, writes reports, appends the sanitized summary, uploads with `if: always()` and `if-no-files-found: error`, then propagates infrastructure failure.
+The prompt embeds only `AGENTS.md`, applicable nested guides, policy, the public fixture corpus, and the response schema; requires the complete schema result array; forbids tools; and never requests hidden reasoning. The official action is the final credentialed step. One fixed post-action step bounds and base64-encodes the temporary response file, deletes the raw file, and exposes only the encoded envelope to the secret-free grade job. The grade job validates and decodes the envelope, writes reports, appends the sanitized summary, uploads with `if: always()` and `if-no-files-found: error`, then propagates infrastructure failure.
 
 - [ ] **Step 4: Update protected policy, routing fixture, and structure references**
 
