@@ -7,4 +7,4 @@ export function validateSuite(value: unknown): ValidationResult;
 export function validateResponse(value: unknown, suite: any): ValidationResult;
 export function scoreResponse(caseDefinition: any, response: any): CaseScore;
 export function gradeShadowEvaluation(input: { suite: any; response: unknown; metadata?: ShadowMetadata }): ShadowReport;
-export function writeShadowReports(root: string, report: ShadowReport): Promise<{ resultsPath: string; summaryPath: string }>;
+export function writeShadowReports(root: string, report: ShadowReport, hooks?: { beforeResultsInstall?: () => void | Promise<void> }): Promise<{ resultsPath: string; summaryPath: string }>;
