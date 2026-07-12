@@ -58,6 +58,7 @@ describe("shadow Codex prompt builder", () => {
       expect(prompt).toContain("export function classifyTask");
       expect(prompt).toContain("does not override");
       expect(prompt).toContain("Class D stop and no-fallthrough invariants");
+      expect(prompt).toContain("continue through the final protected-area entry");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

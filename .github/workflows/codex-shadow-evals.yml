@@ -64,7 +64,7 @@ jobs:
           working-directory: ${{ runner.temp }}/codex-shadow-workspace
           codex-version: 0.144.1
           model: gpt-5.3-codex
-          effort: medium
+          effort: high
           safety-strategy: drop-sudo
           permission-profile: ":read-only"
           output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json

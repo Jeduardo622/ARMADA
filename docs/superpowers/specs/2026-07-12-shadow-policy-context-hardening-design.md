@@ -37,6 +37,14 @@ Its precedence is limited to classifier routing fields and cannot override the
 read-only boundary, untrusted-input handling, Class D invariants, claim honesty,
 or response schema.
 
+## Evaluation Effort
+
+Hosted evidence still showed inconsistent traversal of overlapping protected
+area regexes at medium reasoning effort. Manual shadow evaluation therefore uses
+high effort and explicitly requires traversal through the final protected-area
+entry because one path may match multiple areas. The model, corpus, scorer,
+threshold, weights, and critical rules remain unchanged.
+
 ## Verification
 
 - Contract tests require the structured algorithm and Class D invariants.

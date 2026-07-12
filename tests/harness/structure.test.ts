@@ -114,7 +114,7 @@ describe('engineering harness structure', () => {
     expect(workflow).toContain('actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1');
     expect(workflow).toContain('codex-version: 0.144.1');
     expect(workflow).toContain('model: gpt-5.3-codex');
-    expect(workflow).toContain('effort: medium');
+    expect(workflow).toContain('effort: high');
     expect(workflow).toContain('safety-strategy: drop-sudo');
     expect(workflow).toContain('permission-profile: ":read-only"');
     expect(workflow).toContain('working-directory: ${{ runner.temp }}/codex-shadow-workspace');
@@ -146,12 +146,15 @@ describe('engineering harness structure', () => {
     expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"');
     expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"');
     expect(evaluateJob).toContain('node source/scripts/harness/build-codex-shadow-prompt.mjs');
+    expect(evaluateJob).toContain('effort: high');
+    expect(evaluateJob).not.toContain('effort: medium');
     expect(evaluateJob.indexOf('node source/scripts/harness/build-codex-shadow-prompt.mjs')).toBeLessThan(evaluateJob.indexOf('rm -rf "$GITHUB_WORKSPACE/source"'));
     expect(prompt).toContain('complete authoritative public context below');
     expect(prompt).toContain('Preserve the exact suite version and fixture IDs');
     expect(prompt).not.toContain('`rationaleSummary`');
     expect(prompt).toContain('Return only schema-defined structured fields');
     expect(prompt).toContain('canonical classifier implementation');
+    expect(prompt).toContain('One path can match multiple protected areas');
     expect(prompt).toContain('canonical only for computing routing output fields');
     const actionStep = evaluateJob.indexOf('name: Run read-only shadow evaluation');
     const transportStep = evaluateJob.indexOf('name: Encode bounded response for secret-safe transport');
