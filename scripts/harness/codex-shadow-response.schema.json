@@ -7,42 +7,47 @@
   "properties": {
     "schemaVersion": { "const": 1 },
     "suiteVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
-    "results": {
-      "type": "array",
-      "minItems": 10,
-      "maxItems": 10,
-      "items": { "$ref": "#/$defs/shadowResponse" }
-    }
+    "results": { "type": "array", "minItems": 10, "maxItems": 10, "items": { "$ref": "#/$defs/shadowResponse" } }
   },
   "$defs": {
     "shadowResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["caseId", "classification", "decision", "protectedAreas", "requiredReviewers", "requiredChecks", "allowedActions", "implementationAllowed", "evidenceStatus", "rationale"],
+      "required": ["fixtureId", "classification", "decision", "protectedAreas", "requiredReviewers", "requiredChecks", "allowedActions", "checkClaims", "rollback", "rationaleSummary"],
       "properties": {
-        "caseId": { "type": "string", "pattern": "^[a-z0-9-]+$", "minLength": 1, "maxLength": 64 },
+        "fixtureId": { "type": "string", "pattern": "^[a-z0-9-]+$", "minLength": 1, "maxLength": 64 },
         "classification": { "type": "string", "enum": ["A", "B", "C", "D"] },
-        "decision": { "type": "string", "enum": ["advisory", "implement", "approval-required", "refuse"] },
+        "decision": { "type": "string", "enum": ["proceed", "plan_only", "stop"] },
         "protectedAreas": { "$ref": "#/$defs/stringSet" },
         "requiredReviewers": { "$ref": "#/$defs/stringSet" },
         "requiredChecks": { "$ref": "#/$defs/checkSet" },
         "allowedActions": { "$ref": "#/$defs/stringSet" },
-        "implementationAllowed": { "type": "boolean" },
-        "evidenceStatus": { "type": "string", "enum": ["not-run", "passed", "failed", "blocked", "not-applicable"] },
-        "rationale": { "type": "string", "minLength": 1, "maxLength": 500 }
+        "checkClaims": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/checkClaim" } },
+        "rollback": { "$ref": "#/$defs/rollback" },
+        "rationaleSummary": { "type": "string", "minLength": 1, "maxLength": 500 }
       }
     },
-    "stringSet": {
-      "type": "array",
-      "maxItems": 10,
-      "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    "checkClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "executed", "evidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "status": { "type": "string", "enum": ["not-run", "passed", "failed", "blocked", "not-applicable"] },
+        "executed": { "type": "boolean" },
+        "evidence": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
     },
-    "checkSet": {
-      "type": "array",
-      "maxItems": 20,
-      "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
-    }
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "instructions"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "instructions": { "type": ["string", "null"], "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "stringSet": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } },
+    "checkSet": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } }
   }
 }

@@ -19,7 +19,7 @@ const REQUIRED_CATEGORIES = [
 
 const SAFE_ID = /^[a-z0-9-]+$/;
 const CLASSIFICATIONS = new Set(["A", "B", "C", "D"]);
-const DECISIONS = new Set(["advisory", "implement", "approval-required", "refuse"]);
+const DECISIONS = new Set(["proceed", "plan_only", "stop"]);
 const EVIDENCE_STATUSES = new Set(["not-run", "passed", "failed", "blocked", "not-applicable"]);
 
 function expectBoundedString(value: unknown, maximum: number): asserts value is string {
@@ -32,6 +32,21 @@ function expectStringArray(value: unknown, maximumItems: number, maximumLength: 
   expect(Array.isArray(value)).toBe(true);
   expect((value as unknown[]).length).toBeLessThanOrEqual(maximumItems);
   for (const item of value as unknown[]) expectBoundedString(item, maximumLength);
+  expect(new Set(value as string[]).size).toBe((value as string[]).length);
+}
+
+function expectCheckClaims(value: unknown): void {
+  expect(Array.isArray(value)).toBe(true);
+  const claims = value as Array<Record<string, unknown>>;
+  expect(claims.length).toBeLessThanOrEqual(20);
+  expect(new Set(claims.map(({ id }) => id)).size).toBe(claims.length);
+  for (const claim of claims) {
+    expect(Object.keys(claim).sort()).toEqual(["evidence", "executed", "id", "status"]);
+    expectBoundedString(claim.id, 64);
+    expect(EVIDENCE_STATUSES.has(claim.status as string)).toBe(true);
+    expect(typeof claim.executed).toBe("boolean");
+    expectBoundedString(claim.evidence, 256);
+  }
 }
 
 function expectStrictObjects(schema: unknown, path = "$"): void {
@@ -55,14 +70,18 @@ describe("shadow Codex evaluation contract", () => {
       expect(testCase.id).toMatch(SAFE_ID);
       expectBoundedString(testCase.prompt, 1_000);
       expectStringArray(testCase.changedPaths, 10, 256);
+      expectCheckClaims(testCase.suppliedCheckObservations);
       expect(CLASSIFICATIONS.has(testCase.expected.classification)).toBe(true);
       expect(DECISIONS.has(testCase.expected.decision)).toBe(true);
       expectStringArray(testCase.expected.protectedAreas, 10, 64);
       expectStringArray(testCase.expected.requiredReviewers, 10, 64);
       expectStringArray(testCase.expected.requiredChecks, 20, 64);
       expectStringArray(testCase.expected.allowedActions, 10, 64);
-      expect(typeof testCase.expected.implementationAllowed).toBe("boolean");
-      expect(EVIDENCE_STATUSES.has(testCase.expected.evidenceStatus)).toBe(true);
+      expectCheckClaims(testCase.expected.checkClaims);
+      expect(Object.keys(testCase.expected.rollback).sort()).toEqual(["instructions", "required"]);
+      expect(typeof testCase.expected.rollback.required).toBe("boolean");
+      if (testCase.expected.rollback.required) expectBoundedString(testCase.expected.rollback.instructions, 500);
+      else expect(testCase.expected.rollback.instructions).toBeNull();
     }
   });
 
@@ -70,25 +89,30 @@ describe("shadow Codex evaluation contract", () => {
     expect(replay.schemaVersion).toBe(1);
     expect(replay.suiteVersion).toBe(suite.suiteVersion);
     expect(replay.results).toHaveLength(10);
-    expect(replay.results.map(({ caseId }) => caseId).sort()).toEqual(suite.cases.map(({ id }) => id).sort());
+    expect(replay.results.map(({ fixtureId }) => fixtureId).sort()).toEqual(suite.cases.map(({ id }) => id).sort());
 
     for (const testCase of suite.cases) {
-      const result = replay.results.find(({ caseId }) => caseId === testCase.id);
+      const result = replay.results.find(({ fixtureId }) => fixtureId === testCase.id);
       expect(result).toBeDefined();
       expect(result).toMatchObject(testCase.expected);
-      expect(result?.rationale.length).toBeGreaterThan(0);
-      expect(result?.rationale.length).toBeLessThanOrEqual(500);
+      expectStringArray(result?.protectedAreas, 10, 64);
+      expectStringArray(result?.requiredReviewers, 10, 64);
+      expectStringArray(result?.requiredChecks, 20, 64);
+      expectStringArray(result?.allowedActions, 10, 64);
+      expectCheckClaims(result?.checkClaims);
+      expect(result?.rationaleSummary.length).toBeGreaterThan(0);
+      expect(result?.rationaleSummary.length).toBeLessThanOrEqual(500);
       expect(Object.keys(result ?? {}).sort()).toEqual([
         "allowedActions",
-        "caseId",
+        "checkClaims",
         "classification",
         "decision",
-        "evidenceStatus",
-        "implementationAllowed",
+        "fixtureId",
         "protectedAreas",
-        "rationale",
+        "rationaleSummary",
         "requiredChecks",
         "requiredReviewers",
+        "rollback",
       ]);
     }
   });
@@ -99,8 +123,8 @@ describe("shadow Codex evaluation contract", () => {
     expect(responseSchema.required).toEqual(["schemaVersion", "suiteVersion", "results"]);
     expect(responseSchema.properties.results.maxItems).toBe(10);
     expect(responseSchema.properties.results.minItems).toBe(10);
-    expect(responseSchema.$defs.shadowResponse.properties.caseId.pattern).toBe("^[a-z0-9-]+$");
-    expect(responseSchema.$defs.shadowResponse.properties.rationale.maxLength).toBe(500);
+    expect(responseSchema.$defs.shadowResponse.properties.fixtureId.pattern).toBe("^[a-z0-9-]+$");
+    expect(responseSchema.$defs.shadowResponse.properties.rationaleSummary.maxLength).toBe(500);
     expectStrictObjects(responseSchema);
   });
 });
