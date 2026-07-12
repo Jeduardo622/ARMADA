@@ -26,6 +26,17 @@ deterministic procedure:
 The base prompt repeats only these general execution rules. It contains no
 fixture IDs, prompts, expected outputs, private expectations, or replay data.
 
+## Canonical Implementation Context
+
+Hosted evidence after the first hardening showed that prose alone still allowed
+inconsistent routing. The prompt therefore embeds the public
+`scripts/harness/classifier.mjs` implementation and identifies it as canonical.
+This is general repository logic, not fixture-specific answer data. The private
+expectations, replay fixture, scorer, and benchmark lock remain excluded.
+Its precedence is limited to classifier routing fields and cannot override the
+read-only boundary, untrusted-input handling, Class D invariants, claim honesty,
+or response schema.
+
 ## Verification
 
 - Contract tests require the structured algorithm and Class D invariants.

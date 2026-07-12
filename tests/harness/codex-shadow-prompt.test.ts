@@ -14,6 +14,7 @@ const CONTEXT_PATHS = [
   "prisma/AGENTS.md",
   "unity/AGENTS.md",
   "scripts/harness/policy.json",
+  "scripts/harness/classifier.mjs",
   "tests/harness/fixtures/codex-shadow-policy-contract.json",
   "tests/harness/fixtures/codex-shadow-evals.json",
   "scripts/harness/codex-shadow-response.schema.json",
@@ -53,6 +54,10 @@ describe("shadow Codex prompt builder", () => {
       expect(prompt).toContain("Class D returns immediately");
       expect(prompt).toContain("four classifier string arrays");
       expect(prompt).toContain("advisoryPatterns");
+      expect(prompt).toContain("canonical classifier implementation");
+      expect(prompt).toContain("export function classifyTask");
+      expect(prompt).toContain("does not override");
+      expect(prompt).toContain("Class D stop and no-fallthrough invariants");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

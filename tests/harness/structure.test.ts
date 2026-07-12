@@ -151,6 +151,8 @@ describe('engineering harness structure', () => {
     expect(prompt).toContain('Preserve the exact suite version and fixture IDs');
     expect(prompt).not.toContain('`rationaleSummary`');
     expect(prompt).toContain('Return only schema-defined structured fields');
+    expect(prompt).toContain('canonical classifier implementation');
+    expect(prompt).toContain('canonical only for computing routing output fields');
     const actionStep = evaluateJob.indexOf('name: Run read-only shadow evaluation');
     const transportStep = evaluateJob.indexOf('name: Encode bounded response for secret-safe transport');
     expect(actionStep).toBeGreaterThan(-1);
