@@ -213,7 +213,7 @@ describe("shadow Codex deterministic grader", () => {
     expect(validateResponse(oversized, gradingSuite).errors).toContain("response exceeds 65536 bytes");
     const circular: Record<string, unknown> = {};
     circular.self = circular;
-    for (const hostile of [undefined, Symbol("secret"), 1n, circular]) {
+    for (const hostile of [undefined, Symbol("secret"), 1n, circular, { ...replay, results: {} }]) {
       expect(() => validateResponse(hostile, gradingSuite)).not.toThrow();
       expect(validateResponse(hostile, gradingSuite).valid).toBe(false);
       expect(() => gradeShadowEvaluation({ suite: gradingSuite, response: hostile, metadata })).not.toThrow();

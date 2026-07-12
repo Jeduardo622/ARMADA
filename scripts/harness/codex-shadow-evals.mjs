@@ -126,10 +126,11 @@ export function validateResponse(value, suite) {
   if (!exactKeys(value, ["results", "schemaVersion", "suiteVersion"])) errors.push("response must contain exact top-level keys");
   if (value.schemaVersion !== 1) errors.push("response schemaVersion must be 1");
   if (value.suiteVersion !== suite?.suiteVersion) errors.push("response suiteVersion does not match suite");
-  if (!Array.isArray(value.results) || value.results.length !== 10) errors.push("response must contain exactly 10 results");
-  for (const item of value.results ?? []) validateResult(item, errors);
+  const results = Array.isArray(value.results) ? value.results : [];
+  if (!Array.isArray(value.results) || results.length !== 10) errors.push("response must contain exactly 10 results");
+  for (const item of results) validateResult(item, errors);
   const expectedIds = (suite?.cases ?? []).map(({ id }) => id).sort();
-  const actualIds = (value.results ?? []).map(({ fixtureId }) => fixtureId).sort();
+  const actualIds = results.map(({ fixtureId }) => fixtureId).sort();
   if (JSON.stringify(actualIds) !== JSON.stringify(expectedIds)) errors.push("results must contain exactly the suite fixture IDs");
   return { valid: errors.length === 0, errors: [...new Set(errors)] };
 }
