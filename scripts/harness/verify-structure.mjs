@@ -19,6 +19,7 @@ export const REQUIRED_HARNESS_FILES = [
   'scripts/harness/policy.json',
   'scripts/harness/codex-shadow-evals.mjs',
   'scripts/harness/codex-shadow-evals.d.mts',
+  'scripts/harness/build-codex-shadow-prompt.mjs',
   'scripts/harness/codex-shadow-response.schema.json',
   'scripts/harness/resolve-ci-scope.mjs',
   'scripts/harness/launch-unity-mcp.mjs',
@@ -30,7 +31,8 @@ export const REQUIRED_HARNESS_FILES = [
   'scripts/harness/verify-unity-tests.mjs',
   'tests/harness/fixtures/codex-shadow-evals.json',
   'tests/harness/fixtures/codex-shadow-expectations.json',
-  'tests/harness/fixtures/codex-shadow-responses.json'
+  'tests/harness/fixtures/codex-shadow-responses.json',
+  'tests/harness/codex-shadow-prompt.test.ts'
 ];
 
 const ROOT_REQUIREMENTS = [

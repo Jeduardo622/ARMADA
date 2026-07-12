@@ -102,6 +102,7 @@ describe('engineering harness structure', () => {
   it('isolates manual shadow Codex evaluations from required CI', () => {
     const workflow = readFileSync('.github/workflows/codex-shadow-evals.yml', 'utf8').replace(/\r\n/g, '\n');
     const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+    const prompt = readFileSync('.github/codex/prompts/shadow-evals.md', 'utf8');
 
     expect(workflow).toContain('on:\n  workflow_dispatch:');
     expect(workflow).not.toMatch(/\b(?:pull_request|push):/);
@@ -117,6 +118,7 @@ describe('engineering harness structure', () => {
     expect(workflow).toContain('safety-strategy: drop-sudo');
     expect(workflow).toContain('permission-profile: ":read-only"');
     expect(workflow).toContain('working-directory: ${{ runner.temp }}/codex-shadow-workspace');
+    expect(workflow).toContain('prompt-file: ${{ runner.temp }}/codex-shadow-workspace/shadow-evaluation-prompt.md');
     expect(workflow).toContain('output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json');
     expect(workflow).toContain("codex-args: '[\"--ephemeral\"]'");
     expect(workflow).toContain('if: always()');
@@ -142,6 +144,11 @@ describe('engineering harness structure', () => {
     expect(evaluateJob).toContain('find "$eval_root" -iname agents.md -type f | wc -l)" -eq 7');
     expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"');
     expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"');
+    expect(evaluateJob).toContain('node source/scripts/harness/build-codex-shadow-prompt.mjs');
+    expect(evaluateJob.indexOf('node source/scripts/harness/build-codex-shadow-prompt.mjs')).toBeLessThan(evaluateJob.indexOf('rm -rf "$GITHUB_WORKSPACE/source"'));
+    expect(prompt).toContain('complete authoritative public context below');
+    expect(prompt).toContain('Preserve the exact suite version and fixture IDs');
+    expect(prompt).toContain('`rationaleSummary`');
     expect(evaluateJob.trimEnd()).toMatch(/uses: openai\/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56[\s\S]*codex-args: '\["--ephemeral"\]'$/);
     expect(evaluateJob.match(/secrets\.OPENAI_API_KEY/g)).toHaveLength(1);
     expect(gradeJob).toContain("if: ${{ always() && github.ref == 'refs/heads/main' }}");
