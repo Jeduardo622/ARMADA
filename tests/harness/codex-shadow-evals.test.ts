@@ -64,7 +64,10 @@ function expectCheckClaims(value: unknown): void {
 function expectStrictObjects(schema: unknown, path = "$"): void {
   if (!schema || typeof schema !== "object") return;
   const node = schema as Record<string, unknown>;
-  if (node.type === "object") expect(node.additionalProperties, path).toBe(false);
+  if (node.type === "object") {
+    expect(node.additionalProperties, path).toBe(false);
+    expect([...(node.required as string[])].sort(), path).toEqual(Object.keys(node.properties as Record<string, unknown>).sort());
+  }
   for (const [key, value] of Object.entries(node)) {
     if (key !== "additionalProperties") expectStrictObjects(value, `${path}.${key}`);
   }
@@ -134,14 +137,16 @@ describe("shadow Codex evaluation contract", () => {
   });
 
   it("defines a strict bounded response JSON Schema", () => {
-    expect(responseSchema.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
     expect(responseSchema.type).toBe("object");
+    expect(responseSchema.properties.schemaVersion).toEqual({ type: "integer", const: 1 });
     expect(responseSchema.required).toEqual(["schemaVersion", "suiteVersion", "results"]);
     expect(responseSchema.properties.results.maxItems).toBe(10);
     expect(responseSchema.properties.results.minItems).toBe(10);
+    expect(JSON.stringify(responseSchema)).not.toContain('"uniqueItems"');
     expect(responseSchema.$defs.shadowResponse.properties.fixtureId.pattern).toBe("^[a-z0-9-]+$");
     expect(responseSchema.$defs.shadowResponse.properties.rationaleSummary.maxLength).toBe(500);
-    expect(responseSchema.$defs.rollback.allOf).toHaveLength(1);
+    expect(responseSchema.$defs.rollback.anyOf).toHaveLength(2);
+    expect(JSON.stringify(responseSchema)).not.toMatch(/"(?:allOf|not|dependentRequired|dependentSchemas|if|then|else|uniqueItems)"/);
     expectStrictObjects(responseSchema);
   });
 });
@@ -155,6 +160,12 @@ describe("shadow Codex deterministic grader", () => {
     expect(validateResponse({ ...replay, extra: true }, gradingSuite).valid).toBe(false);
     expect(validateResponse({ ...replay, results: replay.results.slice(1) }, gradingSuite).errors).toContain("results must contain exactly the suite fixture IDs");
     expect(validateResponse({ ...replay, results: [...replay.results, { ...replay.results[0], fixtureId: "unknown" }] }, gradingSuite).valid).toBe(false);
+    const duplicateResponseSet = structuredClone(replay);
+    duplicateResponseSet.results[0].allowedActions = [duplicateResponseSet.results[0].allowedActions[0], duplicateResponseSet.results[0].allowedActions[0]];
+    expect(validateResponse(duplicateResponseSet, gradingSuite).valid).toBe(false);
+    const duplicateResponseClaims = structuredClone(replay);
+    duplicateResponseClaims.results[9].checkClaims = [duplicateResponseClaims.results[9].checkClaims[0], duplicateResponseClaims.results[9].checkClaims[0]];
+    expect(validateResponse(duplicateResponseClaims, gradingSuite).valid).toBe(false);
     expect(validateSuite({ ...gradingSuite, cases: [{ ...gradingSuite.cases[0], id: "../unsafe" }] }).valid).toBe(false);
     const relabeled = structuredClone(gradingSuite);
     relabeled.cases[6].category = "advisory";
