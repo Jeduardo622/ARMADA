@@ -31,6 +31,8 @@ export const REQUIRED_HARNESS_FILES = [
   'scripts/harness/verify-deployment.mjs',
   'scripts/harness/verify-unity-tests.mjs',
   'tests/harness/fixtures/codex-shadow-evals.json',
+  'tests/harness/fixtures/codex-shadow-benchmark-lock.json',
+  'tests/harness/fixtures/codex-shadow-policy-contract.json',
   'tests/harness/fixtures/codex-shadow-expectations.json',
   'tests/harness/fixtures/codex-shadow-responses.json',
   'tests/harness/codex-shadow-prompt.test.ts',
