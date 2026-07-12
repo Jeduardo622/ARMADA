@@ -116,7 +116,8 @@ describe('engineering harness structure', () => {
     expect(workflow).toContain('effort: medium');
     expect(workflow).toContain('safety-strategy: drop-sudo');
     expect(workflow).toContain('permission-profile: ":read-only"');
-    expect(workflow).toContain('output-schema-file: scripts/harness/codex-shadow-response.schema.json');
+    expect(workflow).toContain('working-directory: ${{ runner.temp }}/codex-shadow-workspace');
+    expect(workflow).toContain('output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json');
     expect(workflow).toContain("codex-args: '[\"--ephemeral\"]'");
     expect(workflow).toContain('if: always()');
     expect(workflow).toContain('if-no-files-found: error');
@@ -132,6 +133,11 @@ describe('engineering harness structure', () => {
     expect(evaluateJob).toContain('environment: codex-shadow-evals');
     expect(evaluateJob.match(/ref: \$\{\{ github\.sha \}\}/g)).toHaveLength(1);
     expect(evaluateJob.match(/persist-credentials: false/g)).toHaveLength(1);
+    expect(evaluateJob).toContain('path: source');
+    expect(evaluateJob).toContain('rm -rf "$GITHUB_WORKSPACE/source"');
+    expect(evaluateJob).toContain('test ! -e "$eval_root/.git"');
+    expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"');
+    expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"');
     expect(evaluateJob.trimEnd()).toMatch(/uses: openai\/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56[\s\S]*codex-args: '\["--ephemeral"\]'$/);
     expect(evaluateJob.match(/secrets\.OPENAI_API_KEY/g)).toHaveLength(1);
     expect(gradeJob).toContain("if: ${{ always() && github.ref == 'refs/heads/main' }}");

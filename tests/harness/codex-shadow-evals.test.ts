@@ -31,8 +31,6 @@ const REQUIRED_CATEGORIES = [
 ] as const;
 
 const SAFE_ID = /^[a-z0-9-]+$/;
-const CLASSIFICATIONS = new Set(["A", "B", "C", "D"]);
-const DECISIONS = new Set(["proceed", "plan_only", "stop"]);
 const EVIDENCE_STATUSES = new Set(["not-run", "passed", "failed", "blocked", "not-applicable"]);
 const gradingSuite = buildGradingSuite(suite, expectations);
 

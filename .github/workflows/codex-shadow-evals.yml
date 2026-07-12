@@ -25,19 +25,36 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+          path: source
+
+      - name: Build isolated evaluation workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval_root="$RUNNER_TEMP/codex-shadow-workspace"
+          install -D -m 0444 source/AGENTS.md "$eval_root/AGENTS.md"
+          install -D -m 0444 source/scripts/harness/policy.json "$eval_root/scripts/harness/policy.json"
+          install -D -m 0444 source/scripts/harness/codex-shadow-response.schema.json "$eval_root/scripts/harness/codex-shadow-response.schema.json"
+          install -D -m 0444 source/tests/harness/fixtures/codex-shadow-evals.json "$eval_root/tests/harness/fixtures/codex-shadow-evals.json"
+          install -D -m 0444 source/.github/codex/prompts/shadow-evals.md "$eval_root/.github/codex/prompts/shadow-evals.md"
+          rm -rf "$GITHUB_WORKSPACE/source"
+          test ! -e "$eval_root/.git"
+          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"
+          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"
 
       - name: Run read-only shadow evaluation
         id: codex
         uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .github/codex/prompts/shadow-evals.md
+          prompt-file: ${{ runner.temp }}/codex-shadow-workspace/.github/codex/prompts/shadow-evals.md
+          working-directory: ${{ runner.temp }}/codex-shadow-workspace
           codex-version: 0.144.1
           model: gpt-5.3-codex
           effort: medium
           safety-strategy: drop-sudo
           permission-profile: ":read-only"
-          output-schema-file: scripts/harness/codex-shadow-response.schema.json
+          output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json
           codex-args: '["--ephemeral"]'
 
   grade:
