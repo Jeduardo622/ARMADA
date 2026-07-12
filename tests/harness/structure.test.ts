@@ -137,7 +137,7 @@ describe('engineering harness structure', () => {
     expect(gradeJob).toContain("if: ${{ always() && github.ref == 'refs/heads/main' }}");
     expect(gradeJob.match(/ref: \$\{\{ github\.sha \}\}/g)).toHaveLength(1);
     expect(gradeJob.match(/persist-credentials: false/g)).toHaveLength(1);
-    expect(gradeJob).not.toMatch(/^    environment:/m);
+    expect(gradeJob).not.toMatch(/^ {4}environment:/m);
     expect(gradeJob).not.toContain('secrets.');
 
     const uploadStep = gradeJob.indexOf('name: Upload sanitized shadow report');
