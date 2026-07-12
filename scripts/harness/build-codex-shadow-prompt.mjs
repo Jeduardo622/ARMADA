@@ -11,6 +11,7 @@ export const SHADOW_PROMPT_CONTEXT_PATHS = Object.freeze([
   "prisma/AGENTS.md",
   "unity/AGENTS.md",
   "scripts/harness/policy.json",
+  "tests/harness/fixtures/codex-shadow-policy-contract.json",
   "tests/harness/fixtures/codex-shadow-evals.json",
   "scripts/harness/codex-shadow-response.schema.json",
 ]);

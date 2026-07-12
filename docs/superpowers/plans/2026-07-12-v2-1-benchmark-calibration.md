@@ -29,20 +29,23 @@ are required.
    public contract, prompt allowlist entry, structure entry, and protected path.
 4. Rerun the focused tests. Expected: pass.
 
-### Task 2: Semantic rollback and evidence scoring
+### Task 2: Structured rollback and verification-claim scoring
 
 **Files:**
 - Modify `tests/harness/codex-shadow-evals.test.ts`
+- Modify `tests/harness/fixtures/codex-shadow-expectations.json`
+- Modify `tests/harness/fixtures/codex-shadow-responses.json`
+- Modify `scripts/harness/codex-shadow-response.schema.json`
 - Modify `scripts/harness/codex-shadow-evals.mjs`
 - Modify `scripts/harness/codex-shadow-evals.d.mts`
 
-1. Add failing tests for safe rollback paraphrases, vague and unsafe rollback,
-   exact claim tuples with paraphrased status-consistent evidence, missing and
-   extra claims, status/executed mismatch, inconsistent prose, and unsupported
-   passed claims. Snapshot the fixed weights and every Class D critical rule.
+1. Add failing tests for allowed and disallowed rollback action/target tuples,
+   verification mismatches, missing and extra claims, status/executed mismatch,
+   old prose fields, and unsupported passed claims. Snapshot fixed weights and
+   every Class D critical rule.
 2. Run `npx vitest run tests/harness/codex-shadow-evals.test.ts`.
-   Expected: semantic paraphrases fail under exact JSON equality.
-3. Implement semantic rollback/evidence predicates and reason-code generation.
+   Expected: the old prose contract fails the structured assertions.
+3. Implement structured rollback/claim validators and reason-code generation.
    Keep all exact classification/decision/set scoring and critical gates.
 4. Rerun the focused test. Expected: pass with replay 100.
 
@@ -66,7 +69,7 @@ are required.
 1. Run `npm run verify:structure`, `npm run verify:harness`,
    `npm run verify:policy`, `npm run verify:secrets`, and
    `npm run eval:codex:shadow:replay` with bundled Node 24.
-2. Run `npm run verify:local` with rollback instructions.
+2. Run `npm run verify:local` and record the protected rollback procedure.
 3. Independently review benchmark integrity, answer-key isolation, report
    sanitization, Class D gates, and false-pass behavior.
 4. Commit, push `codex/v2-1-benchmark-calibration`, open a Class C PR, and wait

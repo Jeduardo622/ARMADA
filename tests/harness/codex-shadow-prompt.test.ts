@@ -14,6 +14,7 @@ const CONTEXT_PATHS = [
   "prisma/AGENTS.md",
   "unity/AGENTS.md",
   "scripts/harness/policy.json",
+  "tests/harness/fixtures/codex-shadow-policy-contract.json",
   "tests/harness/fixtures/codex-shadow-evals.json",
   "scripts/harness/codex-shadow-response.schema.json",
 ] as const;
@@ -46,6 +47,7 @@ describe("shadow Codex prompt builder", () => {
       expect(prompt).not.toContain("codex-shadow-responses.json");
       expect(prompt).not.toContain(readFileSync("tests/harness/fixtures/codex-shadow-expectations.json", "utf8"));
       expect(prompt).not.toContain(readFileSync("tests/harness/fixtures/codex-shadow-responses.json", "utf8"));
+      expect(prompt).not.toContain("rationaleSummary");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

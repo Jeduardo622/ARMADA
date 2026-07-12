@@ -149,7 +149,8 @@ describe('engineering harness structure', () => {
     expect(evaluateJob.indexOf('node source/scripts/harness/build-codex-shadow-prompt.mjs')).toBeLessThan(evaluateJob.indexOf('rm -rf "$GITHUB_WORKSPACE/source"'));
     expect(prompt).toContain('complete authoritative public context below');
     expect(prompt).toContain('Preserve the exact suite version and fixture IDs');
-    expect(prompt).toContain('`rationaleSummary`');
+    expect(prompt).not.toContain('`rationaleSummary`');
+    expect(prompt).toContain('Return only schema-defined structured fields');
     const actionStep = evaluateJob.indexOf('name: Run read-only shadow evaluation');
     const transportStep = evaluateJob.indexOf('name: Encode bounded response for secret-safe transport');
     expect(actionStep).toBeGreaterThan(-1);

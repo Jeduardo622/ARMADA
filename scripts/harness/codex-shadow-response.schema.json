@@ -11,7 +11,7 @@
     "shadowResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fixtureId", "classification", "decision", "protectedAreas", "requiredReviewers", "requiredChecks", "allowedActions", "checkClaims", "rollback", "rationaleSummary"],
+      "required": ["fixtureId", "classification", "decision", "protectedAreas", "requiredReviewers", "requiredChecks", "allowedActions", "checkClaims", "rollback"],
       "properties": {
         "fixtureId": { "type": "string", "pattern": "^[a-z0-9-]+$", "minLength": 1, "maxLength": 64 },
         "classification": { "type": "string", "enum": ["A", "B", "C", "D"] },
@@ -21,19 +21,17 @@
         "requiredChecks": { "$ref": "#/$defs/checkSet" },
         "allowedActions": { "$ref": "#/$defs/stringSet" },
         "checkClaims": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/checkClaim" } },
-        "rollback": { "$ref": "#/$defs/rollback" },
-        "rationaleSummary": { "type": "string", "minLength": 1, "maxLength": 500 }
+        "rollback": { "$ref": "#/$defs/rollback" }
       }
     },
     "checkClaim": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "status", "executed", "evidence"],
+      "required": ["id", "status", "executed"],
       "properties": {
         "id": { "type": "string", "minLength": 1, "maxLength": 64 },
         "status": { "type": "string", "enum": ["not-run", "passed", "failed", "blocked", "not-applicable"] },
-        "executed": { "type": "boolean" },
-        "evidence": { "type": "string", "minLength": 1, "maxLength": 256 }
+        "executed": { "type": "boolean" }
       }
     },
     "rollback": {
@@ -41,19 +39,23 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["required", "instructions"],
+          "required": ["required", "action", "target", "verificationPlanned"],
           "properties": {
             "required": { "type": "boolean", "const": true },
-            "instructions": { "type": "string", "minLength": 1, "maxLength": 500 }
+            "action": { "type": "string", "enum": ["revert", "restore", "rollback", "uninstall"] },
+            "target": { "type": "string", "enum": ["change", "commit", "configuration", "files", "migration", "package", "schema", "workflow"] },
+            "verificationPlanned": { "type": "boolean", "const": true }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["required", "instructions"],
+          "required": ["required", "action", "target", "verificationPlanned"],
           "properties": {
             "required": { "type": "boolean", "const": false },
-            "instructions": { "type": "null" }
+            "action": { "type": "string", "const": "none" },
+            "target": { "type": "string", "const": "none" },
+            "verificationPlanned": { "type": "boolean", "const": false }
           }
         }
       ]
