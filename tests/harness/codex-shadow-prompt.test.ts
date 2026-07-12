@@ -48,6 +48,11 @@ describe("shadow Codex prompt builder", () => {
       expect(prompt).not.toContain(readFileSync("tests/harness/fixtures/codex-shadow-expectations.json", "utf8"));
       expect(prompt).not.toContain(readFileSync("tests/harness/fixtures/codex-shadow-responses.json", "utf8"));
       expect(prompt).not.toContain("rationaleSummary");
+      expect(prompt).toContain("evaluate every matching protected area");
+      expect(prompt).toContain("Do not return a subset");
+      expect(prompt).toContain("Class D returns immediately");
+      expect(prompt).toContain("four classifier string arrays");
+      expect(prompt).toContain("advisoryPatterns");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

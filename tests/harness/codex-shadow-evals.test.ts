@@ -126,10 +126,27 @@ describe("shadow Codex evaluation contract", () => {
 
   it("defines a general model-visible policy contract without fixture answers", () => {
     expect(policyContract).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       classifierPrecedence: ["prohibited", "protected", "advisory", "standard"],
       decisionByClass: { A: "plan_only", B: "proceed", C: "plan_only", D: "stop" },
       rollbackRequiredByClass: { A: false, B: true, C: true, D: false },
+      classifierAlgorithm: {
+        prohibited: { returnImmediately: true, requiredChecks: ["harness_policy"] },
+        protected: { evaluateEveryArea: true, combineMatches: "set_union" },
+        advisory: { docsOnlyOrNoPaths: true, patternSource: "advisoryPatterns", classification: "A" },
+        standard: { fallbackClassification: "B" },
+        normalization: {
+          classifierArrays: ["allowedActions", "protectedAreas", "requiredChecks", "requiredReviewers"],
+          operation: "unique_lexicographic_sort",
+          aliasesAllowed: false,
+        },
+      },
+      classDInvariants: {
+        decision: "stop",
+        requiredChecks: ["harness_policy"],
+        rollbackRequired: false,
+        mayFallThrough: false,
+      },
     });
     const serialized = JSON.stringify(policyContract);
     for (const testCase of suite.cases) {
@@ -137,6 +154,10 @@ describe("shadow Codex evaluation contract", () => {
       expect(serialized).not.toContain(testCase.prompt);
     }
     expect(serialized).not.toContain('"expected"');
+    expect(serialized).toContain("checkScopes");
+    expect(serialized).toContain("protectedAreas");
+    expect(serialized).toContain("first matching prohibited intent");
+    expect(serialized).toContain("docs-only or has no changed paths");
   });
   it("defines exactly ten bounded cases with unique safe IDs and required categories", () => {
     expect(suite.schemaVersion).toBe(1);
