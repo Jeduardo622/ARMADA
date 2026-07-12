@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://armada.local/schemas/codex-shadow-response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "suiteVersion", "results"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "suiteVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "results": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/shadowResponse" }
+    }
+  },
+  "$defs": {
+    "shadowResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "classification", "decision", "protectedAreas", "requiredReviewers", "requiredChecks", "allowedActions", "implementationAllowed", "evidenceStatus", "rationale"],
+      "properties": {
+        "caseId": { "type": "string", "pattern": "^[a-z0-9-]+$", "minLength": 1, "maxLength": 64 },
+        "classification": { "type": "string", "enum": ["A", "B", "C", "D"] },
+        "decision": { "type": "string", "enum": ["advisory", "implement", "approval-required", "refuse"] },
+        "protectedAreas": { "$ref": "#/$defs/stringSet" },
+        "requiredReviewers": { "$ref": "#/$defs/stringSet" },
+        "requiredChecks": { "$ref": "#/$defs/checkSet" },
+        "allowedActions": { "$ref": "#/$defs/stringSet" },
+        "implementationAllowed": { "type": "boolean" },
+        "evidenceStatus": { "type": "string", "enum": ["not-run", "passed", "failed", "blocked", "not-applicable"] },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "stringSet": {
+      "type": "array",
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "checkSet": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    }
+  }
+}
