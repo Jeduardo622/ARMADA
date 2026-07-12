@@ -57,6 +57,28 @@ function validateRollback(value) {
     (value.required ? typeof value.instructions === "string" && value.instructions.length > 0 && value.instructions.length <= 500 : value.instructions === null);
 }
 
+export function buildGradingSuite(publicSuite, privateExpectations) {
+  if (!exactKeys(publicSuite, ["cases", "schemaVersion", "suiteVersion"]) ||
+      !exactKeys(privateExpectations, ["expectations", "schemaVersion", "suiteVersion"]) ||
+      publicSuite.schemaVersion !== privateExpectations.schemaVersion ||
+      publicSuite.suiteVersion !== privateExpectations.suiteVersion ||
+      !Array.isArray(publicSuite.cases) || !Array.isArray(privateExpectations.expectations)) {
+    throw new Error("public suite and private expectations are incompatible");
+  }
+  const expectedById = new Map(privateExpectations.expectations.map((item) => [item?.id, item?.expected]));
+  if (expectedById.size !== publicSuite.cases.length || privateExpectations.expectations.length !== publicSuite.cases.length) {
+    throw new Error("private expectations must match public fixture IDs exactly");
+  }
+  const cases = publicSuite.cases.map((item) => {
+    if (!expectedById.has(item.id)) throw new Error("private expectations must match public fixture IDs exactly");
+    return { ...item, expected: expectedById.get(item.id) };
+  });
+  const suite = { ...publicSuite, cases };
+  const validation = validateSuite(suite);
+  if (!validation.valid) throw new Error(`invalid grading suite: ${validation.errors.join(", ")}`);
+  return suite;
+}
+
 export function validateSuite(value) {
   const errors = [];
   if (!exactKeys(value, ["cases", "schemaVersion", "suiteVersion"])) errors.push("suite must contain exact top-level keys");
@@ -220,7 +242,9 @@ async function main() {
   const upstreamIndex = args.indexOf("--upstream-status");
   const upstreamStatus = upstreamIndex >= 0 ? args[upstreamIndex + 1] : "success";
   const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-  const suite = JSON.parse(await readFile(join(root, "tests/harness/fixtures/codex-shadow-evals.json"), "utf8"));
+  const publicSuite = JSON.parse(await readFile(join(root, "tests/harness/fixtures/codex-shadow-evals.json"), "utf8"));
+  const privateExpectations = JSON.parse(await readFile(join(root, "tests/harness/fixtures/codex-shadow-expectations.json"), "utf8"));
+  const suite = buildGradingSuite(publicSuite, privateExpectations);
   let raw = null;
   try { raw = await readFile(resolve(args[modeIndex + 1]), "utf8"); } catch { /* sanitized invalid report below */ }
   const report = gradeShadowEvaluation({ suite, response: raw, metadata: { model: args[modeIndex] === "--replay" ? "replay" : "gpt-5.3-codex", commitSha: process.env.GITHUB_SHA ?? "local", workflowRunId: process.env.GITHUB_RUN_ID ?? "local", timestamp: new Date().toISOString(), upstreamStatus } });

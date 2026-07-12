@@ -45,7 +45,14 @@
       "properties": {
         "required": { "type": "boolean" },
         "instructions": { "type": ["string", "null"], "minLength": 1, "maxLength": 500 }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "required": { "const": true } }, "required": ["required"] },
+          "then": { "properties": { "instructions": { "type": "string", "minLength": 1, "maxLength": 500 } } },
+          "else": { "properties": { "instructions": { "type": "null" } } }
+        }
+      ]
     },
     "stringSet": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } },
     "checkSet": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } }

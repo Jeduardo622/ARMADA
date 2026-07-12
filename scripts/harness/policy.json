@@ -69,7 +69,7 @@
     },
     {
       "id": "codex_evals",
-      "pathPatterns": ["^\\.github/workflows/codex-shadow-evals\\.yml$", "^\\.github/codex/prompts/shadow-evals\\.md$", "^scripts/harness/codex-shadow-(?:evals(?:\\.d)?\\.m(?:js|ts)|response\\.schema\\.json)$", "^tests/harness/fixtures/codex-shadow-(?:evals|responses)\\.json$"],
+      "pathPatterns": ["^\\.github/workflows/codex-shadow-evals\\.yml$", "^\\.github/codex/prompts/shadow-evals\\.md$", "^scripts/harness/codex-shadow-(?:evals(?:\\.d)?\\.m(?:js|ts)|response\\.schema\\.json)$", "^tests/harness/fixtures/codex-shadow-(?:evals|expectations|responses)\\.json$"],
       "intentPatterns": ["shadow codex eval", "codex evaluation"],
       "reviewers": ["Engineering", "Security"],
       "checks": ["harness_structure", "harness_policy", "lint", "secrets", "test", "typecheck"]

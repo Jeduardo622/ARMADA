@@ -3,6 +3,7 @@ export interface CaseScore { score: number; breakdown: Record<string, number>; c
 export interface ShadowMetadata { model?: string; commitSha?: string; workflowRunId?: string; timestamp?: string; upstreamStatus?: string }
 export interface ShadowCaseResult { fixtureId: string; score: number; breakdown: Record<string, number>; criticalMisses: string[] }
 export interface ShadowReport { schemaVersion: 1; suiteVersion: string; status: "passed" | "failed" | "blocked" | "invalid"; model: string; commitSha: string; workflowRunId: string; timestamp: string; aggregateScore: number | null; evaluatedCases: number; criticalMisses: Array<{ fixtureId: string; rule: string }>; reasonCode: string | null; cases: ShadowCaseResult[] }
+export function buildGradingSuite(publicSuite: any, privateExpectations: any): any;
 export function validateSuite(value: unknown): ValidationResult;
 export function validateResponse(value: unknown, suite: any): ValidationResult;
 export function scoreResponse(caseDefinition: any, response: any): CaseScore;
