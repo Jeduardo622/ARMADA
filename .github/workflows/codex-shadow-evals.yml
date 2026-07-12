@@ -43,7 +43,7 @@ jobs:
   grade:
     name: Grade and publish sanitized evidence
     needs: evaluate
-    if: always()
+    if: ${{ always() && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

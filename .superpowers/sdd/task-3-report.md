@@ -10,3 +10,11 @@
 - Verification passed: `npm run verify:structure`, `npm run verify:harness`, `npm run verify:policy`, and `npm run verify:secrets`.
 - Rollback: revert the Task 3 commit; after the workflow is removed, delete the `codex-shadow-evals` GitHub environment if it was created.
 - Residual risk: hosted behavior remains unproven until human merge, protected-environment configuration, and a manual dispatch from merged `main`.
+
+## Review Fix
+
+- Root cause: `evaluate` was main-guarded, but `grade` used bare `always()`, allowing a non-main dispatch to execute repository-controlled grader setup and code after evaluation skipped.
+- TDD red: the job-scoped structure regression failed because `grade` lacked the trusted-main conjunction.
+- Fix: `grade` now uses `${{ always() && github.ref == 'refs/heads/main' }}` while retaining `always()` semantics after an attempted main evaluation.
+- Strengthened proof: tests independently assert both job guards and immutable `${{ github.sha }}` checkouts, both non-persisted credentials, no grade environment or secret scope, and upload-before-propagation with both steps using `always()`.
+- Review verification passed: focused harness (7 files, 106 tests), structure, harness policy/routing, policy schema, and secret scan.
