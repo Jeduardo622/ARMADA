@@ -43,6 +43,10 @@ jobs:
           install -D -m 0444 source/scripts/harness/codex-shadow-response.schema.json "$eval_root/scripts/harness/codex-shadow-response.schema.json"
           install -D -m 0444 source/tests/harness/fixtures/codex-shadow-evals.json "$eval_root/tests/harness/fixtures/codex-shadow-evals.json"
           install -D -m 0444 source/.github/codex/prompts/shadow-evals.md "$eval_root/.github/codex/prompts/shadow-evals.md"
+          prompt_file="$eval_root/shadow-evaluation-prompt.md"
+          node source/scripts/harness/build-codex-shadow-prompt.mjs \
+            --source-root source \
+            --output "$prompt_file"
           rm -rf "$GITHUB_WORKSPACE/source"
           test ! -e "$eval_root/.git"
           test "$(find "$eval_root" -iname agents.md -type f | wc -l)" -eq 7
@@ -54,7 +58,7 @@ jobs:
         uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: ${{ runner.temp }}/codex-shadow-workspace/.github/codex/prompts/shadow-evals.md
+          prompt-file: ${{ runner.temp }}/codex-shadow-workspace/shadow-evaluation-prompt.md
           working-directory: ${{ runner.temp }}/codex-shadow-workspace
           codex-version: 0.144.1
           model: gpt-5.3-codex
