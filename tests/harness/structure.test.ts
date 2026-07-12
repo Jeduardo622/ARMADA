@@ -99,6 +99,65 @@ describe('engineering harness structure', () => {
     expect(workflow).not.toContain('self-hosted');
   });
 
+  it('isolates manual shadow Codex evaluations from required CI', () => {
+    const workflow = readFileSync('.github/workflows/codex-shadow-evals.yml', 'utf8').replace(/\r\n/g, '\n');
+    const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+
+    expect(workflow).toContain('on:\n  workflow_dispatch:');
+    expect(workflow).not.toMatch(/\b(?:pull_request|push):/);
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).toContain('group: codex-shadow-evals-${{ github.ref }}');
+    expect(workflow).toContain('timeout-minutes: 15');
+    expect(workflow).toContain('actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0');
+    expect(workflow).toContain('openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56');
+    expect(workflow).toContain('actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1');
+    expect(workflow).toContain('codex-version: 0.144.1');
+    expect(workflow).toContain('model: gpt-5.3-codex');
+    expect(workflow).toContain('effort: medium');
+    expect(workflow).toContain('safety-strategy: drop-sudo');
+    expect(workflow).toContain('permission-profile: ":read-only"');
+    expect(workflow).toContain('working-directory: ${{ runner.temp }}/codex-shadow-workspace');
+    expect(workflow).toContain('output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json');
+    expect(workflow).toContain("codex-args: '[\"--ephemeral\"]'");
+    expect(workflow).toContain('if: always()');
+    expect(workflow).toContain('if-no-files-found: error');
+    expect(workflow).toContain('retention-days: 14');
+    expect(workflow).toContain('name: codex-shadow-eval-${{ github.sha }}');
+    expect(workflow).not.toMatch(/\b(?:issues|pull-requests|actions|checks|statuses|deployments|packages):\s*write\b/);
+    expect(workflow).not.toContain('continue-on-error');
+    expect(ciWorkflow).not.toContain('codex-shadow-evals');
+
+    const evaluateJob = workflow.slice(workflow.indexOf('  evaluate:'), workflow.indexOf('  grade:'));
+    const gradeJob = workflow.slice(workflow.indexOf('  grade:'));
+    expect(evaluateJob).toContain("if: github.ref == 'refs/heads/main' && github.sha != ''");
+    expect(evaluateJob).toContain('environment: codex-shadow-evals');
+    expect(evaluateJob.match(/ref: \$\{\{ github\.sha \}\}/g)).toHaveLength(1);
+    expect(evaluateJob.match(/persist-credentials: false/g)).toHaveLength(1);
+    expect(evaluateJob).toContain('path: source');
+    expect(evaluateJob).toContain('rm -rf "$GITHUB_WORKSPACE/source"');
+    expect(evaluateJob).toContain('test ! -e "$eval_root/.git"');
+    for (const guide of ['.github/AGENTS.md', 'docs/agents.md', 'src/AGENTS.md', 'tests/AGENTS.md', 'prisma/AGENTS.md', 'unity/AGENTS.md']) {
+      expect(evaluateJob).toContain(`source/${guide} "$eval_root/${guide}"`);
+    }
+    expect(evaluateJob).toContain('find "$eval_root" -iname agents.md -type f | wc -l)" -eq 7');
+    expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"');
+    expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"');
+    expect(evaluateJob.trimEnd()).toMatch(/uses: openai\/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56[\s\S]*codex-args: '\["--ephemeral"\]'$/);
+    expect(evaluateJob.match(/secrets\.OPENAI_API_KEY/g)).toHaveLength(1);
+    expect(gradeJob).toContain("if: ${{ always() && github.ref == 'refs/heads/main' }}");
+    expect(gradeJob.match(/ref: \$\{\{ github\.sha \}\}/g)).toHaveLength(1);
+    expect(gradeJob.match(/persist-credentials: false/g)).toHaveLength(1);
+    expect(gradeJob).not.toMatch(/^ {4}environment:/m);
+    expect(gradeJob).not.toContain('secrets.');
+
+    const uploadStep = gradeJob.indexOf('name: Upload sanitized shadow report');
+    const propagationStep = gradeJob.indexOf('name: Propagate infrastructure failure');
+    expect(uploadStep).toBeGreaterThan(-1);
+    expect(propagationStep).toBeGreaterThan(uploadStep);
+    expect(gradeJob.slice(uploadStep, propagationStep)).toContain('if: always()');
+    expect(gradeJob.slice(propagationStep)).toContain('if: always()');
+  });
+
   it.each(importableHarnessModules)('%s is portable when imported after CRLF checkout', (path) => {
     expect(readFileSync(path, 'utf8')).not.toMatch(/^#!/);
   });

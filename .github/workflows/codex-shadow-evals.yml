@@ -1,0 +1,122 @@
+name: Shadow Codex evaluations
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-shadow-evals-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Evaluate trusted fixtures
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: codex-shadow-evals
+    outputs:
+      response: ${{ steps.codex.outputs.final-message }}
+    steps:
+      - name: Check out trusted main revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: source
+
+      - name: Build isolated evaluation workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval_root="$RUNNER_TEMP/codex-shadow-workspace"
+          install -D -m 0444 source/AGENTS.md "$eval_root/AGENTS.md"
+          install -D -m 0444 source/.github/AGENTS.md "$eval_root/.github/AGENTS.md"
+          install -D -m 0444 source/docs/agents.md "$eval_root/docs/agents.md"
+          install -D -m 0444 source/src/AGENTS.md "$eval_root/src/AGENTS.md"
+          install -D -m 0444 source/tests/AGENTS.md "$eval_root/tests/AGENTS.md"
+          install -D -m 0444 source/prisma/AGENTS.md "$eval_root/prisma/AGENTS.md"
+          install -D -m 0444 source/unity/AGENTS.md "$eval_root/unity/AGENTS.md"
+          install -D -m 0444 source/scripts/harness/policy.json "$eval_root/scripts/harness/policy.json"
+          install -D -m 0444 source/scripts/harness/codex-shadow-response.schema.json "$eval_root/scripts/harness/codex-shadow-response.schema.json"
+          install -D -m 0444 source/tests/harness/fixtures/codex-shadow-evals.json "$eval_root/tests/harness/fixtures/codex-shadow-evals.json"
+          install -D -m 0444 source/.github/codex/prompts/shadow-evals.md "$eval_root/.github/codex/prompts/shadow-evals.md"
+          rm -rf "$GITHUB_WORKSPACE/source"
+          test ! -e "$eval_root/.git"
+          test "$(find "$eval_root" -iname agents.md -type f | wc -l)" -eq 7
+          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"
+          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"
+
+      - name: Run read-only shadow evaluation
+        id: codex
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: ${{ runner.temp }}/codex-shadow-workspace/.github/codex/prompts/shadow-evals.md
+          working-directory: ${{ runner.temp }}/codex-shadow-workspace
+          codex-version: 0.144.1
+          model: gpt-5.3-codex
+          effort: medium
+          safety-strategy: drop-sudo
+          permission-profile: ":read-only"
+          output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json
+          codex-args: '["--ephemeral"]'
+
+  grade:
+    name: Grade and publish sanitized evidence
+    needs: evaluate
+    if: ${{ always() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out evaluated revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Grade bounded action response
+        id: grade
+        shell: bash
+        env:
+          CODEX_SHADOW_RESPONSE: ${{ needs.evaluate.outputs.response }}
+          CODEX_SHADOW_UPSTREAM_STATUS: ${{ needs.evaluate.result }}
+        run: |
+          set +e
+          node -e "require('node:fs').writeFileSync(process.argv[1], process.env.CODEX_SHADOW_RESPONSE || '')" "$RUNNER_TEMP/codex-shadow-response.json"
+          node scripts/harness/codex-shadow-evals.mjs \
+            --grade-response "$RUNNER_TEMP/codex-shadow-response.json" \
+            --upstream-status "$CODEX_SHADOW_UPSTREAM_STATUS"
+          grade_status=$?
+          echo "status=$grade_status" >> "$GITHUB_OUTPUT"
+          if [ -f reports/harness/codex-shadow/summary.md ]; then
+            cat reports/harness/codex-shadow/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
+
+      - name: Upload sanitized shadow report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codex-shadow-eval-${{ github.sha }}
+          path: reports/harness/codex-shadow
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Propagate infrastructure failure
+        if: always()
+        shell: bash
+        env:
+          GRADE_STATUS: ${{ steps.grade.outputs.status }}
+        run: exit "${GRADE_STATUS:-1}"

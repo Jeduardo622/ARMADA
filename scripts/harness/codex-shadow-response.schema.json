@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://armada.local/schemas/codex-shadow-response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "suiteVersion", "results"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "suiteVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "results": { "type": "array", "minItems": 10, "maxItems": 10, "items": { "$ref": "#/$defs/shadowResponse" } }
+  },
+  "$defs": {
+    "shadowResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixtureId", "classification", "decision", "protectedAreas", "requiredReviewers", "requiredChecks", "allowedActions", "checkClaims", "rollback", "rationaleSummary"],
+      "properties": {
+        "fixtureId": { "type": "string", "pattern": "^[a-z0-9-]+$", "minLength": 1, "maxLength": 64 },
+        "classification": { "type": "string", "enum": ["A", "B", "C", "D"] },
+        "decision": { "type": "string", "enum": ["proceed", "plan_only", "stop"] },
+        "protectedAreas": { "$ref": "#/$defs/stringSet" },
+        "requiredReviewers": { "$ref": "#/$defs/stringSet" },
+        "requiredChecks": { "$ref": "#/$defs/checkSet" },
+        "allowedActions": { "$ref": "#/$defs/stringSet" },
+        "checkClaims": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/checkClaim" } },
+        "rollback": { "$ref": "#/$defs/rollback" },
+        "rationaleSummary": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "checkClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "executed", "evidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "status": { "type": "string", "enum": ["not-run", "passed", "failed", "blocked", "not-applicable"] },
+        "executed": { "type": "boolean" },
+        "evidence": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "instructions"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "instructions": { "type": ["string", "null"], "minLength": 1, "maxLength": 500 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "required": { "const": true } }, "required": ["required"] },
+          "then": { "properties": { "instructions": { "type": "string", "minLength": 1, "maxLength": 500 } } },
+          "else": { "properties": { "instructions": { "type": "null" } } }
+        }
+      ]
+    },
+    "stringSet": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } },
+    "checkSet": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } }
+  }
+}

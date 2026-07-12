@@ -78,6 +78,21 @@
     }
   },
   {
+    "id": "codex-shadow-evals-protected",
+    "input": {
+      "description": "Add a manual shadow Codex evaluation workflow",
+      "changedPaths": [".github/workflows/codex-shadow-evals.yml", ".github/codex/prompts/shadow-evals.md", "scripts/harness/codex-shadow-evals.mjs", "scripts/harness/codex-shadow-response.schema.json", "tests/harness/fixtures/codex-shadow-evals.json"]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": ["protected path: ci", "protected intent: ci", "protected path: engineering_harness", "protected path: codex_evals", "protected intent: codex_evals"],
+      "protectedAreas": ["ci", "codex_evals", "engineering_harness"],
+      "allowedActions": ["plan", "read", "report_required_approval"],
+      "requiredReviewers": ["Engineering", "Security"],
+      "requiredChecks": ["harness_policy", "harness_structure", "lint", "secrets", "test", "typecheck"]
+    }
+  },
+  {
     "id": "auth-protected",
     "input": { "description": "Change bearer token verification", "changedPaths": ["src/plugins/auth.ts"] },
     "expected": {

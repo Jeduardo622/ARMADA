@@ -9,12 +9,17 @@ export const REQUIRED_HARNESS_FILES = [
   'prisma/AGENTS.md',
   '.github/AGENTS.md',
   'tests/AGENTS.md',
+  '.github/workflows/codex-shadow-evals.yml',
+  '.github/codex/prompts/shadow-evals.md',
   '.codex/skills/backend-delivery/SKILL.md',
   '.codex/skills/unity-delivery/SKILL.md',
   '.codex/skills/qa-verification/SKILL.md',
   '.codex/skills/security-review/SKILL.md',
   '.codex/skills/release-readiness/SKILL.md',
   'scripts/harness/policy.json',
+  'scripts/harness/codex-shadow-evals.mjs',
+  'scripts/harness/codex-shadow-evals.d.mts',
+  'scripts/harness/codex-shadow-response.schema.json',
   'scripts/harness/resolve-ci-scope.mjs',
   'scripts/harness/launch-unity-mcp.mjs',
   'scripts/harness/unity-ci-evidence.mjs',
@@ -22,7 +27,10 @@ export const REQUIRED_HARNESS_FILES = [
   'scripts/harness/unity-test-results.mjs',
   'scripts/harness/verify-database.mjs',
   'scripts/harness/verify-deployment.mjs',
-  'scripts/harness/verify-unity-tests.mjs'
+  'scripts/harness/verify-unity-tests.mjs',
+  'tests/harness/fixtures/codex-shadow-evals.json',
+  'tests/harness/fixtures/codex-shadow-expectations.json',
+  'tests/harness/fixtures/codex-shadow-responses.json'
 ];
 
 const ROOT_REQUIREMENTS = [

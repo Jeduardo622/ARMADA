@@ -12,6 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:harness": "vitest run tests/harness",
+    "eval:codex:shadow:replay": "node scripts/harness/codex-shadow-evals.mjs --replay tests/harness/fixtures/codex-shadow-responses.json",
+    "eval:codex:shadow:grade": "node scripts/harness/codex-shadow-evals.mjs --grade-response",
     "verify:structure": "node scripts/harness/verify-structure.mjs",
     "verify:contracts": "node scripts/harness/verify-contracts.mjs",
     "verify:database": "node scripts/harness/verify-database.mjs",
