@@ -68,6 +68,13 @@
       "checks": ["harness_structure", "harness_policy", "test", "lint", "typecheck"]
     },
     {
+      "id": "codex_evals",
+      "pathPatterns": ["^\\.github/workflows/codex-shadow-evals\\.yml$", "^\\.github/codex/prompts/shadow-evals\\.md$", "^scripts/harness/codex-shadow-(?:evals(?:\\.d)?\\.m(?:js|ts)|response\\.schema\\.json)$", "^tests/harness/fixtures/codex-shadow-(?:evals|responses)\\.json$"],
+      "intentPatterns": ["shadow codex eval", "codex evaluation"],
+      "reviewers": ["Engineering", "Security"],
+      "checks": ["harness_structure", "harness_policy", "lint", "secrets", "test", "typecheck"]
+    },
+    {
       "id": "deployment",
       "pathPatterns": ["^docker-compose\\.yml$", "^scripts/harness/verify-deployment(?:\\.d)?\\.m(?:js|ts)$"],
       "intentPatterns": ["deploy(ment)?", "production rollout"],

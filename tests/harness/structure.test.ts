@@ -99,6 +99,43 @@ describe('engineering harness structure', () => {
     expect(workflow).not.toContain('self-hosted');
   });
 
+  it('isolates manual shadow Codex evaluations from required CI', () => {
+    const workflow = readFileSync('.github/workflows/codex-shadow-evals.yml', 'utf8').replace(/\r\n/g, '\n');
+    const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+
+    expect(workflow).toContain('on:\n  workflow_dispatch:');
+    expect(workflow).not.toMatch(/\b(?:pull_request|push):/);
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).toContain('group: codex-shadow-evals-${{ github.ref }}');
+    expect(workflow).toContain('environment: codex-shadow-evals');
+    expect(workflow).toContain("if: github.ref == 'refs/heads/main' && github.sha != ''");
+    expect(workflow).toContain('timeout-minutes: 15');
+    expect(workflow).toContain('ref: ${{ github.sha }}');
+    expect(workflow).toContain('persist-credentials: false');
+    expect(workflow).toContain('actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0');
+    expect(workflow).toContain('openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56');
+    expect(workflow).toContain('actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1');
+    expect(workflow).toContain('codex-version: 0.144.1');
+    expect(workflow).toContain('model: gpt-5.3-codex');
+    expect(workflow).toContain('effort: medium');
+    expect(workflow).toContain('safety-strategy: drop-sudo');
+    expect(workflow).toContain('permission-profile: ":read-only"');
+    expect(workflow).toContain('output-schema-file: scripts/harness/codex-shadow-response.schema.json');
+    expect(workflow).toContain("codex-args: '[\"--ephemeral\"]'");
+    expect(workflow).toContain('if: always()');
+    expect(workflow).toContain('if-no-files-found: error');
+    expect(workflow).toContain('retention-days: 14');
+    expect(workflow).toContain('name: codex-shadow-eval-${{ github.sha }}');
+    expect(workflow).not.toMatch(/\b(?:issues|pull-requests|actions|checks|statuses|deployments|packages):\s*write\b/);
+    expect(workflow).not.toContain('continue-on-error');
+    expect(ciWorkflow).not.toContain('codex-shadow-evals');
+
+    const evaluateJob = workflow.slice(workflow.indexOf('  evaluate:'), workflow.indexOf('  grade:'));
+    expect(evaluateJob.trimEnd()).toMatch(/uses: openai\/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56[\s\S]*codex-args: '\["--ephemeral"\]'$/);
+    expect(evaluateJob.match(/secrets\.OPENAI_API_KEY/g)).toHaveLength(1);
+    expect(workflow.slice(workflow.indexOf('  grade:'))).not.toContain('secrets.');
+  });
+
   it.each(importableHarnessModules)('%s is portable when imported after CRLF checkout', (path) => {
     expect(readFileSync(path, 'utf8')).not.toMatch(/^#!/);
   });
