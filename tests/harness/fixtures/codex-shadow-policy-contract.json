@@ -20,9 +20,15 @@
       "requiredChecks": ["harness_policy"]
     },
     "protected": {
-      "procedure": "When no prohibited intent matches, initialize requiredChecks from every matching checkScopes entry, using harness_policy only when no scope matches. Then evaluate every protectedAreas entry against both changed paths and prompt intent. Combine every matched area ID, reviewer, and check with set union.",
+      "procedure": "When no prohibited intent matches, initialize requiredChecks from every matching checkScopes entry, using harness_policy only when no scope matches. Build an area-level path-pattern match matrix: for every protectedAreas entry, determine whether any normalized changed path matches any configured pathPatterns regex, then continue through every area entry after a match. Evaluate intent patterns independently. A path match does not require the prompt to mention the area name. Combine every matched area ID, reviewer, and check with set union.",
       "evaluateEveryArea": true,
-      "combineMatches": "set_union"
+      "combineMatches": "set_union",
+      "pathMatchMatrix": {
+        "evaluateEveryAreaWithAnyPathPattern": true,
+        "continueAfterAreaMatch": true,
+        "areaNameInferenceAllowed": false,
+        "pathMatchRequiresIntentMatch": false
+      }
     },
     "advisory": {
       "procedure": "When no protected area matches, return Class A only when the path set is docs-only or has no changed paths and the prompt matches advisoryPatterns.",
