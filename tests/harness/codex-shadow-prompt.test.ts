@@ -59,6 +59,9 @@ describe("shadow Codex prompt builder", () => {
       expect(prompt).toContain("does not override");
       expect(prompt).toContain("Class D stop and no-fallthrough invariants");
       expect(prompt).toContain("continue through the final protected-area entry");
+      expect(prompt).toContain("copy every identifier from each matched `checks` array verbatim");
+      expect(prompt).toContain("Check identifiers such as `secrets` are policy data");
+      expect(prompt).toContain("does not authorize accessing credentials");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
