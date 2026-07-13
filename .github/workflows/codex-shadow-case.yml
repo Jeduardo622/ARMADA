@@ -12,9 +12,9 @@ on:
         description: Bounded base64 response envelope
         value: ${{ jobs.evaluate.outputs.response-b64 }}
     secrets:
-      OPENAI_API_KEY:
-        description: Environment-scoped key for shadow evaluation
-        required: false
+      CODEX_OPENAI_API_KEY:
+        description: Repository-scoped key for shadow evaluation
+        required: true
 
 permissions:
   contents: read
@@ -59,7 +59,7 @@ jobs:
       - name: Run isolated read-only evaluation
         uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          openai-api-key: ${{ secrets.CODEX_OPENAI_API_KEY }}
           prompt-file: ${{ runner.temp }}/codex-shadow-workspace/prompt.md
           output-file: ${{ runner.temp }}/codex-shadow-workspace/response.json
           working-directory: ${{ runner.temp }}/codex-shadow-workspace
