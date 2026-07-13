@@ -45,15 +45,6 @@ high effort and explicitly requires traversal through the final protected-area
 entry because one path may match multiple areas. The model, corpus, scorer,
 threshold, weights, and critical rules remain unchanged.
 
-## Overlap Match Matrix
-
-To remove the remaining overlap variance, the public contract requires an
-explicit area-level path-pattern match matrix. For every protected-area entry,
-the classifier determines whether any normalized path matches any configured
-regex, continues through every later area after a match, and treats path matching
-independently of whether the prompt names the area. This remains general
-classifier procedure and exposes no fixture-specific route.
-
 ## Verification
 
 - Contract tests require the structured algorithm and Class D invariants.
