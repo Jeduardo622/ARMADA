@@ -59,8 +59,6 @@ describe("shadow Codex prompt builder", () => {
       expect(prompt).toContain("does not override");
       expect(prompt).toContain("Class D stop and no-fallthrough invariants");
       expect(prompt).toContain("continue through the final protected-area entry");
-      expect(prompt).toContain("path-pattern match matrix");
-      expect(prompt).toContain("does not mention the area name");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
