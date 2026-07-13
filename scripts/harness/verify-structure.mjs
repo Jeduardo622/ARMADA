@@ -10,6 +10,7 @@ export const REQUIRED_HARNESS_FILES = [
   '.github/AGENTS.md',
   'tests/AGENTS.md',
   '.github/workflows/codex-shadow-evals.yml',
+  '.github/workflows/codex-shadow-case.yml',
   '.github/codex/prompts/shadow-evals.md',
   '.codex/skills/backend-delivery/SKILL.md',
   '.codex/skills/unity-delivery/SKILL.md',

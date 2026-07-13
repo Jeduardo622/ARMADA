@@ -101,6 +101,7 @@ describe('engineering harness structure', () => {
 
   it('isolates manual shadow Codex evaluations from required CI', () => {
     const workflow = readFileSync('.github/workflows/codex-shadow-evals.yml', 'utf8').replace(/\r\n/g, '\n');
+    const caseWorkflow = readFileSync('.github/workflows/codex-shadow-case.yml', 'utf8').replace(/\r\n/g, '\n');
     const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
     const prompt = readFileSync('.github/codex/prompts/shadow-evals.md', 'utf8');
 
@@ -110,45 +111,54 @@ describe('engineering harness structure', () => {
     expect(workflow).toContain('group: codex-shadow-evals-${{ github.ref }}');
     expect(workflow).toContain('timeout-minutes: 15');
     expect(workflow).toContain('actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0');
-    expect(workflow).toContain('openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56');
     expect(workflow).toContain('actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1');
-    expect(workflow).toContain('codex-version: 0.144.1');
-    expect(workflow).toContain('model: gpt-5.3-codex');
-    expect(workflow).toContain('effort: high');
-    expect(workflow).toContain('safety-strategy: drop-sudo');
-    expect(workflow).toContain('permission-profile: ":read-only"');
-    expect(workflow).toContain('working-directory: ${{ runner.temp }}/codex-shadow-workspace');
-    expect(workflow).toContain('prompt-file: ${{ runner.temp }}/codex-shadow-workspace/shadow-evaluation-prompt.md');
-    expect(workflow).toContain('output-file: ${{ runner.temp }}/codex-shadow-workspace/codex-shadow-response.json');
-    expect(workflow).toContain('output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json');
-    expect(workflow).toContain("codex-args: '[\"--ephemeral\"]'");
     expect(workflow).toContain('if: always()');
     expect(workflow).toContain('if-no-files-found: error');
     expect(workflow).toContain('retention-days: 14');
     expect(workflow).toContain('name: codex-shadow-eval-${{ github.sha }}');
     expect(workflow).not.toMatch(/\b(?:issues|pull-requests|actions|checks|statuses|deployments|packages):\s*write\b/);
     expect(workflow).not.toContain('continue-on-error');
+    expect(workflow).not.toContain('openai/codex-action@');
+    expect(workflow).not.toContain('secrets: inherit');
     expect(ciWorkflow).not.toContain('codex-shadow-evals');
 
-    const evaluateJob = workflow.slice(workflow.indexOf('  evaluate:'), workflow.indexOf('  grade:'));
     const gradeJob = workflow.slice(workflow.indexOf('  grade:'));
-    expect(evaluateJob).toContain("if: github.ref == 'refs/heads/main' && github.sha != ''");
-    expect(evaluateJob).toContain('environment: codex-shadow-evals');
-    expect(evaluateJob.match(/ref: \$\{\{ github\.sha \}\}/g)).toHaveLength(1);
-    expect(evaluateJob.match(/persist-credentials: false/g)).toHaveLength(1);
-    expect(evaluateJob).toContain('path: source');
-    expect(evaluateJob).toContain('rm -rf "$GITHUB_WORKSPACE/source"');
-    expect(evaluateJob).toContain('test ! -e "$eval_root/.git"');
-    for (const guide of ['.github/AGENTS.md', 'docs/agents.md', 'src/AGENTS.md', 'tests/AGENTS.md', 'prisma/AGENTS.md', 'unity/AGENTS.md']) {
-      expect(evaluateJob).toContain(`source/${guide} "$eval_root/${guide}"`);
+    expect(workflow.match(/uses: \.\/\.github\/workflows\/codex-shadow-case\.yml/g)).toHaveLength(10);
+    for (const fixtureId of [
+      'advisory-doc-review', 'standard-format-fix', 'authentication-token-change',
+      'database-player-migration', 'ci-workflow-repair', 'unity-tooling-install',
+      'secret-extraction-request', 'production-data-mutation', 'required-check-bypass',
+      'unrun-check-honesty',
+    ]) {
+      expect(workflow).toContain(`fixture-id: ${fixtureId}`);
+      expect(gradeJob).toContain(`decode_case ${fixtureId}`);
     }
-    expect(evaluateJob).toContain('find "$eval_root" -iname agents.md -type f | wc -l)" -eq 7');
-    expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"');
-    expect(evaluateJob).toContain('test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"');
-    expect(evaluateJob).toContain('node source/scripts/harness/build-codex-shadow-prompt.mjs');
-    expect(evaluateJob).toContain('effort: high');
-    expect(evaluateJob).not.toContain('effort: medium');
-    expect(evaluateJob.indexOf('node source/scripts/harness/build-codex-shadow-prompt.mjs')).toBeLessThan(evaluateJob.indexOf('rm -rf "$GITHUB_WORKSPACE/source"'));
+    expect(workflow).not.toContain('secrets.OPENAI_API_KEY');
+    expect(gradeJob.match(/\.outputs\.response-b64/g)).toHaveLength(10);
+    expect(gradeJob).toContain('codex-shadow-transport.mjs combine');
+
+    expect(caseWorkflow).toContain('on:\n  workflow_call:');
+    expect(caseWorkflow).not.toMatch(/\b(?:workflow_dispatch|pull_request|push):/);
+    expect(caseWorkflow).toContain('permissions:\n  contents: read');
+    expect(caseWorkflow).toContain('environment: codex-shadow-evals');
+    expect(caseWorkflow).toContain('openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56');
+    expect(caseWorkflow).toContain('ref: ${{ github.sha }}');
+    expect(caseWorkflow).toContain('persist-credentials: false');
+    expect(caseWorkflow).toContain('--fixture-id "$FIXTURE_ID"');
+    expect(caseWorkflow).toContain('rm -rf "$GITHUB_WORKSPACE/source"');
+    expect(caseWorkflow).toContain('test ! -e "$eval_root/.git"');
+    expect(caseWorkflow).toContain('test "$(find "$eval_root" -type f -name \'*.md\' | wc -l)" -eq 1');
+    expect(caseWorkflow).toContain('test "$(find "$eval_root" -type f -name \'*.json\' | wc -l)" -eq 1');
+    expect(caseWorkflow).toContain('codex-version: 0.144.1');
+    expect(caseWorkflow).toContain('model: gpt-5.3-codex');
+    expect(caseWorkflow).toContain('effort: high');
+    expect(caseWorkflow).not.toContain('effort: medium');
+    expect(caseWorkflow).toContain('safety-strategy: drop-sudo');
+    expect(caseWorkflow).toContain('permission-profile: ":read-only"');
+    expect(caseWorkflow).toContain("codex-args: '[\"--ephemeral\"]'");
+    expect(caseWorkflow.match(/secrets\.OPENAI_API_KEY/g)).toHaveLength(1);
+    expect(caseWorkflow).toContain('codex-shadow-transport.mjs" encode');
+    expect(caseWorkflow).not.toContain('upload-artifact');
     expect(prompt).toContain('complete authoritative public context below');
     expect(prompt).toContain('Preserve the exact suite version and fixture IDs');
     expect(prompt).not.toContain('`rationaleSummary`');
@@ -156,22 +166,12 @@ describe('engineering harness structure', () => {
     expect(prompt).toContain('canonical classifier implementation');
     expect(prompt).toContain('One path can match multiple protected areas');
     expect(prompt).toContain('canonical only for computing routing output fields');
-    const actionStep = evaluateJob.indexOf('name: Run read-only shadow evaluation');
-    const transportStep = evaluateJob.indexOf('name: Encode bounded response for secret-safe transport');
-    expect(actionStep).toBeGreaterThan(-1);
-    expect(transportStep).toBeGreaterThan(actionStep);
-    expect(evaluateJob.slice(transportStep)).toContain('codex-shadow-transport.mjs" encode');
-    expect(evaluateJob.slice(transportStep)).not.toContain('secrets.');
-    expect(evaluateJob.trimEnd()).toMatch(/--github-output "\$GITHUB_OUTPUT"$/);
-    expect(evaluateJob.match(/secrets\.OPENAI_API_KEY/g)).toHaveLength(1);
     expect(gradeJob).toContain("if: ${{ always() && github.ref == 'refs/heads/main' }}");
     expect(gradeJob.match(/ref: \$\{\{ github\.sha \}\}/g)).toHaveLength(1);
     expect(gradeJob.match(/persist-credentials: false/g)).toHaveLength(1);
     expect(gradeJob).not.toMatch(/^ {4}environment:/m);
     expect(gradeJob).not.toContain('secrets.');
-    expect(gradeJob).toContain('CODEX_SHADOW_RESPONSE_B64: ${{ needs.evaluate.outputs.response-b64 }}');
     expect(gradeJob).toContain('codex-shadow-transport.mjs decode');
-    expect(gradeJob).not.toContain('needs.evaluate.outputs.response }}');
 
     const uploadStep = gradeJob.indexOf('name: Upload sanitized shadow report');
     const propagationStep = gradeJob.indexOf('name: Propagate infrastructure failure');

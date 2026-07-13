@@ -11,78 +11,79 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  evaluate:
-    name: Evaluate trusted fixtures
+  evaluate_advisory:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: codex-shadow-evals
-    outputs:
-      response-b64: ${{ steps.transport.outputs.response-b64 }}
-    steps:
-      - name: Check out trusted main revision
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-          path: source
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: advisory-doc-review
 
-      - name: Build isolated evaluation workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          eval_root="$RUNNER_TEMP/codex-shadow-workspace"
-          install -D -m 0444 source/AGENTS.md "$eval_root/AGENTS.md"
-          install -D -m 0444 source/.github/AGENTS.md "$eval_root/.github/AGENTS.md"
-          install -D -m 0444 source/docs/agents.md "$eval_root/docs/agents.md"
-          install -D -m 0444 source/src/AGENTS.md "$eval_root/src/AGENTS.md"
-          install -D -m 0444 source/tests/AGENTS.md "$eval_root/tests/AGENTS.md"
-          install -D -m 0444 source/prisma/AGENTS.md "$eval_root/prisma/AGENTS.md"
-          install -D -m 0444 source/unity/AGENTS.md "$eval_root/unity/AGENTS.md"
-          install -D -m 0444 source/scripts/harness/policy.json "$eval_root/scripts/harness/policy.json"
-          install -D -m 0444 source/scripts/harness/codex-shadow-response.schema.json "$eval_root/scripts/harness/codex-shadow-response.schema.json"
-          install -D -m 0444 source/scripts/harness/codex-shadow-transport.mjs "$eval_root/scripts/harness/codex-shadow-transport.mjs"
-          install -D -m 0444 source/tests/harness/fixtures/codex-shadow-evals.json "$eval_root/tests/harness/fixtures/codex-shadow-evals.json"
-          install -D -m 0444 source/.github/codex/prompts/shadow-evals.md "$eval_root/.github/codex/prompts/shadow-evals.md"
-          prompt_file="$eval_root/shadow-evaluation-prompt.md"
-          node source/scripts/harness/build-codex-shadow-prompt.mjs \
-            --source-root source \
-            --output "$prompt_file"
-          rm -rf "$GITHUB_WORKSPACE/source"
-          test ! -e "$eval_root/.git"
-          test "$(find "$eval_root" -iname agents.md -type f | wc -l)" -eq 7
-          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"
-          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"
+  evaluate_standard:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: standard-format-fix
 
-      - name: Run read-only shadow evaluation
-        id: codex
-        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56
-        with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: ${{ runner.temp }}/codex-shadow-workspace/shadow-evaluation-prompt.md
-          output-file: ${{ runner.temp }}/codex-shadow-workspace/codex-shadow-response.json
-          working-directory: ${{ runner.temp }}/codex-shadow-workspace
-          codex-version: 0.144.1
-          model: gpt-5.3-codex
-          effort: high
-          safety-strategy: drop-sudo
-          permission-profile: ":read-only"
-          output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/scripts/harness/codex-shadow-response.schema.json
-          codex-args: '["--ephemeral"]'
+  evaluate_authentication:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: authentication-token-change
 
-      - name: Encode bounded response for secret-safe transport
-        id: transport
-        shell: bash
-        env:
-          RESPONSE_PATH: ${{ runner.temp }}/codex-shadow-workspace/codex-shadow-response.json
-        run: |
-          node "$RUNNER_TEMP/codex-shadow-workspace/scripts/harness/codex-shadow-transport.mjs" encode \
-            --input "$RESPONSE_PATH" \
-            --github-output "$GITHUB_OUTPUT"
+  evaluate_database:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: database-player-migration
+
+  evaluate_ci:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: ci-workflow-repair
+
+  evaluate_unity_tooling:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: unity-tooling-install
+
+  evaluate_secret_extraction:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: secret-extraction-request
+
+  evaluate_production_mutation:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: production-data-mutation
+
+  evaluate_check_bypass:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: required-check-bypass
+
+  evaluate_honesty:
+    if: github.ref == 'refs/heads/main' && github.sha != ''
+    uses: ./.github/workflows/codex-shadow-case.yml
+    with:
+      fixture-id: unrun-check-honesty
 
   grade:
     name: Grade and publish sanitized evidence
-    needs: evaluate
+    needs:
+      - evaluate_advisory
+      - evaluate_standard
+      - evaluate_authentication
+      - evaluate_database
+      - evaluate_ci
+      - evaluate_unity_tooling
+      - evaluate_secret_extraction
+      - evaluate_production_mutation
+      - evaluate_check_bypass
+      - evaluate_honesty
     if: ${{ always() && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -102,19 +103,56 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Grade bounded action response
+      - name: Aggregate and grade bounded case responses
         id: grade
         shell: bash
         env:
-          CODEX_SHADOW_RESPONSE_B64: ${{ needs.evaluate.outputs.response-b64 }}
-          CODEX_SHADOW_UPSTREAM_STATUS: ${{ needs.evaluate.result }}
+          RESPONSE_ADVISORY: ${{ needs.evaluate_advisory.outputs.response-b64 }}
+          RESPONSE_STANDARD: ${{ needs.evaluate_standard.outputs.response-b64 }}
+          RESPONSE_AUTHENTICATION: ${{ needs.evaluate_authentication.outputs.response-b64 }}
+          RESPONSE_DATABASE: ${{ needs.evaluate_database.outputs.response-b64 }}
+          RESPONSE_CI: ${{ needs.evaluate_ci.outputs.response-b64 }}
+          RESPONSE_UNITY_TOOLING: ${{ needs.evaluate_unity_tooling.outputs.response-b64 }}
+          RESPONSE_SECRET_EXTRACTION: ${{ needs.evaluate_secret_extraction.outputs.response-b64 }}
+          RESPONSE_PRODUCTION_MUTATION: ${{ needs.evaluate_production_mutation.outputs.response-b64 }}
+          RESPONSE_CHECK_BYPASS: ${{ needs.evaluate_check_bypass.outputs.response-b64 }}
+          RESPONSE_HONESTY: ${{ needs.evaluate_honesty.outputs.response-b64 }}
+          CODEX_SHADOW_UPSTREAM_STATUS: ${{ needs.evaluate_advisory.result == 'success' && needs.evaluate_standard.result == 'success' && needs.evaluate_authentication.result == 'success' && needs.evaluate_database.result == 'success' && needs.evaluate_ci.result == 'success' && needs.evaluate_unity_tooling.result == 'success' && needs.evaluate_secret_extraction.result == 'success' && needs.evaluate_production_mutation.result == 'success' && needs.evaluate_check_bypass.result == 'success' && needs.evaluate_honesty.result == 'success' && 'success' || 'failure' }}
         run: |
           set +e
-          node scripts/harness/codex-shadow-transport.mjs decode \
-            --output "$RUNNER_TEMP/codex-shadow-response.json"
+          response_dir="$RUNNER_TEMP/codex-shadow-case-responses"
+          combined="$RUNNER_TEMP/codex-shadow-response.json"
+          mkdir -p "$response_dir"
+          aggregate_status=0
+          decode_case() {
+            fixture_id="$1"
+            encoded="$2"
+            CODEX_SHADOW_RESPONSE_B64="$encoded" node scripts/harness/codex-shadow-transport.mjs decode \
+              --output "$response_dir/$fixture_id.json" || aggregate_status=1
+          }
+          decode_case advisory-doc-review "$RESPONSE_ADVISORY"
+          decode_case standard-format-fix "$RESPONSE_STANDARD"
+          decode_case authentication-token-change "$RESPONSE_AUTHENTICATION"
+          decode_case database-player-migration "$RESPONSE_DATABASE"
+          decode_case ci-workflow-repair "$RESPONSE_CI"
+          decode_case unity-tooling-install "$RESPONSE_UNITY_TOOLING"
+          decode_case secret-extraction-request "$RESPONSE_SECRET_EXTRACTION"
+          decode_case production-data-mutation "$RESPONSE_PRODUCTION_MUTATION"
+          decode_case required-check-bypass "$RESPONSE_CHECK_BYPASS"
+          decode_case unrun-check-honesty "$RESPONSE_HONESTY"
+          if [ "$aggregate_status" -eq 0 ]; then
+            node scripts/harness/codex-shadow-transport.mjs combine \
+              --input-dir "$response_dir" \
+              --suite tests/harness/fixtures/codex-shadow-evals.json \
+              --output "$combined" || aggregate_status=1
+          fi
+          upstream_status="$CODEX_SHADOW_UPSTREAM_STATUS"
+          if [ "$aggregate_status" -ne 0 ]; then
+            upstream_status=failure
+          fi
           node scripts/harness/codex-shadow-evals.mjs \
-            --grade-response "$RUNNER_TEMP/codex-shadow-response.json" \
-            --upstream-status "$CODEX_SHADOW_UPSTREAM_STATUS"
+            --grade-response "$combined" \
+            --upstream-status "$upstream_status"
           grade_status=$?
           echo "status=$grade_status" >> "$GITHUB_OUTPUT"
           if [ -f reports/harness/codex-shadow/summary.md ]; then

@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import suite from "./fixtures/codex-shadow-evals.json";
+import replay from "./fixtures/codex-shadow-responses.json";
 
 const SCRIPT = resolve("scripts/harness/codex-shadow-transport.mjs");
 
@@ -68,6 +70,42 @@ describe("shadow Codex response transport", () => {
       const decoded = join(root, "decoded.json");
       expect(run(["decode", "--output", decoded], { CODEX_SHADOW_RESPONSE_B64: envelope }).status).toBe(1);
       expect(await readFile(decoded)).toEqual(Buffer.alloc(0));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("combines exactly one response per trusted fixture in suite order and deletes raw files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "armada-shadow-combine-"));
+    const input = join(root, "responses");
+    const output = join(root, "combined.json");
+    try {
+      await mkdir(input);
+      await Promise.all(replay.results.map(async (result) => {
+        await writeFile(join(input, `${result.fixtureId}.json`), JSON.stringify({ schemaVersion: 1, suiteVersion: replay.suiteVersion, results: [result] }));
+      }));
+      expect(run(["combine", "--input-dir", input, "--suite", resolve("tests/harness/fixtures/codex-shadow-evals.json"), "--output", output]).status).toBe(0);
+      expect(JSON.parse(await readFile(output, "utf8"))).toEqual(replay);
+      expect(existsSync(input)).toBe(false);
+      expect(JSON.parse(await readFile(resolve("tests/harness/fixtures/codex-shadow-evals.json"), "utf8")).cases.map(({ id }: { id: string }) => id)).toEqual(suite.cases.map(({ id }) => id));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed on a mismatched one-case envelope and deletes all raw files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "armada-shadow-combine-"));
+    const input = join(root, "responses");
+    const output = join(root, "combined.json");
+    try {
+      await mkdir(input);
+      await Promise.all(replay.results.map(async (result, index) => {
+        const actual = index === 0 ? { ...result, fixtureId: "wrong-fixture" } : result;
+        await writeFile(join(input, `${result.fixtureId}.json`), JSON.stringify({ schemaVersion: 1, suiteVersion: replay.suiteVersion, results: [actual] }));
+      }));
+      expect(run(["combine", "--input-dir", input, "--suite", resolve("tests/harness/fixtures/codex-shadow-evals.json"), "--output", output]).status).toBe(1);
+      expect(existsSync(input)).toBe(false);
+      expect(existsSync(output)).toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

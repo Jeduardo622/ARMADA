@@ -63,4 +63,28 @@ describe("shadow Codex prompt builder", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("builds a one-case prompt and one-result schema without other fixture data", async () => {
+    const root = await mkdtemp(join(tmpdir(), "armada-shadow-case-"));
+    const output = join(root, "prompt.md");
+    const schemaOutput = join(root, "schema.json");
+    try {
+      execFileSync(process.execPath, [
+        resolve("scripts/harness/build-codex-shadow-prompt.mjs"),
+        "--source-root", resolve("."),
+        "--output", output,
+        "--fixture-id", "standard-format-fix",
+        "--schema-output", schemaOutput,
+      ]);
+      const prompt = await readFile(output, "utf8");
+      const schema = JSON.parse(await readFile(schemaOutput, "utf8"));
+      expect(prompt).toContain('"id": "standard-format-fix"');
+      expect(prompt).toContain("Fix deterministic simulation summary formatting");
+      expect(prompt).not.toContain('"id": "ci-workflow-repair"');
+      expect(prompt).not.toContain("codex-shadow-expectations.json");
+      expect(schema.properties.results).toMatchObject({ minItems: 1, maxItems: 1 });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

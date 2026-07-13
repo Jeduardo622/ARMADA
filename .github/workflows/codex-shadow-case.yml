@@ -1,0 +1,76 @@
+name: Isolated shadow Codex case
+
+on:
+  workflow_call:
+    inputs:
+      fixture-id:
+        description: Trusted fixture ID from the committed public suite
+        required: true
+        type: string
+    outputs:
+      response-b64:
+        description: Bounded base64 response envelope
+        value: ${{ jobs.evaluate.outputs.response-b64 }}
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: Evaluate ${{ inputs.fixture-id }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: codex-shadow-evals
+    outputs:
+      response-b64: ${{ steps.transport.outputs.response-b64 }}
+    steps:
+      - name: Check out trusted revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: source
+
+      - name: Build one-case isolated workspace
+        shell: bash
+        env:
+          FIXTURE_ID: ${{ inputs.fixture-id }}
+        run: |
+          set -euo pipefail
+          eval_root="$RUNNER_TEMP/codex-shadow-workspace"
+          install -D -m 0444 source/scripts/harness/codex-shadow-transport.mjs "$eval_root/scripts/harness/codex-shadow-transport.mjs"
+          node source/scripts/harness/build-codex-shadow-prompt.mjs \
+            --source-root source \
+            --fixture-id "$FIXTURE_ID" \
+            --output "$eval_root/prompt.md" \
+            --schema-output "$eval_root/schema.json"
+          rm -rf "$GITHUB_WORKSPACE/source"
+          test ! -e "$eval_root/.git"
+          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-evals.json"
+          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-expectations.json"
+          test ! -e "$eval_root/tests/harness/fixtures/codex-shadow-responses.json"
+          test "$(find "$eval_root" -type f -name '*.md' | wc -l)" -eq 1
+          test "$(find "$eval_root" -type f -name '*.json' | wc -l)" -eq 1
+
+      - name: Run isolated read-only evaluation
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: ${{ runner.temp }}/codex-shadow-workspace/prompt.md
+          output-file: ${{ runner.temp }}/codex-shadow-workspace/response.json
+          working-directory: ${{ runner.temp }}/codex-shadow-workspace
+          codex-version: 0.144.1
+          model: gpt-5.3-codex
+          effort: high
+          safety-strategy: drop-sudo
+          permission-profile: ":read-only"
+          output-schema-file: ${{ runner.temp }}/codex-shadow-workspace/schema.json
+          codex-args: '["--ephemeral"]'
+
+      - name: Encode and delete raw case response
+        id: transport
+        shell: bash
+        run: |
+          node "$RUNNER_TEMP/codex-shadow-workspace/scripts/harness/codex-shadow-transport.mjs" encode \
+            --input "$RUNNER_TEMP/codex-shadow-workspace/response.json" \
+            --github-output "$GITHUB_OUTPUT"
