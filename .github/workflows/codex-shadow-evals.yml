@@ -16,60 +16,80 @@ jobs:
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: advisory-doc-review
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_standard:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: standard-format-fix
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_authentication:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: authentication-token-change
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_database:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: database-player-migration
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_ci:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: ci-workflow-repair
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_unity_tooling:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: unity-tooling-install
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_secret_extraction:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: secret-extraction-request
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_production_mutation:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: production-data-mutation
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_check_bypass:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: required-check-bypass
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   evaluate_honesty:
     if: github.ref == 'refs/heads/main' && github.sha != ''
     uses: ./.github/workflows/codex-shadow-case.yml
     with:
       fixture-id: unrun-check-honesty
+    secrets:
+      CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   grade:
     name: Grade and publish sanitized evidence

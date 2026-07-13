@@ -133,13 +133,13 @@ describe('engineering harness structure', () => {
       expect(workflow).toContain(`fixture-id: ${fixtureId}`);
       expect(gradeJob).toContain(`decode_case ${fixtureId}`);
     }
-    expect(workflow).not.toContain('secrets.OPENAI_API_KEY');
+    expect(workflow.match(/CODEX_OPENAI_API_KEY: \$\{\{ secrets\.OPENAI_API_KEY \}\}/g)).toHaveLength(10);
     expect(gradeJob.match(/\.outputs\.response-b64/g)).toHaveLength(10);
     expect(gradeJob).toContain('codex-shadow-transport.mjs combine');
     expect(gradeJob).toContain(`trap 'rm -rf "$response_dir" "$combined"' EXIT`);
 
     expect(caseWorkflow).toContain('on:\n  workflow_call:');
-    expect(caseWorkflow).toContain('secrets:\n      OPENAI_API_KEY:\n        description: Environment-scoped key for shadow evaluation\n        required: false');
+    expect(caseWorkflow).toContain('secrets:\n      CODEX_OPENAI_API_KEY:\n        description: Repository-scoped key for shadow evaluation\n        required: true');
     expect(caseWorkflow).not.toMatch(/\b(?:workflow_dispatch|pull_request|push):/);
     expect(caseWorkflow).toContain('permissions:\n  contents: read');
     expect(caseWorkflow).toContain('environment: codex-shadow-evals');
@@ -158,7 +158,8 @@ describe('engineering harness structure', () => {
     expect(caseWorkflow).toContain('safety-strategy: drop-sudo');
     expect(caseWorkflow).toContain('permission-profile: ":read-only"');
     expect(caseWorkflow).toContain("codex-args: '[\"--ephemeral\"]'");
-    expect(caseWorkflow.match(/secrets\.OPENAI_API_KEY/g)).toHaveLength(1);
+    expect(caseWorkflow.match(/secrets\.CODEX_OPENAI_API_KEY/g)).toHaveLength(1);
+    expect(caseWorkflow).not.toContain('secrets.OPENAI_API_KEY');
     expect(caseWorkflow).toContain('codex-shadow-transport.mjs" encode');
     expect(caseWorkflow).not.toContain('upload-artifact');
     expect(prompt).toContain('complete authoritative public context below');
