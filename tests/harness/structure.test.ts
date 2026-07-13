@@ -136,6 +136,7 @@ describe('engineering harness structure', () => {
     expect(workflow).not.toContain('secrets.OPENAI_API_KEY');
     expect(gradeJob.match(/\.outputs\.response-b64/g)).toHaveLength(10);
     expect(gradeJob).toContain('codex-shadow-transport.mjs combine');
+    expect(gradeJob).toContain(`trap 'rm -rf "$response_dir" "$combined"' EXIT`);
 
     expect(caseWorkflow).toContain('on:\n  workflow_call:');
     expect(caseWorkflow).not.toMatch(/\b(?:workflow_dispatch|pull_request|push):/);

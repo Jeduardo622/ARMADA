@@ -48,15 +48,17 @@ function exactKeys(value, keys) {
 export async function combineShadowResponses(inputDir, suitePath, outputPath) {
   const input = resolve(inputDir);
   const output = resolve(outputPath);
+  let fixtureIds = [];
   try {
     const suite = JSON.parse(await readFile(resolve(suitePath), "utf8"));
     if (!Array.isArray(suite?.cases) || suite.cases.length !== 10 || typeof suite.suiteVersion !== "string") {
       throw new Error("trusted suite is invalid for response aggregation");
     }
-    const fixtureIds = suite.cases.map(({ id }) => id);
-    if (new Set(fixtureIds).size !== fixtureIds.length || fixtureIds.some((id) => !/^[a-z0-9-]{1,64}$/.test(id))) {
+    const candidateFixtureIds = suite.cases.map(({ id }) => id);
+    if (new Set(candidateFixtureIds).size !== candidateFixtureIds.length || candidateFixtureIds.some((id) => !/^[a-z0-9-]{1,64}$/.test(id))) {
       throw new Error("trusted suite fixture IDs are invalid for response aggregation");
     }
+    fixtureIds = candidateFixtureIds;
     const results = [];
     for (const fixtureId of fixtureIds) {
       const raw = await readFile(resolve(input, `${fixtureId}.json`));
@@ -77,7 +79,7 @@ export async function combineShadowResponses(inputDir, suitePath, outputPath) {
     await rm(output, { force: true });
     throw error;
   } finally {
-    await rm(input, { recursive: true, force: true });
+    await Promise.all(fixtureIds.map((fixtureId) => rm(resolve(input, `${fixtureId}.json`), { force: true })));
   }
 }
 

@@ -122,6 +122,7 @@ jobs:
           set +e
           response_dir="$RUNNER_TEMP/codex-shadow-case-responses"
           combined="$RUNNER_TEMP/codex-shadow-response.json"
+          trap 'rm -rf "$response_dir" "$combined"' EXIT
           mkdir -p "$response_dir"
           aggregate_status=0
           decode_case() {

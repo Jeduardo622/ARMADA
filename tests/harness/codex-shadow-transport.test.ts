@@ -86,7 +86,8 @@ describe("shadow Codex response transport", () => {
       }));
       expect(run(["combine", "--input-dir", input, "--suite", resolve("tests/harness/fixtures/codex-shadow-evals.json"), "--output", output]).status).toBe(0);
       expect(JSON.parse(await readFile(output, "utf8"))).toEqual(replay);
-      expect(existsSync(input)).toBe(false);
+      expect(existsSync(input)).toBe(true);
+      for (const result of replay.results) expect(existsSync(join(input, `${result.fixtureId}.json`))).toBe(false);
       expect(JSON.parse(await readFile(resolve("tests/harness/fixtures/codex-shadow-evals.json"), "utf8")).cases.map(({ id }: { id: string }) => id)).toEqual(suite.cases.map(({ id }) => id));
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -104,7 +105,47 @@ describe("shadow Codex response transport", () => {
         await writeFile(join(input, `${result.fixtureId}.json`), JSON.stringify({ schemaVersion: 1, suiteVersion: replay.suiteVersion, results: [actual] }));
       }));
       expect(run(["combine", "--input-dir", input, "--suite", resolve("tests/harness/fixtures/codex-shadow-evals.json"), "--output", output]).status).toBe(1);
-      expect(existsSync(input)).toBe(false);
+      expect(existsSync(input)).toBe(true);
+      for (const result of replay.results) expect(existsSync(join(input, `${result.fixtureId}.json`))).toBe(false);
+      expect(existsSync(output)).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves unrelated files in the caller-supplied input directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "armada-shadow-combine-"));
+    const input = join(root, "responses");
+    const output = join(root, "combined.json");
+    const sentinel = join(input, "unrelated.txt");
+    try {
+      await mkdir(input);
+      await writeFile(sentinel, "preserve me");
+      await Promise.all(replay.results.map(async (result) => {
+        await writeFile(join(input, `${result.fixtureId}.json`), JSON.stringify({ schemaVersion: 1, suiteVersion: replay.suiteVersion, results: [result] }));
+      }));
+      expect(run(["combine", "--input-dir", input, "--suite", resolve("tests/harness/fixtures/codex-shadow-evals.json"), "--output", output]).status).toBe(0);
+      expect(await readFile(sentinel, "utf8")).toBe("preserve me");
+      expect(existsSync(input)).toBe(true);
+      for (const result of replay.results) expect(existsSync(join(input, `${result.fixtureId}.json`))).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not delete outside the input directory when the trusted suite has an invalid fixture ID", async () => {
+    const root = await mkdtemp(join(tmpdir(), "armada-shadow-combine-"));
+    const input = join(root, "responses");
+    const suitePath = join(root, "invalid-suite.json");
+    const output = join(root, "combined.json");
+    const sentinel = join(root, "victim.json");
+    try {
+      await mkdir(input);
+      await writeFile(sentinel, "preserve me");
+      const invalidSuite = { ...suite, cases: suite.cases.map((entry, index) => index === 0 ? { ...entry, id: "../victim" } : entry) };
+      await writeFile(suitePath, JSON.stringify(invalidSuite));
+      expect(run(["combine", "--input-dir", input, "--suite", suitePath, "--output", output]).status).toBe(1);
+      expect(await readFile(sentinel, "utf8")).toBe("preserve me");
       expect(existsSync(output)).toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
