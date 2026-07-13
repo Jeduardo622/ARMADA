@@ -139,6 +139,7 @@ describe('engineering harness structure', () => {
     expect(gradeJob).toContain(`trap 'rm -rf "$response_dir" "$combined"' EXIT`);
 
     expect(caseWorkflow).toContain('on:\n  workflow_call:');
+    expect(caseWorkflow).toContain('secrets:\n      OPENAI_API_KEY:\n        description: Environment-scoped key for shadow evaluation\n        required: false');
     expect(caseWorkflow).not.toMatch(/\b(?:workflow_dispatch|pull_request|push):/);
     expect(caseWorkflow).toContain('permissions:\n  contents: read');
     expect(caseWorkflow).toContain('environment: codex-shadow-evals');

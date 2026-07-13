@@ -11,6 +11,10 @@ on:
       response-b64:
         description: Bounded base64 response envelope
         value: ${{ jobs.evaluate.outputs.response-b64 }}
+    secrets:
+      OPENAI_API_KEY:
+        description: Environment-scoped key for shadow evaluation
+        required: false
 
 permissions:
   contents: read
