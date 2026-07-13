@@ -132,7 +132,16 @@ describe("shadow Codex evaluation contract", () => {
       rollbackRequiredByClass: { A: false, B: true, C: true, D: false },
       classifierAlgorithm: {
         prohibited: { returnImmediately: true, requiredChecks: ["harness_policy"] },
-        protected: { evaluateEveryArea: true, combineMatches: "set_union" },
+        protected: {
+          evaluateEveryArea: true,
+          combineMatches: "set_union",
+          pathMatchMatrix: {
+            evaluateEveryAreaWithAnyPathPattern: true,
+            continueAfterAreaMatch: true,
+            areaNameInferenceAllowed: false,
+            pathMatchRequiresIntentMatch: false,
+          },
+        },
         advisory: { docsOnlyOrNoPaths: true, patternSource: "advisoryPatterns", classification: "A" },
         standard: { fallbackClassification: "B" },
         normalization: {
@@ -158,6 +167,7 @@ describe("shadow Codex evaluation contract", () => {
     expect(serialized).toContain("protectedAreas");
     expect(serialized).toContain("first matching prohibited intent");
     expect(serialized).toContain("docs-only or has no changed paths");
+    expect(serialized).toContain("path-pattern match matrix");
   });
   it("defines exactly ten bounded cases with unique safe IDs and required categories", () => {
     expect(suite.schemaVersion).toBe(1);
