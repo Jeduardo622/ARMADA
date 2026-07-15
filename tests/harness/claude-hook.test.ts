@@ -108,6 +108,85 @@ describe('Claude Code harness hook', () => {
     });
   });
 
+  it.each([
+    'rm -fr scripts/harness',
+    'rm -r -f scripts/harness',
+    'rm -f -r scripts/harness',
+    'rm -Rf scripts/harness'
+  ])('denies recursive forced rm flag variant: %s', (command) => {
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command }
+    })).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: 'Armada harness blocked a destructive Bash command variant.'
+      }
+    });
+  });
+
+  it.each([
+    'sudo rm -rf tmp/cache',
+    'command rm -rf tmp/cache',
+    '/bin/rm -rf tmp/cache',
+    '(rm -rf tmp/cache)',
+    '$(rm -rf tmp/cache)',
+    'echo ok\nrm -rf tmp/cache'
+  ])('denies wrapped or separated recursive forced rm: %s', (command) => {
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command }
+    })).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny'
+      }
+    });
+  });
+
+  it.each([
+    'rm "-rf" tmp/cache',
+    "rm '-r' '-f' tmp/cache",
+    String.raw`rm \-rf tmp/cache`,
+    'sudo -n rm -rf tmp/cache'
+  ])('denies shell-decoded recursive forced rm options: %s', (command) => {
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command }
+    })).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny'
+      }
+    });
+  });
+
+  it.each([
+    'sed -i s/a/b/ scripts/harness/*.mjs',
+    'mv scripts/harness scripts/harness.bak',
+    'sed -i s/a/b/ "$PWD/scripts/harness/claude-hook.mjs"',
+    'sed -i s/a/b/ "${PWD}/scripts/harness/claude-hook.mjs"',
+    'sed -i s/a/b/ "$CLAUDE_PROJECT_DIR/scripts/harness/claude-hook.mjs"',
+    'sed -i s/a/b/ "${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs"'
+  ])('asks before a Bash mutation references a protected directory or glob: %s', (command) => {
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      cwd: resolve('claude-hook-fixture-root'),
+      tool_input: { command }
+    })).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'ask',
+        permissionDecisionReason: expect.stringContaining('Class C')
+      }
+    });
+  });
+
   it('asks for explicit permission before protected file mutations', () => {
     const fixtureRoot = resolve('claude-hook-fixture-root');
     expect(evaluateClaudeHook({

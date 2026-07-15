@@ -35,17 +35,42 @@ function projectRelativePath(input, filePath) {
   return relative(root, absolute).replaceAll('\\', '/');
 }
 
+function hasRecursiveForceRm(command) {
+  const invocations = command.matchAll(
+    /(?:^|[;&|(\r\n]\s*)(?:(?:sudo(?:\s+-[a-z]+)*|command)\s+|\/(?:usr\/)?bin\/)?rm\b([^;&|\r\n)]*)/gi
+  );
+  for (const invocation of invocations) {
+    const tokens = invocation[1].trim().split(/\s+/);
+    const optionBoundary = tokens.indexOf('--');
+    const flags = (optionBoundary === -1 ? tokens : tokens.slice(0, optionBoundary))
+      .map((token) => token.match(/^(['"])(-[a-z-]+)\1$/i)?.[2] ?? token)
+      .map((token) => token.replace(/^\\(?=-)/, ''))
+      .filter((token) => /^-(?:-[a-z-]+|[a-z]+)$/i.test(token));
+    const hasRecursive = flags.some((flag) => flag.toLowerCase() === '--recursive' ||
+      (!flag.startsWith('--') && /r/i.test(flag)));
+    const hasForce = flags.some((flag) => flag.toLowerCase() === '--force' ||
+      (!flag.startsWith('--') && /f/i.test(flag)));
+    if (hasRecursive && hasForce) return true;
+  }
+  return false;
+}
+
 function isDestructiveShellVariant(command) {
   return /\bgit(?:\s+-C\s+\S+)?\s+reset\s+--hard\b/i.test(command) ||
-    /(?:^|[;&|]\s*)rm\s+-[a-z]*r[a-z]*f\b/i.test(command) ||
+    hasRecursiveForceRm(command) ||
     /\bRemove-Item\b(?=[^\r\n]*(?:-Recurse[^\r\n]*-Force|-Force[^\r\n]*-Recurse))/i.test(command);
 }
 
 function commandPathReferences(input, command) {
-  const nested = command.match(/(?:[A-Za-z]:[\\/])?(?:\.{0,2}[\\/])?(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+/g) ?? [];
-  const rootFiles = command.match(/(?:^|[\s'"`><=,(])(?:CLAUDE\.md|AGENTS\.md|package\.json|docker-compose\.yml|\.env(?:\.[A-Za-z0-9_.-]+)?)(?=$|[\s'"`<>,;)])/g) ?? [];
+  const normalizedCommand = command.replace(
+    /\$(?:PWD|\{PWD\}|CLAUDE_PROJECT_DIR|\{CLAUDE_PROJECT_DIR\})(?=[\\/])/g,
+    '.'
+  );
+  const nested = normalizedCommand.match(/(?:[A-Za-z]:[\\/])?(?:\.{0,2}[\\/])?(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+/g) ?? [];
+  const rootFiles = normalizedCommand.match(/(?:^|[\s'"`><=,(])(?:CLAUDE\.md|AGENTS\.md|package\.json|docker-compose\.yml|\.env(?:\.[A-Za-z0-9_.-]+)?)(?=$|[\s'"`<>,;)])/g) ?? [];
   const cleanedRootFiles = rootFiles.map((value) => value.replace(/^[\s'"`><=,(]+/, ''));
-  return [...new Set([...nested, ...cleanedRootFiles].map((path) => projectRelativePath(input, path)))];
+  const normalized = [...nested, ...cleanedRootFiles].map((path) => projectRelativePath(input, path));
+  return [...new Set(normalized.flatMap((path) => [path, `${path}/`]))];
 }
 
 export function formatRoutingContext(routing) {
