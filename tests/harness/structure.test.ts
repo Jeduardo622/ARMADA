@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { verifyStructure } from '../../scripts/harness/verify-structure.mjs';
+import {
+  REQUIRED_HARNESS_FILES,
+  verifyStructure
+} from '../../scripts/harness/verify-structure.mjs';
 
 const requiredFiles = [
   'AGENTS.md',
@@ -13,7 +16,17 @@ const requiredFiles = [
   '.codex/skills/unity-delivery/SKILL.md',
   '.codex/skills/qa-verification/SKILL.md',
   '.codex/skills/security-review/SKILL.md',
-  '.codex/skills/release-readiness/SKILL.md'
+  '.codex/skills/release-readiness/SKILL.md',
+  'CLAUDE.md',
+  '.claude/settings.json',
+  '.claude/skills/route-task/SKILL.md',
+  '.claude/skills/verify-change/SKILL.md',
+  '.claude/skills/harness-help/SKILL.md',
+  '.claude/agents/tester.md',
+  '.claude/agents/reviewer.md',
+  '.claude/agents/ui-hardener.md',
+  '.claude/agents/test-isolation.md',
+  '.claude/agents/security-reviewer.md'
 ];
 
 const importableHarnessModules = [
@@ -33,7 +46,8 @@ const importableHarnessModules = [
   'scripts/harness/unity-project-sandbox.mjs',
   'scripts/harness/unity-test-results.mjs',
   'scripts/harness/launch-unity-mcp.mjs',
-  'scripts/harness/verify-unity.mjs'
+  'scripts/harness/verify-unity.mjs',
+  'scripts/harness/claude-hook.mjs'
 ];
 
 describe('engineering harness structure', () => {
@@ -43,6 +57,27 @@ describe('engineering harness structure', () => {
 
   it('validates instruction and skill structure from the repository root', () => {
     expect(verifyStructure(process.cwd())).toMatchObject({ status: 'passed' });
+  });
+
+  it('treats the complete local Claude adapter as required harness structure', () => {
+    for (const path of [
+      'CLAUDE.md',
+      '.claude/settings.json',
+      '.claude/skills/route-task/SKILL.md',
+      '.claude/skills/verify-change/SKILL.md',
+      '.claude/skills/harness-help/SKILL.md',
+      '.claude/agents/tester.md',
+      '.claude/agents/reviewer.md',
+      '.claude/agents/ui-hardener.md',
+      '.claude/agents/test-isolation.md',
+      '.claude/agents/security-reviewer.md',
+      'scripts/harness/claude-hook.mjs',
+      'scripts/harness/claude-hook.d.mts',
+      'tests/harness/claude-hook.test.ts',
+      'tests/harness/claude-structure.test.ts'
+    ]) {
+      expect(REQUIRED_HARNESS_FILES).toContain(path);
+    }
   });
 
   it('uses path-aware least-privilege CI with a stable aggregate contract', () => {

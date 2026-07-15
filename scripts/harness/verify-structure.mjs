@@ -17,7 +17,19 @@ export const REQUIRED_HARNESS_FILES = [
   '.codex/skills/qa-verification/SKILL.md',
   '.codex/skills/security-review/SKILL.md',
   '.codex/skills/release-readiness/SKILL.md',
+  'CLAUDE.md',
+  '.claude/settings.json',
+  '.claude/skills/route-task/SKILL.md',
+  '.claude/skills/verify-change/SKILL.md',
+  '.claude/skills/harness-help/SKILL.md',
+  '.claude/agents/tester.md',
+  '.claude/agents/reviewer.md',
+  '.claude/agents/ui-hardener.md',
+  '.claude/agents/test-isolation.md',
+  '.claude/agents/security-reviewer.md',
   'scripts/harness/policy.json',
+  'scripts/harness/claude-hook.mjs',
+  'scripts/harness/claude-hook.d.mts',
   'scripts/harness/codex-shadow-evals.mjs',
   'scripts/harness/codex-shadow-evals.d.mts',
   'scripts/harness/build-codex-shadow-prompt.mjs',
@@ -37,7 +49,9 @@ export const REQUIRED_HARNESS_FILES = [
   'tests/harness/fixtures/codex-shadow-expectations.json',
   'tests/harness/fixtures/codex-shadow-responses.json',
   'tests/harness/codex-shadow-prompt.test.ts',
-  'tests/harness/codex-shadow-transport.test.ts'
+  'tests/harness/codex-shadow-transport.test.ts',
+  'tests/harness/claude-hook.test.ts',
+  'tests/harness/claude-structure.test.ts'
 ];
 
 const ROOT_REQUIREMENTS = [

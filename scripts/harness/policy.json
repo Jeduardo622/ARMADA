@@ -62,7 +62,7 @@
     },
     {
       "id": "engineering_harness",
-      "pathPatterns": ["^scripts/harness/", "^tests/harness/", "^package\\.json$", "^AGENTS\\.md$", "^unity/AGENTS\\.md$", "^\\.codex/skills/", "^docs/superpowers/(plans|specs)/.*engineering-harness"],
+      "pathPatterns": ["^scripts/harness/", "^tests/harness/", "^package\\.json$", "^AGENTS\\.md$", "^CLAUDE\\.md$", "^unity/AGENTS\\.md$", "^\\.codex/skills/", "^\\.claude/", "^docs/superpowers/(plans|specs)/.*engineering-harness"],
       "intentPatterns": ["engineering harness", "verification harness", "harness policy"],
       "reviewers": ["Engineering", "Security"],
       "checks": ["harness_structure", "harness_policy", "test", "lint", "typecheck"]
