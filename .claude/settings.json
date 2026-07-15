@@ -2,24 +2,23 @@
   "hooks": {
     "UserPromptSubmit": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs\"",
-            "timeout": 10
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs"]
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "^(Bash|Edit|Write|NotebookEdit|mcp__.*)$",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs\"",
-            "timeout": 10
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs"]
           }
         ]
       }

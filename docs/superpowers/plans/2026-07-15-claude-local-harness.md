@@ -13,7 +13,9 @@
 - Local Claude Code only; do not add GitHub Actions, Anthropic secrets, model settings, or provider evaluations.
 - `AGENTS.md`, `scripts/harness/policy.json`, and `scripts/harness/` remain canonical.
 - Class D is blocked deterministically; Class C preserves bounded approval, required reviewers/checks, rollback evidence, and human merge.
-- Hooks fail closed, treat hook JSON fields as data, and never auto-approve tools.
+- Handled hook input fails closed, hook JSON fields remain data, and hooks never
+  auto-approve tools. Claude permissions remain the boundary for startup failure
+  and timeout cases that Claude Code treats as non-blocking.
 - Follow TDD: observe the focused test fail before implementation.
 - This is Class C `engineering_harness` work requiring Engineering and Security review.
 
@@ -162,19 +164,18 @@ expect(readFileSync('CLAUDE.md', 'utf8')).toMatch(/^@AGENTS\.md/m);
 expect(JSON.parse(readFileSync('.claude/settings.json', 'utf8'))).toEqual({
   hooks: {
     UserPromptSubmit: [{
-      matcher: '',
       hooks: [{
         type: 'command',
-        command: 'node "${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs"',
-        timeout: 10
+        command: 'node',
+        args: ['${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs']
       }]
     }],
     PreToolUse: [{
-      matcher: 'Bash',
+      matcher: '^(Bash|Edit|Write|NotebookEdit|mcp__.*)$',
       hooks: [{
         type: 'command',
-        command: 'node "${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs"',
-        timeout: 10
+        command: 'node',
+        args: ['${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs']
       }]
     }]
   }
@@ -200,8 +201,9 @@ that lists the three skills and five agents, states that automatic routing does
 not replace path-aware reclassification, and requires `/verify-change` before
 completion.
 
-Create `.claude/settings.json` exactly as asserted in Step 1. Do not add a
-`permissions` key.
+Create `.claude/settings.json` exactly as asserted in Step 1, using exec-form
+`node` plus `args`, no unsupported UserPromptSubmit matcher, and no short
+timeout. Do not add a `permissions` key.
 
 - [ ] **Step 4: Add the three project skills**
 
@@ -322,8 +324,10 @@ git commit -m "docs: enforce Claude harness structure"
 Run `node scripts/harness/route-task.mjs` with the approved task description,
 every changed path from `git diff --name-only origin/main...HEAD`, and `--json`.
 
-Expected: Class C with `engineering_harness`, Engineering/Security reviewers,
-and `harness_policy`, `harness_structure`, `lint`, `test`, and `typecheck` checks.
+Expected: Class C with `engineering_harness` and `unity_ci` because policy is a
+protected Unity CI input; Engineering/Security/Unity reviewers; and policy,
+structure, lint, secrets, test, typecheck, Unity static, compilation, and runtime
+test checks.
 
 - [ ] **Step 2: Run focused protected checks**
 

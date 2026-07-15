@@ -1,4 +1,5 @@
 import { readSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifyTask } from './classifier.mjs';
 
@@ -16,6 +17,28 @@ function requireText(value, label) {
     throw new Error(`${label} requires a non-empty ${label === 'prompt' ? 'prompt' : label}`);
   }
   return value;
+}
+
+function toolDecision(permissionDecision, permissionDecisionReason) {
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision,
+      permissionDecisionReason
+    }
+  };
+}
+
+function projectRelativePath(input, filePath) {
+  const root = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
+  const absolute = isAbsolute(filePath) ? filePath : resolve(root, filePath);
+  return relative(root, absolute).replaceAll('\\', '/');
+}
+
+function isDestructiveShellVariant(command) {
+  return /\bgit(?:\s+-C\s+\S+)?\s+reset\s+--hard\b/i.test(command) ||
+    /(?:^|[;&|]\s*)rm\s+-[a-z]*r[a-z]*f\b/i.test(command) ||
+    /\bRemove-Item\b(?=[^\r\n]*(?:-Recurse[^\r\n]*-Force|-Force[^\r\n]*-Recurse))/i.test(command);
 }
 
 export function formatRoutingContext(routing) {
@@ -53,24 +76,45 @@ export function evaluateClaudeHook(value) {
   }
 
   if (eventName === 'PreToolUse') {
-    if (input.tool_name !== 'Bash') return {};
+    const toolName = requireText(input.tool_name, 'tool_name');
     const toolInput = requireObject(input.tool_input, 'tool_input');
-    let command;
-    try {
-      command = requireText(toolInput.command, 'tool_input.command');
-    } catch {
-      throw new Error('PreToolUse requires a non-empty tool_input.command');
+
+    if (toolName === 'Bash') {
+      let command;
+      try {
+        command = requireText(toolInput.command, 'tool_input.command');
+      } catch {
+        throw new Error('PreToolUse requires a non-empty tool_input.command');
+      }
+      const routing = classifyTask({ description: command, changedPaths: [] });
+      if (routing.classification === 'D') {
+        return toolDecision('deny', `Armada harness blocked Class D command: ${routing.reasons.join('; ')}`);
+      }
+      if (isDestructiveShellVariant(command)) {
+        return toolDecision('deny', 'Armada harness blocked a destructive Bash command variant.');
+      }
+      if (routing.classification === 'C') {
+        return toolDecision('ask', `Armada harness requires explicit permission for Class C command: ${routing.reasons.join('; ')}`);
+      }
+      return {};
     }
-    const routing = classifyTask({ description: command, changedPaths: [] });
-    return routing.classification === 'D'
-      ? {
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: `Armada harness blocked Class D command: ${routing.reasons.join('; ')}`
-          }
-        }
-      : {};
+
+    if (toolName.startsWith('mcp__')) {
+      return toolDecision('ask', `Armada harness requires explicit permission for MCP tool ${toolName}.`);
+    }
+
+    const pathField = toolName === 'NotebookEdit' ? 'notebook_path' : 'file_path';
+    if (!['Edit', 'Write', 'NotebookEdit'].includes(toolName)) return {};
+    const filePath = requireText(toolInput[pathField], `tool_input.${pathField}`);
+    const changedPath = projectRelativePath(input, filePath);
+    const routing = classifyTask({ description: `${toolName} repository file`, changedPaths: [changedPath] });
+    if (routing.classification === 'D') {
+      return toolDecision('deny', `Armada harness blocked Class D file mutation: ${routing.reasons.join('; ')}`);
+    }
+    if (routing.classification === 'C') {
+      return toolDecision('ask', `Armada harness requires explicit permission for Class C path ${changedPath}: ${routing.reasons.join('; ')}`);
+    }
+    return {};
   }
 
   throw new Error(`Unsupported Claude hook event: ${eventName}`);

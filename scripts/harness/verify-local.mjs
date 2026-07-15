@@ -80,12 +80,16 @@ function writeReport(root, report) {
 
 const UNITY_RUNTIME_PATH = /^(?:unity\/(?:Assets|Packages|ProjectSettings)\/|\.codex\/config\.toml$)/;
 
-export function requiresUnityCompilation(changedPaths, env = process.env) {
-  return Boolean(env.UNITY_COMPILATION_REQUIRED) || changedPaths.some((path) => UNITY_RUNTIME_PATH.test(path));
+export function requiresUnityCompilation(changedPaths, env = process.env, routing) {
+  return Boolean(env.UNITY_COMPILATION_REQUIRED) ||
+    routing?.requiredChecks?.includes('unity_compilation') ||
+    changedPaths.some((path) => UNITY_RUNTIME_PATH.test(path));
 }
 
-export function requiresUnityTests(changedPaths, env = process.env) {
-  return Boolean(env.UNITY_TESTS_REQUIRED) || changedPaths.some((path) => UNITY_RUNTIME_PATH.test(path));
+export function requiresUnityTests(changedPaths, env = process.env, routing) {
+  return Boolean(env.UNITY_TESTS_REQUIRED) ||
+    routing?.requiredChecks?.includes('unity_tests') ||
+    changedPaths.some((path) => UNITY_RUNTIME_PATH.test(path));
 }
 
 export function readChangedPaths(root, env = process.env) {
@@ -168,8 +172,12 @@ export function runVerification(root = process.cwd()) {
   const changedPaths = readChangedPaths(root);
   const metadata = resolveVerificationMetadata(changedPaths);
   const verificationEnv = { ...process.env };
-  if (requiresUnityCompilation(changedPaths)) verificationEnv.UNITY_COMPILATION_REQUIRED = '1';
-  if (requiresUnityTests(changedPaths)) verificationEnv.UNITY_TESTS_REQUIRED = '1';
+  if (requiresUnityCompilation(changedPaths, verificationEnv, metadata.routing)) {
+    verificationEnv.UNITY_COMPILATION_REQUIRED = '1';
+  }
+  if (requiresUnityTests(changedPaths, verificationEnv, metadata.routing)) {
+    verificationEnv.UNITY_TESTS_REQUIRED = '1';
+  }
   for (const definition of CHECK_DEFINITIONS) {
     let result = resolveConditionalCheck(definition, verificationEnv);
     if (!result) {

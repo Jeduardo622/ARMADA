@@ -27,6 +27,7 @@ describe('Claude Code project integration', () => {
       expect(guide).toContain(entry);
     }
     expect(guide).toContain('Automatic prompt routing does not replace path-aware reclassification');
+    expect(guide).toContain('Claude Code permissions remain the security boundary');
     expect(guide).toContain('human merge');
   });
 
@@ -34,19 +35,18 @@ describe('Claude Code project integration', () => {
     expect(JSON.parse(readFileSync('.claude/settings.json', 'utf8'))).toEqual({
       hooks: {
         UserPromptSubmit: [{
-          matcher: '',
           hooks: [{
             type: 'command',
-            command: 'node "${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs"',
-            timeout: 10
+            command: 'node',
+            args: ['${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs']
           }]
         }],
         PreToolUse: [{
-          matcher: 'Bash',
+          matcher: '^(Bash|Edit|Write|NotebookEdit|mcp__.*)$',
           hooks: [{
             type: 'command',
-            command: 'node "${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs"',
-            timeout: 10
+            command: 'node',
+            args: ['${CLAUDE_PROJECT_DIR}/scripts/harness/claude-hook.mjs']
           }]
         }]
       }
@@ -132,5 +132,6 @@ describe('Claude Code project integration', () => {
     expect(readme).toContain('/route-task');
     expect(readme).toContain('/verify-change');
     expect(readme).toContain('local only');
+    expect(readme).toContain('Claude Code permissions remain the security boundary');
   });
 });

@@ -70,6 +70,65 @@ describe('Claude Code harness hook', () => {
       tool_name: 'Bash',
       tool_input: { command: 'npm test' }
     })).toEqual({});
+
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'prisma migrate deploy' }
+    })).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'ask',
+        permissionDecisionReason: expect.stringContaining('Class C')
+      }
+    });
+
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'git -C . reset --hard' }
+    })).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny'
+      }
+    });
+  });
+
+  it('asks for explicit permission before protected file mutations', () => {
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      cwd: 'C:/repo',
+      tool_input: { file_path: 'C:/repo/.claude/settings.json', old_string: '{}', new_string: '{"hooks":{}}' }
+    })).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'ask',
+        permissionDecisionReason: expect.stringContaining('Class C')
+      }
+    });
+
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Write',
+      cwd: 'C:/repo',
+      tool_input: { file_path: 'C:/repo/notes.txt', content: 'safe local note' }
+    })).toEqual({});
+  });
+
+  it('asks before MCP tool execution because mutation intent is not portable', () => {
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'mcp__filesystem__write_file',
+      tool_input: { path: 'README.md' }
+    })).toEqual({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'ask',
+        permissionDecisionReason: 'Armada harness requires explicit permission for MCP tool mcp__filesystem__write_file.'
+      }
+    });
   });
 
   it('ignores non-Bash PreToolUse events without granting permission', () => {

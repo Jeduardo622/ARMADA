@@ -220,6 +220,11 @@ describe('repository verifiers', () => {
     expect(requiresUnityCompilation(['.codex/config.toml'], {})).toBe(true);
     expect(requiresUnityCompilation(['unity/Assets/Armada/UI/MissionUIController.cs'], {})).toBe(true);
     expect(requiresUnityTests(['unity/Assets/Armada/UI/MissionUIController.cs'], {})).toBe(true);
+    const policyRouting = resolveVerificationMetadata(['scripts/harness/policy.json'], {
+      HARNESS_TASK_DESCRIPTION: 'Update engineering harness policy'
+    }).routing;
+    expect(requiresUnityCompilation(['scripts/harness/policy.json'], {}, policyRouting)).toBe(true);
+    expect(requiresUnityTests(['scripts/harness/policy.json'], {}, policyRouting)).toBe(true);
 
     expect(buildUnityCompileArgs('C:/repo', 'C:/logs/unity.log')).toEqual([
       '-batchmode',

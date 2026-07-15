@@ -10,8 +10,16 @@ export interface CheckDefinition {
 }
 export const CHECK_DEFINITIONS: CheckDefinition[];
 export function readChangedPaths(root: string, env?: NodeJS.ProcessEnv): string[];
-export function requiresUnityCompilation(changedPaths: string[], env?: NodeJS.ProcessEnv): boolean;
-export function requiresUnityTests(changedPaths: string[], env?: NodeJS.ProcessEnv): boolean;
+export function requiresUnityCompilation(
+  changedPaths: string[],
+  env?: NodeJS.ProcessEnv,
+  routing?: import('./classifier.mjs').ClassificationResult
+): boolean;
+export function requiresUnityTests(
+  changedPaths: string[],
+  env?: NodeJS.ProcessEnv,
+  routing?: import('./classifier.mjs').ClassificationResult
+): boolean;
 export function resolveVerificationMetadata(changedPaths: string[], env?: NodeJS.ProcessEnv): {
   routing: import('./classifier.mjs').ClassificationResult;
   rollback?: string;

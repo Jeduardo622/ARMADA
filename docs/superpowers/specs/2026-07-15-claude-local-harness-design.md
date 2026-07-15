@@ -62,21 +62,25 @@ to the main Claude session.
 
 ### Deterministic hooks
 
-`.claude/settings.json` registers a cross-platform Node hook adapter:
+`.claude/settings.json` registers a cross-platform Node hook adapter using
+Claude Code's exec-form command configuration:
 
 - `UserPromptSubmit` classifies the submitted prompt using the canonical
   classifier and injects the exact routing result into Claude's context.
-- A Class D prompt exits with Claude Code's blocking status and returns the safe
-  stop reason. The user's prompt is not executed.
+- A recognized Class D prompt returns Claude Code's blocking decision and the
+  safe stop reason. The user's prompt is not executed when the hook runs.
 - Class A-C prompts continue. Class C context explicitly identifies reviewers,
   required checks, and the need for bounded approval and rollback evidence.
-- `PreToolUse` inspects Bash commands with the same prohibited-intent policy and
-  blocks commands classified as Class D. Normal Claude permissions still apply
-  to every other command.
+- `PreToolUse` inspects Bash, Edit, Write, NotebookEdit, and MCP calls. It denies
+  recognized Class D and destructive Bash variants, requests explicit
+  confirmation for Class C paths or commands, and conservatively requests
+  confirmation for MCP tools whose mutation semantics are provider-specific.
 
-The hook fails closed for malformed input or classifier failures: it blocks the
-affected prompt/tool call and reports that routing was unavailable. It never
-reads secrets, writes repository state, runs tests, or grants permissions.
+The adapter returns blocking status for malformed input or classifier failures
+that it receives. Claude Code itself treats hook startup failures and timeouts as
+non-blocking, so hooks are defense in depth rather than a sandbox. Workspace
+trust and normal Claude Code permissions remain the security boundary. The hook
+never reads secrets, writes repository state, runs tests, or grants permissions.
 
 ### Structure verification
 
@@ -87,9 +91,10 @@ structure. Focused tests validate:
 - `CLAUDE.md` imports `AGENTS.md` rather than copying policy;
 - settings use only the intended hook events and the repository Node adapter;
 - hook output for Class A-C routing;
-- Class D prompt and Bash blocking;
+- Class D prompt/Bash blocking and Class C mutation confirmation;
 - fail-closed malformed input;
-- no automatic verification, secret access, or permission escalation.
+- no automatic verification, secret access, permission grant, or permission
+  escalation.
 
 ## Local Workflow
 
@@ -106,13 +111,16 @@ structure. Focused tests validate:
 
 ## Security and Failure Handling
 
-- Class D is always blocked by the hook.
+- Recognized Class D prompts and mutations are blocked when the hook executes.
 - Class C is not silently converted into standard delivery. It is surfaced with
   the canonical restrictions and may proceed only after explicit bounded user
   approval, such as the approval for this integration.
 - Hooks do not auto-approve tools or use `dangerously-skip-permissions`.
+- Workspace trust and Claude Code tool permissions must remain enabled because
+  hook process failures and timeouts are non-blocking upstream behavior.
 - No API keys, Claude GitHub Action, network calls, or CI changes are included.
-- Hook errors block instead of allowing an unclassified operation.
+- Handled malformed input blocks without reflecting untrusted content; upstream
+  hook startup failures and timeouts remain visible, non-blocking failures.
 - Repository scripts receive untrusted prompt/tool values as data arguments;
   the hook never evaluates them as shell code.
 

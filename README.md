@@ -36,8 +36,13 @@ Flags are backed by Unleash; seeds set them on by default. Storage is S3-compati
 
 Install a current Claude Code release and start `claude` from the repository
 root with Node 20 or newer available. `CLAUDE.md` imports the canonical
-`AGENTS.md`, and project hooks automatically classify prompts and deny Class D
-Bash operations. Normal Claude Code permissions continue to apply.
+`AGENTS.md`, and project hooks classify prompts, deny recognized Class D or
+destructive Bash operations, and request confirmation for protected file,
+command, notebook, and MCP mutations.
+
+Claude Code permissions remain the security boundary. Keep workspace trust and
+normal tool approval enabled because hook process errors and timeouts are
+non-blocking in Claude Code.
 
 - `/harness-help` explains the engineering lifecycle and navigation.
 - `/route-task` performs path-aware classification before edits or scope growth.
