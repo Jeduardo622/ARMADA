@@ -73,8 +73,9 @@ Claude Code's exec-form command configuration:
   required checks, and the need for bounded approval and rollback evidence.
 - `PreToolUse` inspects Bash, Edit, Write, NotebookEdit, and MCP calls. It denies
   recognized Class D and destructive Bash variants, requests explicit
-  confirmation for Class C paths or commands, and conservatively requests
-  confirmation for MCP tools whose mutation semantics are provider-specific.
+  confirmation for Class C paths or commands (including protected path
+  references extracted from Bash text), and conservatively requests confirmation
+  for MCP tools whose mutation semantics are provider-specific.
 
 The adapter returns blocking status for malformed input or classifier failures
 that it receives. Claude Code itself treats hook startup failures and timeouts as

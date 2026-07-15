@@ -41,6 +41,13 @@ function isDestructiveShellVariant(command) {
     /\bRemove-Item\b(?=[^\r\n]*(?:-Recurse[^\r\n]*-Force|-Force[^\r\n]*-Recurse))/i.test(command);
 }
 
+function commandPathReferences(input, command) {
+  const nested = command.match(/(?:[A-Za-z]:[\\/])?(?:\.{0,2}[\\/])?(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+/g) ?? [];
+  const rootFiles = command.match(/(?:^|[\s'"`><=,(])(?:CLAUDE\.md|AGENTS\.md|package\.json|docker-compose\.yml|\.env(?:\.[A-Za-z0-9_.-]+)?)(?=$|[\s'"`<>,;)])/g) ?? [];
+  const cleanedRootFiles = rootFiles.map((value) => value.replace(/^[\s'"`><=,(]+/, ''));
+  return [...new Set([...nested, ...cleanedRootFiles].map((path) => projectRelativePath(input, path)))];
+}
+
 export function formatRoutingContext(routing) {
   const approval = routing.classification === 'C'
     ? ' Explicit bounded approval and rollback evidence are required before implementation.'
@@ -86,7 +93,10 @@ export function evaluateClaudeHook(value) {
       } catch {
         throw new Error('PreToolUse requires a non-empty tool_input.command');
       }
-      const routing = classifyTask({ description: command, changedPaths: [] });
+      const routing = classifyTask({
+        description: command,
+        changedPaths: commandPathReferences(input, command)
+      });
       if (routing.classification === 'D') {
         return toolDecision('deny', `Armada harness blocked Class D command: ${routing.reasons.join('; ')}`);
       }

@@ -93,6 +93,19 @@ describe('Claude Code harness hook', () => {
         permissionDecision: 'deny'
       }
     });
+
+    expect(evaluateClaudeHook({
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      cwd: 'C:/repo',
+      tool_input: { command: "printf '{}' > .claude/settings.json" }
+    })).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'ask',
+        permissionDecisionReason: expect.stringContaining('Class C')
+      }
+    });
   });
 
   it('asks for explicit permission before protected file mutations', () => {

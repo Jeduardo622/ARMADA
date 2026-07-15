@@ -348,9 +348,11 @@ HARNESS_ROLLBACK=Revert the Claude harness integration commits and rerun npm run
 
 Run: `npm run verify:local`.
 
-Expected: overall PASS; Unity compilation/tests may be `not_applicable` because
-the slice does not change Unity runtime files. No skipped check may be called
-passed.
+Expected locally without an Editor: overall FAIL with Unity compilation/tests
+marked failed because `scripts/harness/policy.json` routes through `unity_ci`.
+After exact-commit CI evidence is available, rerun with
+`UNITY_CI_EVIDENCE_PATH` and expect overall PASS. No skipped or unavailable
+check may be called passed.
 
 - [ ] **Step 4: Perform independent Engineering and Security review**
 
