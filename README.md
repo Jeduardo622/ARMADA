@@ -32,6 +32,22 @@ Flags are backed by Unleash; seeds set them on by default. Storage is S3-compati
 - Ops/CI: `docs/ops/`, `docs/ci/`, `docker-compose.yml`, `.env.example`
 - Content: `docs/content/` (missions, AI profiles, balance tables)
 
+## Local Claude Code Harness
+
+Install a current Claude Code release and start `claude` from the repository
+root with Node 20 or newer available. `CLAUDE.md` imports the canonical
+`AGENTS.md`, and project hooks automatically classify prompts and deny Class D
+Bash operations. Normal Claude Code permissions continue to apply.
+
+- `/harness-help` explains the engineering lifecycle and navigation.
+- `/route-task` performs path-aware classification before edits or scope growth.
+- `/verify-change` runs focused checks and `npm run verify:local` before handoff.
+- `tester`, `reviewer`, `ui-hardener`, `test-isolation`, and
+  `security-reviewer` provide bounded specialist workflows.
+
+This integration is local only. It does not add Claude CI, shadow evaluations,
+Anthropic credentials, or model configuration.
+
 ## Next Steps
 - Configure git creds to push.
 - Enable CI checks when code lands (see `.github/workflows/ci.yml`).

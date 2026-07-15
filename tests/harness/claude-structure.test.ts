@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { classifyTask } from '../../scripts/harness/classifier.mjs';
 
 const skillPaths = [
   '.claude/skills/route-task/SKILL.md',
@@ -111,5 +112,25 @@ describe('Claude Code project integration', () => {
     expect(content).not.toMatch(/pull_request:|workflow_dispatch:|issue_comment:/);
     expect(content).not.toContain('prohibitedIntents');
     expect(content).not.toContain('pathPatterns');
+  });
+
+  it('classifies Claude integration paths as protected engineering harness work', () => {
+    expect(classifyTask({
+      description: 'Update local project guidance',
+      changedPaths: ['CLAUDE.md', '.claude/settings.json']
+    })).toMatchObject({
+      classification: 'C',
+      protectedAreas: ['engineering_harness'],
+      requiredReviewers: ['Engineering', 'Security']
+    });
+  });
+
+  it('documents how to start and navigate the local Claude harness', () => {
+    const readme = readFileSync('README.md', 'utf8');
+    expect(readme).toContain('## Local Claude Code Harness');
+    expect(readme).toContain('/harness-help');
+    expect(readme).toContain('/route-task');
+    expect(readme).toContain('/verify-change');
+    expect(readme).toContain('local only');
   });
 });
