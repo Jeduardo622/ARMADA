@@ -97,7 +97,7 @@ describe('Claude Code harness hook', () => {
     expect(evaluateClaudeHook({
       hook_event_name: 'PreToolUse',
       tool_name: 'Bash',
-      cwd: 'C:/repo',
+      cwd: resolve('claude-hook-fixture-root'),
       tool_input: { command: "printf '{}' > .claude/settings.json" }
     })).toMatchObject({
       hookSpecificOutput: {
@@ -109,11 +109,12 @@ describe('Claude Code harness hook', () => {
   });
 
   it('asks for explicit permission before protected file mutations', () => {
+    const fixtureRoot = resolve('claude-hook-fixture-root');
     expect(evaluateClaudeHook({
       hook_event_name: 'PreToolUse',
       tool_name: 'Edit',
-      cwd: 'C:/repo',
-      tool_input: { file_path: 'C:/repo/.claude/settings.json', old_string: '{}', new_string: '{"hooks":{}}' }
+      cwd: fixtureRoot,
+      tool_input: { file_path: resolve(fixtureRoot, '.claude/settings.json'), old_string: '{}', new_string: '{"hooks":{}}' }
     })).toMatchObject({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
@@ -125,8 +126,8 @@ describe('Claude Code harness hook', () => {
     expect(evaluateClaudeHook({
       hook_event_name: 'PreToolUse',
       tool_name: 'Write',
-      cwd: 'C:/repo',
-      tool_input: { file_path: 'C:/repo/notes.txt', content: 'safe local note' }
+      cwd: fixtureRoot,
+      tool_input: { file_path: resolve(fixtureRoot, 'notes.txt'), content: 'safe local note' }
     })).toEqual({});
   });
 
