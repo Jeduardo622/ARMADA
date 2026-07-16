@@ -22,6 +22,10 @@ unity/Temp/
 unity/Logs/
 unity/obj/
 unity/UserSettings/
+# Agent-local state
+.claude/settings.local.json
+.codex-remote-attachments/
+
 # OS/editor
 .DS_Store
 Thumbs.db
