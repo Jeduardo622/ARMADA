@@ -1,0 +1,66 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "suiteVersion", "results"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "suiteVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "results": { "type": "array", "minItems": 10, "maxItems": 10, "items": { "$ref": "#/$defs/shadowResponse" } }
+  },
+  "$defs": {
+    "shadowResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixtureId", "classification", "decision", "protectedAreas", "requiredReviewers", "requiredChecks", "allowedActions", "checkClaims", "rollback"],
+      "properties": {
+        "fixtureId": { "type": "string", "pattern": "^[a-z0-9-]+$", "minLength": 1, "maxLength": 64 },
+        "classification": { "type": "string", "enum": ["A", "B", "C", "D"] },
+        "decision": { "type": "string", "enum": ["proceed", "plan_only", "stop"] },
+        "protectedAreas": { "$ref": "#/$defs/stringSet" },
+        "requiredReviewers": { "$ref": "#/$defs/stringSet" },
+        "requiredChecks": { "$ref": "#/$defs/checkSet" },
+        "allowedActions": { "$ref": "#/$defs/stringSet" },
+        "checkClaims": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/checkClaim" } },
+        "rollback": { "$ref": "#/$defs/rollback" }
+      }
+    },
+    "checkClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "executed"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "status": { "type": "string", "enum": ["not-run", "passed", "failed", "blocked", "not-applicable"] },
+        "executed": { "type": "boolean" }
+      }
+    },
+    "rollback": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "action", "target", "verificationPlanned"],
+          "properties": {
+            "required": { "type": "boolean", "const": true },
+            "action": { "type": "string", "enum": ["revert", "restore", "rollback", "uninstall"] },
+            "target": { "type": "string", "enum": ["change", "commit", "configuration", "files", "migration", "package", "schema", "workflow"] },
+            "verificationPlanned": { "type": "boolean", "const": true }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "action", "target", "verificationPlanned"],
+          "properties": {
+            "required": { "type": "boolean", "const": false },
+            "action": { "type": "string", "const": "none" },
+            "target": { "type": "string", "const": "none" },
+            "verificationPlanned": { "type": "boolean", "const": false }
+          }
+        }
+      ]
+    },
+    "stringSet": { "type": "array", "maxItems": 10, "items": { "type": "string", "minLength": 1, "maxLength": 64 } },
+    "checkSet": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 64 } }
+  }
+}

@@ -55,22 +55,22 @@
     },
     {
       "id": "unity_tooling",
-      "pathPatterns": ["^unity/Packages/(manifest|packages-lock)\\.json$", "^\\.codex/config\\.toml$"],
+      "pathPatterns": ["^unity/Packages/(manifest|packages-lock)\\.json$", "^\\.codex/config\\.toml$", "^\\.mcp\\.json$"],
       "intentPatterns": ["unity mcp", "unity package", "mcp server"],
       "reviewers": ["Unity", "Security"],
       "checks": ["unity_static", "unity_compilation", "unity_tests", "contracts", "dependencies", "secrets", "harness_policy"]
     },
     {
       "id": "engineering_harness",
-      "pathPatterns": ["^scripts/harness/", "^tests/harness/", "^package\\.json$", "^AGENTS\\.md$", "^CLAUDE\\.md$", "^unity/AGENTS\\.md$", "^\\.codex/skills/", "^\\.claude/", "^docs/superpowers/(plans|specs)/.*engineering-harness"],
+      "pathPatterns": ["^scripts/harness/", "^tests/harness/", "^package\\.json$", "^AGENTS\\.md$", "^CLAUDE\\.md$", "^unity/AGENTS\\.md$", "^\\.codex/skills/", "^\\.claude/", "^\\.mcp\\.json$", "^docs/superpowers/(plans|specs)/.*engineering-harness"],
       "intentPatterns": ["engineering harness", "verification harness", "harness policy"],
       "reviewers": ["Engineering", "Security"],
       "checks": ["harness_structure", "harness_policy", "test", "lint", "typecheck"]
     },
     {
-      "id": "codex_evals",
-      "pathPatterns": ["^\\.github/workflows/codex-shadow-(?:evals|case)\\.yml$", "^\\.github/codex/prompts/shadow-evals\\.md$", "^scripts/harness/(?:build-codex-shadow-prompt\\.mjs|codex-shadow-(?:evals(?:\\.d)?\\.m(?:js|ts)|response\\.schema\\.json|transport\\.mjs))$", "^tests/harness/fixtures/codex-shadow-(?:benchmark-lock|evals|expectations|policy-contract|responses)\\.json$"],
-      "intentPatterns": ["shadow codex eval", "codex evaluation"],
+      "id": "shadow_evals",
+      "pathPatterns": ["^\\.github/workflows/shadow-(?:evals|case)\\.yml$", "^\\.github/prompts/shadow-evals\\.md$", "^scripts/harness/(?:build-shadow-prompt\\.mjs|claude-shadow-request(?:\\.d)?\\.m(?:js|ts)|shadow-(?:evals(?:\\.d)?\\.m(?:js|ts)|response\\.schema\\.json|transport\\.mjs))$", "^tests/harness/fixtures/shadow-(?:benchmark-lock|evals|expectations|policy-contract|responses)\\.json$"],
+      "intentPatterns": ["shadow codex eval", "shadow claude eval", "codex evaluation", "claude evaluation"],
       "reviewers": ["Engineering", "Security"],
       "checks": ["harness_structure", "harness_policy", "lint", "secrets", "test", "typecheck"]
     },
