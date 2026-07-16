@@ -20,6 +20,13 @@ const WIND_TAILWIND_ARC = 45;
 const WIND_HEADWIND_ARC = 135;
 const MOVEMENT_SCALE = 5;
 
+// Raking fire (modifiers.rakingFire): a broadside whose shot line runs along
+// the target's keel — bearing within RAKE_ARC of the target heading (stern
+// rake) or its reverse (bow rake) — deals multiplied damage
+// (docs/content/balance-tables.md, raking multiplier baseline).
+const RAKE_ARC = 20;
+const RAKE_MULTIPLIER = 1.5;
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -105,10 +112,22 @@ function resolveBroadside(
   target: ShipState,
   order: SimOrder,
   damageScale: number,
-  attackerSpeed: number
+  attackerSpeed: number,
+  rakingEnabled: boolean
 ): SimEvent {
   const range = distance(attacker, target);
   const bearingToTarget = angleBetween(attacker, target);
+
+  let rake: 'bow' | 'stern' | undefined;
+  if (rakingEnabled) {
+    const rawKeelDiff = Math.abs(normalizeHeading(bearingToTarget - target.heading));
+    const keelDiff = Math.min(rawKeelDiff, 360 - rawKeelDiff);
+    if (keelDiff <= RAKE_ARC) {
+      rake = 'stern';
+    } else if (keelDiff >= 180 - RAKE_ARC) {
+      rake = 'bow';
+    }
+  }
   const angleDiff = Math.abs(normalizeHeading(attacker.heading - bearingToTarget));
   const normalizedDiff = Math.min(angleDiff, 360 - angleDiff);
 
@@ -122,7 +141,10 @@ function resolveBroadside(
 
   const baseDamage = 18 + Math.floor(attacker.sail / 25) + Math.floor(attackerSpeed * 1.5);
   const variance = Math.floor(rng() * 6);
-  const scaledDamage = Math.floor((baseDamage + variance) * damageScale);
+  let scaledDamage = Math.floor((baseDamage + variance) * damageScale);
+  if (rake) {
+    scaledDamage = Math.floor(scaledDamage * RAKE_MULTIPLIER);
+  }
   const hullDamage = hit ? scaledDamage : 0;
   const sailDamage = hit ? Math.floor(scaledDamage * 0.6) : 0;
   const crewDamage = hit ? Math.floor(scaledDamage * 0.35) : 0;
@@ -148,7 +170,8 @@ function resolveBroadside(
       hp: target.hp,
       sail: target.sail,
       crew: target.crew
-    }
+    },
+    ...(rake ? { rake } : {})
   };
 }
 
@@ -247,7 +270,8 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
       if (target && target.hp > 0) {
         const damageScale = input.modifiers?.damageScale?.[ship.id] ?? 1;
         const attackerSpeed = windAware ? effectiveSpeed(ship, input.state.wind) : ship.speed;
-        events.push(resolveBroadside(rng, ship, target, order, damageScale, attackerSpeed));
+        const rakingEnabled = input.modifiers?.rakingFire === true;
+        events.push(resolveBroadside(rng, ship, target, order, damageScale, attackerSpeed, rakingEnabled));
       }
     } else if (order.action === 'boarding' && order.targetShipId) {
       const target = shipById.get(order.targetShipId);

@@ -190,6 +190,102 @@ describe('engine wind and movement (modifiers.windMovement)', () => {
   });
 });
 
+describe('engine raking fire (modifiers.rakingFire)', () => {
+  const rakePreview = (targetHeading: number, rakingFire?: boolean) => ({
+    schemaVersion: 1 as const,
+    seed: 7,
+    turn: 1,
+    state: {
+      turn: 1,
+      wind: { direction: 0, speed: 5 },
+      ships: [
+        {
+          id: 'attacker',
+          side: 'player' as const,
+          position: { x: 0, y: 0 },
+          heading: 0,
+          speed: 3,
+          hp: 120,
+          sail: 80,
+          crew: 50
+        },
+        {
+          id: 'target',
+          side: 'enemy' as const,
+          position: { x: 100, y: 0 },
+          heading: targetHeading,
+          speed: 2,
+          hp: 200,
+          sail: 70,
+          crew: 40
+        }
+      ]
+    },
+    orders: [
+      {
+        shipId: 'attacker',
+        action: 'broadside' as const,
+        targetShipId: 'target',
+        side: 'starboard' as const,
+        turnDelta: 0,
+        speedDelta: 0
+      }
+    ],
+    ...(rakingFire === undefined ? {} : { modifiers: { rakingFire } })
+  });
+
+  const broadsideEvent = (targetHeading: number, rakingFire?: boolean) => {
+    const event = resolveSimPreview(rakePreview(targetHeading, rakingFire)).events.find(
+      (candidate) => candidate.type === 'broadside'
+    );
+    if (event?.type !== 'broadside') throw new Error('expected broadside event');
+    return event;
+  };
+
+  it('marks a stern rake when the shot runs down the keel from behind', () => {
+    const plain = broadsideEvent(0);
+    const raked = broadsideEvent(0, true);
+    expect(plain.hit).toBe(true);
+    expect(plain).not.toHaveProperty('rake');
+    expect(raked.rake).toBe('stern');
+    expect(raked.damage.hull).toBe(Math.floor(plain.damage.hull * 1.5));
+  });
+
+  it('marks a bow rake for a head-on keel line', () => {
+    expect(broadsideEvent(180, true).rake).toBe('bow');
+  });
+
+  it('does not rake beam-on targets even with the flag set', () => {
+    const plain = broadsideEvent(90);
+    const flagged = broadsideEvent(90, true);
+    expect(flagged).not.toHaveProperty('rake');
+    expect(flagged.damage).toEqual(plain.damage);
+  });
+});
+
+describe('mission 01 regression pin', () => {
+  it('keeps the fixture turn-hash chains stable across combat-rule slices', () => {
+    const fire = runMission01(16, allBroadsides);
+    expect(fire.turns.map((turn) => turn.hash.slice(0, 12))).toEqual([
+      'd5f84192acf5',
+      '45b4a619dd67',
+      'f640d180aedb',
+      '7078747d25e9'
+    ]);
+    const idle = runMission01(8, []);
+    expect(idle.turns.map((turn) => turn.hash.slice(0, 12))).toEqual([
+      '887fdc2d94f4',
+      '92398433325c',
+      '341de9e01e32',
+      'c8f29f0e6545',
+      'fa0ae6e45746',
+      '86c4e12ad405',
+      '349279f0e69c',
+      '42eabcd1c0fc'
+    ]);
+  });
+});
+
 describe('mission 01 routes', () => {
   it('starts deterministically with default seed and scenario payload', async () => {
     const res1 = await app.inject({ method: 'POST', url: `/missions/${MISSION_01_CODE}/start` });

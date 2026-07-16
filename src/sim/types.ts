@@ -79,7 +79,10 @@ export const simModifiersSchema = z
     damageScale: z.record(z.string(), z.number().min(0).max(2)).optional(),
     // Opt-in wind-aware resolution: wind impact curve on effective speed plus
     // per-turn movement. Absent or false keeps the legacy stationary rules.
-    windMovement: z.boolean().optional()
+    windMovement: z.boolean().optional(),
+    // Opt-in raking fire: broadsides aligned with the target's keel line deal
+    // multiplied damage. Absent or false keeps the legacy damage rules.
+    rakingFire: z.boolean().optional()
   })
   .strict();
 
@@ -130,6 +133,7 @@ export type SimEvent =
         sail: number;
         crew: number;
       };
+      rake?: 'bow' | 'stern';
     }
   | {
       type: 'boarding';

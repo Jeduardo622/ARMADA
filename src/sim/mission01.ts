@@ -1,3 +1,4 @@
+import { aiOrderFor } from './ai.js';
 import { createDeterministicRng, resolveSimPreview } from './engine.js';
 import { SimEvent, SimOrder, SimState, SimSummary } from './types.js';
 
@@ -20,9 +21,6 @@ const ENEMY_HULL_HP = Math.floor(ENEMY_BASE_HULL_HP * MISSION_01_ENEMY_DAMAGE_SC
 const WIND_DIRECTION = 0;
 const WIND_BASE_SPEED = 5;
 
-// Line-advance profile: hold the line, advance steadily, then stay
-// broadside-aligned once inside preferred range (docs/content/ai-profiles.md).
-const LINE_ADVANCE_PREFERRED_RANGE = 100;
 
 
 export function createMission01State(): SimState {
@@ -106,26 +104,10 @@ export function mission01Fingerprint(start: Mission01StartResponse): string {
 
 export function mission01EnemyOrder(state: SimState): SimOrder {
   const enemy = state.ships.find((ship) => ship.id === MISSION_01_ENEMY_SHIP_ID);
-  const player = state.ships.find((ship) => ship.id === MISSION_01_PLAYER_SHIP_ID);
-  if (!enemy || enemy.hp <= 0 || !player || player.hp <= 0) {
+  if (!enemy) {
     return { shipId: MISSION_01_ENEMY_SHIP_ID, action: 'pass', turnDelta: 0, speedDelta: 0 };
   }
-
-  const dx = player.position.x - enemy.position.x;
-  const dy = player.position.y - enemy.position.y;
-  const range = Math.sqrt(dx * dx + dy * dy);
-  if (range > LINE_ADVANCE_PREFERRED_RANGE) {
-    return { shipId: enemy.id, action: 'maneuver', turnDelta: 0, speedDelta: 1 };
-  }
-
-  return {
-    shipId: enemy.id,
-    action: 'broadside',
-    targetShipId: player.id,
-    side: 'port',
-    turnDelta: 0,
-    speedDelta: 0
-  };
+  return aiOrderFor(enemy, state, 'line-advance');
 }
 
 function windSpeedForTurn(seed: number, turn: number): number {
