@@ -1,8 +1,13 @@
 # Armada Engineering Agent Guide
 
-This repository uses Codex for software delivery. Product, game-design, live-ops,
-audio, and project-management documents are reference context, not autonomous
-agent roles.
+This repository uses coding agents (Codex and Claude Code) for software
+delivery. Product, game-design, live-ops, audio, and project-management
+documents are reference context, not autonomous agent roles.
+
+Codex discovers this file directly and loads skills from `.codex/skills/`.
+Claude Code starts at `CLAUDE.md`, loads skills from `.claude/skills/`, and
+uses MCP servers from `.mcp.json`. Both entry points share this guide, the
+same policy, and the same verification contract; no agent gets weaker rules.
 
 ## Required Lifecycle
 
@@ -23,7 +28,7 @@ review, prepare a PR, and hand off for human merge.
 - **A, advisory:** analysis, planning, documentation review, and code review.
   Read-only unless the user explicitly asks for an artifact.
 - **B, standard delivery:** bounded application or test changes outside protected
-  paths. Codex may branch, edit, test, commit, push, and manage a PR.
+  paths. The agent may branch, edit, test, commit, push, and manage a PR.
 - **C, protected:** authentication, authorization, API boundaries, runtime
   configuration, CI, database schema or migrations, secrets, permissions,
   deployment, economy, or production-data paths. Implementation requires an
@@ -37,8 +42,8 @@ Mixed-scope work uses the highest applicable class. Classifier failure is Class 
 
 ## Authority
 
-Codex may inspect, branch, edit, test, commit, push, and open or update pull
-requests within the approved task. Humans approve merges. Do not deploy
+The agent may inspect, branch, edit, test, commit, push, and open or update
+pull requests within the approved task. Humans approve merges. Do not deploy
 production, expose secrets, mutate production data, weaken controls, or perform
 destructive cleanup without a separate explicit request and applicable review.
 
@@ -58,6 +63,9 @@ destructive cleanup without a separate explicit request and applicable review.
   `route-task` in addition to full verification.
 
 ## Repository Skills
+
+Canonical skill definitions live in `.codex/skills/`; `.claude/skills/`
+contains discovery pointers to the same workflows for Claude Code.
 
 - Backend work: `.codex/skills/backend-delivery/SKILL.md`
 - Unity/client work: `.codex/skills/unity-delivery/SKILL.md`

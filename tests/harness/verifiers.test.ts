@@ -55,10 +55,13 @@ describe('repository verifiers', () => {
   });
 
   it('evaluates all routing fixtures deterministically', () => {
+    const fixtures = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'tests/harness/fixtures/routing.json'), 'utf8')
+    );
     expect(runEvaluations(process.cwd())).toMatchObject({
       id: 'harness_evals',
       status: 'passed',
-      fixtureCount: 19
+      fixtureCount: fixtures.length
     });
   });
 

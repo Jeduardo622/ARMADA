@@ -7,6 +7,8 @@ import {
 
 const requiredFiles = [
   'AGENTS.md',
+  'CLAUDE.md',
+  '.mcp.json',
   'src/AGENTS.md',
   'unity/AGENTS.md',
   'prisma/AGENTS.md',
@@ -17,7 +19,11 @@ const requiredFiles = [
   '.codex/skills/qa-verification/SKILL.md',
   '.codex/skills/security-review/SKILL.md',
   '.codex/skills/release-readiness/SKILL.md',
-  'CLAUDE.md',
+  '.claude/skills/backend-delivery/SKILL.md',
+  '.claude/skills/unity-delivery/SKILL.md',
+  '.claude/skills/qa-verification/SKILL.md',
+  '.claude/skills/security-review/SKILL.md',
+  '.claude/skills/release-readiness/SKILL.md',
   '.claude/settings.json',
   '.claude/skills/route-task/SKILL.md',
   '.claude/skills/verify-change/SKILL.md',
@@ -46,6 +52,7 @@ const importableHarnessModules = [
   'scripts/harness/unity-project-sandbox.mjs',
   'scripts/harness/unity-test-results.mjs',
   'scripts/harness/launch-unity-mcp.mjs',
+  'scripts/harness/claude-shadow-request.mjs',
   'scripts/harness/verify-unity.mjs',
   'scripts/harness/claude-hook.mjs'
 ];
@@ -134,31 +141,31 @@ describe('engineering harness structure', () => {
     expect(workflow).not.toContain('self-hosted');
   });
 
-  it('isolates manual shadow Codex evaluations from required CI', () => {
-    const workflow = readFileSync('.github/workflows/codex-shadow-evals.yml', 'utf8').replace(/\r\n/g, '\n');
-    const caseWorkflow = readFileSync('.github/workflows/codex-shadow-case.yml', 'utf8').replace(/\r\n/g, '\n');
+  it('isolates manual shadow agent evaluations from required CI', () => {
+    const workflow = readFileSync('.github/workflows/shadow-evals.yml', 'utf8').replace(/\r\n/g, '\n');
+    const caseWorkflow = readFileSync('.github/workflows/shadow-case.yml', 'utf8').replace(/\r\n/g, '\n');
     const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
-    const prompt = readFileSync('.github/codex/prompts/shadow-evals.md', 'utf8');
+    const prompt = readFileSync('.github/prompts/shadow-evals.md', 'utf8');
 
     expect(workflow).toContain('on:\n  workflow_dispatch:');
     expect(workflow).not.toMatch(/\b(?:pull_request|push):/);
     expect(workflow).toContain('permissions:\n  contents: read');
-    expect(workflow).toContain('group: codex-shadow-evals-${{ github.ref }}');
+    expect(workflow).toContain('group: shadow-evals-${{ github.ref }}');
     expect(workflow).toContain('timeout-minutes: 15');
     expect(workflow).toContain('actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0');
     expect(workflow).toContain('actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1');
     expect(workflow).toContain('if: always()');
     expect(workflow).toContain('if-no-files-found: error');
     expect(workflow).toContain('retention-days: 14');
-    expect(workflow).toContain('name: codex-shadow-eval-${{ github.sha }}');
+    expect(workflow).toContain('name: shadow-eval-${{ inputs.provider }}-${{ github.sha }}');
     expect(workflow).not.toMatch(/\b(?:issues|pull-requests|actions|checks|statuses|deployments|packages):\s*write\b/);
     expect(workflow).not.toContain('continue-on-error');
     expect(workflow).not.toContain('openai/codex-action@');
     expect(workflow).not.toContain('secrets: inherit');
-    expect(ciWorkflow).not.toContain('codex-shadow-evals');
+    expect(ciWorkflow).not.toContain('shadow-evals');
 
     const gradeJob = workflow.slice(workflow.indexOf('  grade:'));
-    expect(workflow.match(/uses: \.\/\.github\/workflows\/codex-shadow-case\.yml/g)).toHaveLength(10);
+    expect(workflow.match(/uses: \.\/\.github\/workflows\/shadow-case\.yml/g)).toHaveLength(10);
     for (const fixtureId of [
       'advisory-doc-review', 'standard-format-fix', 'authentication-token-change',
       'database-player-migration', 'ci-workflow-repair', 'unity-tooling-install',
@@ -169,15 +176,27 @@ describe('engineering harness structure', () => {
       expect(gradeJob).toContain(`decode_case ${fixtureId}`);
     }
     expect(workflow.match(/CODEX_OPENAI_API_KEY: \$\{\{ secrets\.OPENAI_API_KEY \}\}/g)).toHaveLength(10);
+    expect(workflow.match(/CLAUDE_ANTHROPIC_API_KEY: \$\{\{ secrets\.ANTHROPIC_API_KEY \}\}/g)).toHaveLength(10);
+    expect(workflow.match(/provider: \$\{\{ inputs\.provider \}\}/g)).toHaveLength(10);
+    expect(workflow).toContain("SHADOW_EVAL_MODEL: ${{ inputs.provider == 'claude' && 'claude-sonnet-5' || 'gpt-5.3-codex' }}");
+    expect(gradeJob).toContain('--model "$SHADOW_EVAL_MODEL"');
     expect(gradeJob.match(/\.outputs\.response-b64/g)).toHaveLength(10);
-    expect(gradeJob).toContain('codex-shadow-transport.mjs combine');
+    expect(gradeJob).toContain('shadow-transport.mjs combine');
     expect(gradeJob).toContain(`trap 'rm -rf "$response_dir" "$combined"' EXIT`);
 
     expect(caseWorkflow).toContain('on:\n  workflow_call:');
-    expect(caseWorkflow).toContain('secrets:\n      CODEX_OPENAI_API_KEY:\n        description: Repository-scoped key for shadow evaluation\n        required: true');
+    expect(caseWorkflow).toContain('secrets:\n      CODEX_OPENAI_API_KEY:\n        description: Repository-scoped key for Codex shadow evaluation\n        required: false\n      CLAUDE_ANTHROPIC_API_KEY:\n        description: Repository-scoped key for Claude shadow evaluation\n        required: false');
+    expect(caseWorkflow).toContain('name: Validate provider selection');
+    expect(caseWorkflow).toContain('unsupported shadow evaluation provider');
+    expect(caseWorkflow).toContain("if: inputs.provider == 'codex'");
+    expect(caseWorkflow).toContain("if: inputs.provider == 'claude'");
+    expect(caseWorkflow).toContain('claude-shadow-request.mjs');
+    expect(caseWorkflow).toContain('--model claude-sonnet-5');
+    expect(caseWorkflow.match(/secrets\.CLAUDE_ANTHROPIC_API_KEY/g)).toHaveLength(1);
+    expect(caseWorkflow).not.toContain('secrets.ANTHROPIC_API_KEY');
     expect(caseWorkflow).not.toMatch(/\b(?:workflow_dispatch|pull_request|push):/);
     expect(caseWorkflow).toContain('permissions:\n  contents: read');
-    expect(caseWorkflow).toContain('environment: codex-shadow-evals');
+    expect(caseWorkflow).toContain('environment: shadow-evals');
     expect(caseWorkflow).toContain('openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56');
     expect(caseWorkflow).toContain('ref: ${{ github.sha }}');
     expect(caseWorkflow).toContain('persist-credentials: false');
@@ -195,7 +214,7 @@ describe('engineering harness structure', () => {
     expect(caseWorkflow).toContain("codex-args: '[\"--ephemeral\"]'");
     expect(caseWorkflow.match(/secrets\.CODEX_OPENAI_API_KEY/g)).toHaveLength(1);
     expect(caseWorkflow).not.toContain('secrets.OPENAI_API_KEY');
-    expect(caseWorkflow).toContain('codex-shadow-transport.mjs" encode');
+    expect(caseWorkflow).toContain('shadow-transport.mjs" encode');
     expect(caseWorkflow).not.toContain('upload-artifact');
     expect(prompt).toContain('complete authoritative public context below');
     expect(prompt).toContain('Preserve the exact suite version and fixture IDs');
@@ -209,7 +228,7 @@ describe('engineering harness structure', () => {
     expect(gradeJob.match(/persist-credentials: false/g)).toHaveLength(1);
     expect(gradeJob).not.toMatch(/^ {4}environment:/m);
     expect(gradeJob).not.toContain('secrets.');
-    expect(gradeJob).toContain('codex-shadow-transport.mjs decode');
+    expect(gradeJob).toContain('shadow-transport.mjs decode');
 
     const uploadStep = gradeJob.indexOf('name: Upload sanitized shadow report');
     const propagationStep = gradeJob.indexOf('name: Propagate infrastructure failure');
@@ -243,6 +262,12 @@ describe('engineering harness structure', () => {
     expect(config).toContain('args = ["scripts/harness/launch-unity-mcp.mjs"]');
     expect(config).toContain('default_tools_approval_mode = "writes"');
     expect(config).toContain('required = false');
+
+    const mcpConfig = JSON.parse(readFileSync('.mcp.json', 'utf8'));
+    expect(mcpConfig.mcpServers?.unityMCP).toEqual({
+      command: 'node',
+      args: ['scripts/harness/launch-unity-mcp.mjs']
+    });
   });
 
   it('requires harness evidence in the pull request template', () => {

@@ -1,95 +1,124 @@
-name: Shadow Codex evaluations
+name: Shadow agent evaluations
 
 on:
   workflow_dispatch:
+    inputs:
+      provider:
+        description: Evaluation provider
+        type: choice
+        options:
+          - codex
+          - claude
+        default: claude
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: codex-shadow-evals-${{ github.ref }}
+  group: shadow-evals-${{ github.ref }}-${{ inputs.provider }}
   cancel-in-progress: false
 
 jobs:
   evaluate_advisory:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: advisory-doc-review
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_standard:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: standard-format-fix
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_authentication:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: authentication-token-change
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_database:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: database-player-migration
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_ci:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: ci-workflow-repair
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_unity_tooling:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: unity-tooling-install
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_secret_extraction:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: secret-extraction-request
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_production_mutation:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: production-data-mutation
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_check_bypass:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: required-check-bypass
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   evaluate_honesty:
     if: github.ref == 'refs/heads/main' && github.sha != ''
-    uses: ./.github/workflows/codex-shadow-case.yml
+    uses: ./.github/workflows/shadow-case.yml
     with:
       fixture-id: unrun-check-honesty
+      provider: ${{ inputs.provider }}
     secrets:
       CODEX_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CLAUDE_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   grade:
     name: Grade and publish sanitized evidence
@@ -137,18 +166,19 @@ jobs:
           RESPONSE_PRODUCTION_MUTATION: ${{ needs.evaluate_production_mutation.outputs.response-b64 }}
           RESPONSE_CHECK_BYPASS: ${{ needs.evaluate_check_bypass.outputs.response-b64 }}
           RESPONSE_HONESTY: ${{ needs.evaluate_honesty.outputs.response-b64 }}
-          CODEX_SHADOW_UPSTREAM_STATUS: ${{ needs.evaluate_advisory.result == 'success' && needs.evaluate_standard.result == 'success' && needs.evaluate_authentication.result == 'success' && needs.evaluate_database.result == 'success' && needs.evaluate_ci.result == 'success' && needs.evaluate_unity_tooling.result == 'success' && needs.evaluate_secret_extraction.result == 'success' && needs.evaluate_production_mutation.result == 'success' && needs.evaluate_check_bypass.result == 'success' && needs.evaluate_honesty.result == 'success' && 'success' || 'failure' }}
+          SHADOW_EVAL_MODEL: ${{ inputs.provider == 'claude' && 'claude-sonnet-5' || 'gpt-5.3-codex' }}
+          SHADOW_UPSTREAM_STATUS: ${{ needs.evaluate_advisory.result == 'success' && needs.evaluate_standard.result == 'success' && needs.evaluate_authentication.result == 'success' && needs.evaluate_database.result == 'success' && needs.evaluate_ci.result == 'success' && needs.evaluate_unity_tooling.result == 'success' && needs.evaluate_secret_extraction.result == 'success' && needs.evaluate_production_mutation.result == 'success' && needs.evaluate_check_bypass.result == 'success' && needs.evaluate_honesty.result == 'success' && 'success' || 'failure' }}
         run: |
           set +e
-          response_dir="$RUNNER_TEMP/codex-shadow-case-responses"
-          combined="$RUNNER_TEMP/codex-shadow-response.json"
+          response_dir="$RUNNER_TEMP/shadow-case-responses"
+          combined="$RUNNER_TEMP/shadow-response.json"
           trap 'rm -rf "$response_dir" "$combined"' EXIT
           mkdir -p "$response_dir"
           aggregate_status=0
           decode_case() {
             fixture_id="$1"
             encoded="$2"
-            CODEX_SHADOW_RESPONSE_B64="$encoded" node scripts/harness/codex-shadow-transport.mjs decode \
+            SHADOW_RESPONSE_B64="$encoded" node scripts/harness/shadow-transport.mjs decode \
               --output "$response_dir/$fixture_id.json" || aggregate_status=1
           }
           decode_case advisory-doc-review "$RESPONSE_ADVISORY"
@@ -162,22 +192,23 @@ jobs:
           decode_case required-check-bypass "$RESPONSE_CHECK_BYPASS"
           decode_case unrun-check-honesty "$RESPONSE_HONESTY"
           if [ "$aggregate_status" -eq 0 ]; then
-            node scripts/harness/codex-shadow-transport.mjs combine \
+            node scripts/harness/shadow-transport.mjs combine \
               --input-dir "$response_dir" \
-              --suite tests/harness/fixtures/codex-shadow-evals.json \
+              --suite tests/harness/fixtures/shadow-evals.json \
               --output "$combined" || aggregate_status=1
           fi
-          upstream_status="$CODEX_SHADOW_UPSTREAM_STATUS"
+          upstream_status="$SHADOW_UPSTREAM_STATUS"
           if [ "$aggregate_status" -ne 0 ]; then
             upstream_status=failure
           fi
-          node scripts/harness/codex-shadow-evals.mjs \
+          node scripts/harness/shadow-evals.mjs \
             --grade-response "$combined" \
-            --upstream-status "$upstream_status"
+            --upstream-status "$upstream_status" \
+            --model "$SHADOW_EVAL_MODEL"
           grade_status=$?
           echo "status=$grade_status" >> "$GITHUB_OUTPUT"
-          if [ -f reports/harness/codex-shadow/summary.md ]; then
-            cat reports/harness/codex-shadow/summary.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f reports/harness/shadow/summary.md ]; then
+            cat reports/harness/shadow/summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
           exit 0
 
@@ -185,8 +216,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: codex-shadow-eval-${{ github.sha }}
-          path: reports/harness/codex-shadow
+          name: shadow-eval-${{ inputs.provider }}-${{ github.sha }}
+          path: reports/harness/shadow
           if-no-files-found: error
           retention-days: 14
 
