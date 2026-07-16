@@ -10,6 +10,15 @@ import {
   mission01StartResponse,
   runMission01
 } from '../sim/mission01.js';
+import {
+  MISSION_02_CODE,
+  MISSION_02_DEFAULT_SEED,
+  MISSION_02_ENEMY_SHIP_IDS,
+  MISSION_02_PLAYER_SHIP_IDS,
+  MISSION_02_TURN_LIMIT,
+  mission02StartResponse,
+  runMission02
+} from '../sim/mission02.js';
 import { simOrderSchema } from '../sim/types.js';
 
 const completeSchema = z.object({
@@ -29,6 +38,20 @@ const mission01ResolveSchema = z
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_01_TURN_LIMIT)
+  })
+  .strict();
+
+const mission02StartSchema = z
+  .object({
+    seed: z.number().int().nonnegative().default(MISSION_02_DEFAULT_SEED)
+  })
+  .strict();
+
+const mission02ResolveSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+    seed: z.number().int().nonnegative(),
+    turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_02_TURN_LIMIT)
   })
   .strict();
 
@@ -103,6 +126,73 @@ export function registerMissionRoutes(app: FastifyInstance) {
         requestId: request.id
       },
       'mission01_resolved'
+    );
+
+    return { outcome };
+  });
+
+  app.post(`/missions/${MISSION_02_CODE}/start`, async (request, reply) => {
+    if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_02_CODE }))) {
+      return;
+    }
+
+    const parsed = mission02StartSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.format() });
+    }
+
+    return mission02StartResponse(parsed.data.seed);
+  });
+
+  app.post(`/missions/${MISSION_02_CODE}/resolve`, async (request, reply) => {
+    if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_02_CODE }))) {
+      return;
+    }
+
+    const parsed = mission02ResolveSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.format() });
+    }
+
+    if (!validateJsonLimit(reply, parsed.data.turns)) {
+      return;
+    }
+
+    const playerShipIds = new Set<string>(MISSION_02_PLAYER_SHIP_IDS);
+    const enemyShipIds = new Set<string>(MISSION_02_ENEMY_SHIP_IDS);
+    for (const turnOrders of parsed.data.turns) {
+      for (const order of turnOrders) {
+        if (!playerShipIds.has(order.shipId)) {
+          return reply.status(400).send({ error: 'invalid_order_ship', shipId: order.shipId });
+        }
+        if (order.action === 'boarding') {
+          return reply.status(400).send({ error: 'boarding_disabled' });
+        }
+        if (order.targetShipId && !enemyShipIds.has(order.targetShipId)) {
+          return reply
+            .status(400)
+            .send({ error: 'unknown_target_in_order', shipId: order.targetShipId });
+        }
+      }
+    }
+
+    const outcome = runMission02(parsed.data.seed, parsed.data.turns);
+
+    request.log.info(
+      {
+        actor: request.user?.id,
+        missionCode: MISSION_02_CODE,
+        result: outcome.result,
+        failReason: outcome.failReason,
+        turnCount: outcome.turnCount,
+        damageProfile: outcome.damageProfile,
+        bonusObjectives: outcome.bonusObjectives,
+        rakeAttempts: outcome.telemetry.rakeAttempts,
+        rakeHits: outcome.telemetry.rakeHits,
+        upwindTurns: outcome.telemetry.upwindTurns,
+        requestId: request.id
+      },
+      'mission02_resolved'
     );
 
     return { outcome };

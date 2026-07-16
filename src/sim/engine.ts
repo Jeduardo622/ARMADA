@@ -7,6 +7,8 @@ import {
   SimState,
   SimSummary,
   ShipState,
+  Obstacle,
+  Vector2,
   Wind
 } from './types.js';
 
@@ -76,18 +78,31 @@ export function effectiveSpeed(ship: ShipState, wind: Wind): number {
   return clamp(ship.speed + delta, 1, MAX_SPEED);
 }
 
-function applyMovement(ship: ShipState, wind: Wind): SimEvent {
+function insideObstacle(point: Vector2, obstacles: Obstacle[]) {
+  return obstacles.some((obstacle) => {
+    const dx = point.x - obstacle.position.x;
+    const dy = point.y - obstacle.position.y;
+    return Math.sqrt(dx * dx + dy * dy) < obstacle.radius;
+  });
+}
+
+function applyMovement(ship: ShipState, wind: Wind, obstacles: Obstacle[]): SimEvent {
   const speed = effectiveSpeed(ship, wind);
   const radians = (ship.heading * Math.PI) / 180;
-  ship.position = {
+  const destination = {
     x: ship.position.x + Math.round(Math.cos(radians) * speed * MOVEMENT_SCALE),
     y: ship.position.y + Math.round(Math.sin(radians) * speed * MOVEMENT_SCALE)
   };
+  const blocked = insideObstacle(destination, obstacles);
+  if (!blocked) {
+    ship.position = destination;
+  }
   return {
     type: 'movement',
     shipId: ship.id,
     effectiveSpeed: speed,
-    position: { ...ship.position }
+    position: { ...ship.position },
+    ...(blocked ? { blocked: true } : {})
   };
 }
 
@@ -252,9 +267,10 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
 
   const windAware = input.modifiers?.windMovement === true;
   if (windAware) {
+    const obstacles = input.state.obstacles ?? [];
     for (const ship of resolutionOrder) {
       if (ship.hp <= 0) continue;
-      events.push(applyMovement(ship, input.state.wind));
+      events.push(applyMovement(ship, input.state.wind, obstacles));
     }
   }
 

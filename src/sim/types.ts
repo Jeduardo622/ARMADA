@@ -41,11 +41,21 @@ export const shipSchema = z
   })
   .strict();
 
+export const obstacleSchema = z
+  .object({
+    position: vectorSchema,
+    radius: z.number().int().min(1)
+  })
+  .strict();
+
 export const simStateSchema = z
   .object({
     turn: z.number().int().min(1),
     wind: windSchema,
-    ships: z.array(shipSchema).min(1)
+    ships: z.array(shipSchema).min(1),
+    // Impassable terrain (e.g. islands). Movement halts at the edge instead
+    // of entering. Only meaningful with modifiers.windMovement.
+    obstacles: z.array(obstacleSchema).max(8).optional()
   })
   .strict();
 
@@ -98,6 +108,7 @@ export const simPreviewSchema = z
   .strict();
 
 export type SimModifiers = z.infer<typeof simModifiersSchema>;
+export type Obstacle = z.infer<typeof obstacleSchema>;
 export type Vector2 = z.infer<typeof vectorSchema>;
 export type Wind = z.infer<typeof windSchema>;
 export type ShipStatus = z.infer<typeof shipStatusSchema>;
@@ -154,6 +165,7 @@ export type SimEvent =
       shipId: string;
       effectiveSpeed: number;
       position: Vector2;
+      blocked?: boolean;
     }
   | {
       type: 'status';

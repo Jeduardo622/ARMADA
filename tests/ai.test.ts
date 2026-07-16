@@ -99,6 +99,23 @@ describe('aggressive profile', () => {
   });
 });
 
+describe('obstacle avoidance', () => {
+  it('deflects an approach heading that would run into an obstacle', () => {
+    const enemy = ship({ id: 'e1', side: 'enemy', heading: 0 });
+    const player = ship({ id: 'p1', side: 'player', position: { x: 200, y: 0 }, heading: 0 });
+    const open = board([player, enemy]);
+    const blocked = {
+      ...board([player, enemy]),
+      obstacles: [{ position: { x: 50, y: 5 }, radius: 20 }]
+    };
+
+    const direct = aiOrderFor(enemy, open, 'aggressive', { rakeBias: 'low' });
+    const deflected = aiOrderFor(enemy, blocked, 'aggressive', { rakeBias: 'low' });
+    expect(direct).toMatchObject({ action: 'maneuver', turnDelta: 0 });
+    expect(deflected).toMatchObject({ action: 'maneuver', turnDelta: -30 });
+  });
+});
+
 describe('kiting profile', () => {
   it('disengages downwind when the target closes inside standoff', () => {
     const kiter = ship({ id: 'e1', side: 'enemy', heading: 90 });
