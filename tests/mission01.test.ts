@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildServer } from '../src/app.js';
-import { resolveSimPreview } from '../src/sim/engine.js';
+import { effectiveSpeed, resolveSimPreview } from '../src/sim/engine.js';
 import {
   MISSION_01_CODE,
   MISSION_01_ENEMY_SHIP_ID,
@@ -54,14 +54,27 @@ describe('mission 01 scenario', () => {
   });
 
   it('is deterministic for the same seed and orders', () => {
-    const first = runMission01(44, allBroadsides);
-    const second = runMission01(44, allBroadsides);
+    const first = runMission01(16, allBroadsides);
+    const second = runMission01(16, allBroadsides);
     expect(second).toEqual(first);
     expect(first.turns.map((turn) => turn.hash)).toEqual(second.turns.map((turn) => turn.hash));
   });
 
-  it('reports a win with both bonus objectives for seed 44', () => {
-    const outcome = runMission01(44, allBroadsides);
+  it('closes the range through movement before the enemy opens fire', () => {
+    const outcome = runMission01(16, allBroadsides);
+    const movementEvents = outcome.turns[0].events.filter((event) => event.type === 'movement');
+    expect(movementEvents).toHaveLength(2);
+    const enemyBroadsides = outcome.turns.flatMap((turn) =>
+      turn.events.filter(
+        (event) => event.type === 'broadside' && event.shipId === MISSION_01_ENEMY_SHIP_ID
+      )
+    );
+    expect(outcome.turns[0].events.some((event) => event.type === 'broadside')).toBe(true);
+    expect(enemyBroadsides.length).toBeLessThan(outcome.turnCount);
+  });
+
+  it('reports a win with both bonus objectives for seed 16', () => {
+    const outcome = runMission01(16, allBroadsides);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
     expect(outcome.turnCount).toBeLessThanOrEqual(6);
@@ -74,14 +87,14 @@ describe('mission 01 scenario', () => {
   });
 
   it('reports a win without the hull bonus when the player takes heavy fire', () => {
-    const outcome = runMission01(4, allBroadsides);
+    const outcome = runMission01(2, allBroadsides);
     expect(outcome.result).toBe('win');
     expect(outcome.bonusObjectives.underHullDamageThreshold).toBe(false);
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(true);
   });
 
   it('fails with timeout when the player never engages', () => {
-    const outcome = runMission01(30, []);
+    const outcome = runMission01(8, []);
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('timeout');
     expect(outcome.turnCount).toBe(MISSION_01_TURN_LIMIT);
@@ -89,7 +102,7 @@ describe('mission 01 scenario', () => {
   });
 
   it('fails with sunk when the enemy destroys the player', () => {
-    const outcome = runMission01(1, []);
+    const outcome = runMission01(2, []);
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('sunk');
     expect(outcome.damageProfile.playerRemainingHp).toBe(0);
@@ -131,6 +144,52 @@ describe('engine damage scale modifier', () => {
   });
 });
 
+describe('engine wind and movement (modifiers.windMovement)', () => {
+  const twoShipState = () => createMission01State();
+
+  it('keeps default resolution wind-free and stationary', () => {
+    const result = resolveSimPreview({
+      schemaVersion: 1,
+      seed: 5,
+      turn: 1,
+      state: twoShipState(),
+      orders: []
+    });
+    expect(result.events.filter((event) => event.type === 'movement')).toHaveLength(0);
+    expect(result.nextState.ships.map((ship) => ship.position)).toEqual([
+      { x: 0, y: 0 },
+      { x: 150, y: 0 }
+    ]);
+  });
+
+  it('applies the wind curve to effective speed', () => {
+    const wind = { direction: 0, speed: 5 };
+    const ship = twoShipState().ships[0];
+    expect(effectiveSpeed({ ...ship, heading: 0, speed: 3 }, wind)).toBe(5);
+    expect(effectiveSpeed({ ...ship, heading: 90, speed: 3 }, wind)).toBe(3);
+    expect(effectiveSpeed({ ...ship, heading: 180, speed: 3 }, wind)).toBe(1);
+    expect(effectiveSpeed({ ...ship, heading: 180, speed: 0 }, wind)).toBe(0);
+  });
+
+  it('moves ships along their heading with tailwind bonus and headwind penalty', () => {
+    const result = resolveSimPreview({
+      schemaVersion: 1,
+      seed: 5,
+      turn: 1,
+      state: twoShipState(),
+      orders: [],
+      modifiers: { windMovement: true }
+    });
+    const player = result.nextState.ships.find((ship) => ship.id === MISSION_01_PLAYER_SHIP_ID);
+    const enemy = result.nextState.ships.find((ship) => ship.id === MISSION_01_ENEMY_SHIP_ID);
+    // Player runs downwind: speed 3 + floor(5/2) = 5 -> 25 units east.
+    expect(player?.position).toEqual({ x: 25, y: 0 });
+    // Enemy beats upwind: speed 2 - 2 clamped to steerage 1 -> 5 units west.
+    expect(enemy?.position).toEqual({ x: 145, y: 0 });
+    expect(result.events.filter((event) => event.type === 'movement')).toHaveLength(2);
+  });
+});
+
 describe('mission 01 routes', () => {
   it('starts deterministically with default seed and scenario payload', async () => {
     const res1 = await app.inject({ method: 'POST', url: `/missions/${MISSION_01_CODE}/start` });
@@ -164,7 +223,7 @@ describe('mission 01 routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/missions/${MISSION_01_CODE}/resolve`,
-      payload: { schemaVersion: 1, seed: 44, turns: allBroadsides }
+      payload: { schemaVersion: 1, seed: 16, turns: allBroadsides }
     });
     expect(res.statusCode).toBe(200);
 
@@ -182,7 +241,7 @@ describe('mission 01 routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/missions/${MISSION_01_CODE}/resolve`,
-      payload: { schemaVersion: 1, seed: 30, turns: [] }
+      payload: { schemaVersion: 1, seed: 8, turns: [] }
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().outcome.result).toBe('loss');

@@ -76,7 +76,10 @@ export const simOrderSchema = z
 
 export const simModifiersSchema = z
   .object({
-    damageScale: z.record(z.string(), z.number().min(0).max(2)).optional()
+    damageScale: z.record(z.string(), z.number().min(0).max(2)).optional(),
+    // Opt-in wind-aware resolution: wind impact curve on effective speed plus
+    // per-turn movement. Absent or false keeps the legacy stationary rules.
+    windMovement: z.boolean().optional()
   })
   .strict();
 
@@ -141,6 +144,12 @@ export type SimEvent =
         sail: number;
         crew: number;
       };
+    }
+  | {
+      type: 'movement';
+      shipId: string;
+      effectiveSpeed: number;
+      position: Vector2;
     }
   | {
       type: 'status';
