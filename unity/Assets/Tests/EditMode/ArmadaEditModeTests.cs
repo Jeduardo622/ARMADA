@@ -90,6 +90,21 @@ namespace Armada.Client.Tests.EditMode
             StringAssert.Contains("\"orders\":[]", json);
         }
 
+        [Test]
+        public void Mission01Scenario_FingerprintMatchesBackendPin()
+        {
+            // Must equal EXPECTED_FINGERPRINT in tests/mission01.test.ts so the
+            // client and server pin the identical deterministic scenario.
+            const string expected =
+                "mission-01-fair-wind|turnLimit=8|bonusTurns=6|bonusHull=0.2|enemyScale=0.9|wind=0:5|" +
+                "enemy-sloop:enemy:150,0:h180:v2:hp108:sl70:cw40|player-sloop:player:0,0:h0:v3:hp120:sl80:cw50";
+
+            Assert.That(Mission01Scenario.Fingerprint(), Is.EqualTo(expected));
+            Assert.That(
+                Mission01Scenario.FingerprintOf(Mission01Scenario.BuildExpectedStart(44)),
+                Is.EqualTo(expected));
+        }
+
         private static TelemetryEvent Event(string type, string value)
         {
             return new TelemetryEvent

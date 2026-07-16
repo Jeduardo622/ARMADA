@@ -1,5 +1,9 @@
 using System.Collections;
+using System.Collections.Generic;
+using System.Net;
+using System.Threading.Tasks;
 using Armada.Client.Core;
+using Armada.Client.Services;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -29,6 +33,86 @@ namespace Armada.Client.Tests.PlayMode
             {
                 UnityEngine.Random.state = originalState;
                 UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Mission01Flow_RunsMissionWithSeedAndScenarioParity()
+        {
+            var originalState = UnityEngine.Random.state;
+            var gameObject = new GameObject("mission01-flow-test");
+            try
+            {
+                var hooks = gameObject.AddComponent<DeterministicSimHooks>();
+
+                hooks.ApplySeed(44);
+                var expectedDraw = UnityEngine.Random.Range(0, int.MaxValue);
+
+                var flow = new Mission01Flow(new FakeMission01Client(), hooks);
+                var run = flow.RunAsync(44, new List<List<SimOrder>>());
+                while (!run.IsCompleted)
+                {
+                    yield return null;
+                }
+
+                Assert.That(run.Result.Success, Is.True, run.Result.FailureReason);
+                Assert.That(run.Result.Outcome.Result, Is.EqualTo("win"));
+                Assert.That(run.Result.Outcome.FailReason, Is.Null);
+                Assert.That(run.Result.Outcome.TurnCount, Is.LessThanOrEqualTo(Mission01Scenario.BonusTurnTarget));
+
+                // The flow re-applied seed 44 through DeterministicSimHooks, so the
+                // next draw repeats the seeded sequence.
+                Assert.That(UnityEngine.Random.Range(0, int.MaxValue), Is.EqualTo(expectedDraw));
+            }
+            finally
+            {
+                UnityEngine.Random.state = originalState;
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+
+        private sealed class FakeMission01Client : IMission01Client
+        {
+            public Task<ServiceResult<Mission01StartResponse>> StartMission01Async(int seed)
+            {
+                return Task.FromResult(new ServiceResult<Mission01StartResponse>
+                {
+                    Data = Mission01Scenario.BuildExpectedStart(seed),
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<Mission01Outcome>> ResolveMission01Async(Mission01ResolveRequest request)
+            {
+                return Task.FromResult(new ServiceResult<Mission01Outcome>
+                {
+                    Data = new Mission01Outcome
+                    {
+                        MissionCode = Mission01Scenario.MissionCode,
+                        Seed = request.Seed,
+                        Result = "win",
+                        FailReason = null,
+                        TurnCount = 4,
+                        TurnLimit = Mission01Scenario.TurnLimit,
+                        BonusObjectives = new Mission01BonusObjectives
+                        {
+                            UnderHullDamageThreshold = true,
+                            WithinTurnTarget = true
+                        },
+                        DamageProfile = new Mission01DamageProfile
+                        {
+                            PlayerHullDamage = 22,
+                            PlayerHullDamageFraction = 0.18,
+                            PlayerRemainingHp = 98,
+                            EnemyHullDamage = 108,
+                            EnemyRemainingHp = 0
+                        },
+                        Turns = new List<Mission01TurnRecord>()
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
             }
         }
     }

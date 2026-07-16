@@ -34,7 +34,7 @@ function distance(from: ShipState, to: ShipState) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function createDeterministicRng(seed: number) {
+export function createDeterministicRng(seed: number) {
   let t = seed >>> 0;
   return () => {
     t += 0x6d2b79f5;
@@ -63,7 +63,8 @@ function resolveBroadside(
   rng: () => number,
   attacker: ShipState,
   target: ShipState,
-  order: SimOrder
+  order: SimOrder,
+  damageScale: number
 ): SimEvent {
   const range = distance(attacker, target);
   const bearingToTarget = angleBetween(attacker, target);
@@ -80,9 +81,10 @@ function resolveBroadside(
 
   const baseDamage = 18 + Math.floor(attacker.sail / 25) + Math.floor(attacker.speed * 1.5);
   const variance = Math.floor(rng() * 6);
-  const hullDamage = hit ? baseDamage + variance : 0;
-  const sailDamage = hit ? Math.floor((baseDamage + variance) * 0.6) : 0;
-  const crewDamage = hit ? Math.floor((baseDamage + variance) * 0.35) : 0;
+  const scaledDamage = Math.floor((baseDamage + variance) * damageScale);
+  const hullDamage = hit ? scaledDamage : 0;
+  const sailDamage = hit ? Math.floor(scaledDamage * 0.6) : 0;
+  const crewDamage = hit ? Math.floor(scaledDamage * 0.35) : 0;
 
   target.hp = clamp(target.hp - hullDamage, 0, target.hp);
   target.sail = clamp(target.sail - sailDamage, 0, target.sail);
@@ -194,7 +196,8 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
     if (order.action === 'broadside' && order.targetShipId) {
       const target = shipById.get(order.targetShipId);
       if (target && target.hp > 0) {
-        events.push(resolveBroadside(rng, ship, target, order));
+        const damageScale = input.modifiers?.damageScale?.[ship.id] ?? 1;
+        events.push(resolveBroadside(rng, ship, target, order, damageScale));
       }
     } else if (order.action === 'boarding' && order.targetShipId) {
       const target = shipById.get(order.targetShipId);

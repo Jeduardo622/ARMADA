@@ -216,6 +216,85 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class Mission01Objectives
+    {
+        public int TurnLimit { get; set; }
+        public int BonusTurnTarget { get; set; }
+        public double BonusHullDamageFraction { get; set; }
+        public double EnemyDamageScale { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission01StartRequest
+    {
+        public int Seed { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission01StartResponse
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission01Objectives Objectives { get; set; }
+        public SimState State { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission01ResolveRequest
+    {
+        [JsonProperty("schemaVersion")] public int SchemaVersion { get; set; } = 1;
+        public int Seed { get; set; }
+        public List<List<SimOrder>> Turns { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission01BonusObjectives
+    {
+        public bool UnderHullDamageThreshold { get; set; }
+        public bool WithinTurnTarget { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission01DamageProfile
+    {
+        public int PlayerHullDamage { get; set; }
+        public double PlayerHullDamageFraction { get; set; }
+        public int PlayerRemainingHp { get; set; }
+        public int EnemyHullDamage { get; set; }
+        public int EnemyRemainingHp { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission01TurnRecord
+    {
+        public int Turn { get; set; }
+        public string Hash { get; set; }
+        public SimSummary Summary { get; set; }
+        public List<SimEvent> Events { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission01Outcome
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public string Result { get; set; }
+        public string FailReason { get; set; }
+        public int TurnCount { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission01BonusObjectives BonusObjectives { get; set; }
+        public Mission01DamageProfile DamageProfile { get; set; }
+        public List<Mission01TurnRecord> Turns { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission01ResolveEnvelope
+    {
+        public Mission01Outcome Outcome { get; set; }
+    }
+
+    [Serializable]
     public sealed class ConfigSnapshot
     {
         public string Namespace { get; set; }
