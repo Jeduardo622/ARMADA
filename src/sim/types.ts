@@ -74,16 +74,24 @@ export const simOrderSchema = z
     }
   });
 
+export const simModifiersSchema = z
+  .object({
+    damageScale: z.record(z.string(), z.number().min(0).max(2)).optional()
+  })
+  .strict();
+
 export const simPreviewSchema = z
   .object({
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turn: z.number().int().min(1).default(1),
     state: simStateSchema,
-    orders: z.array(simOrderSchema).max(32)
+    orders: z.array(simOrderSchema).max(32),
+    modifiers: simModifiersSchema.optional()
   })
   .strict();
 
+export type SimModifiers = z.infer<typeof simModifiersSchema>;
 export type Vector2 = z.infer<typeof vectorSchema>;
 export type Wind = z.infer<typeof windSchema>;
 export type ShipStatus = z.infer<typeof shipStatusSchema>;

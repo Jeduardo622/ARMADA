@@ -7,7 +7,13 @@ using UnityEngine.Networking;
 
 namespace Armada.Client.Services
 {
-    public sealed class MissionService
+    public interface IMission01Client
+    {
+        Task<ServiceResult<Mission01StartResponse>> StartMission01Async(int seed);
+        Task<ServiceResult<Mission01Outcome>> ResolveMission01Async(Mission01ResolveRequest request);
+    }
+
+    public sealed class MissionService : IMission01Client
     {
         private readonly ApiClient _client;
         private readonly FeatureFlags _flags;
@@ -32,6 +38,39 @@ namespace Armada.Client.Services
             return new ServiceResult<List<Mission>>
             {
                 Data = resp.Data?.Missions,
+                Success = resp.Success,
+                Status = resp.StatusCode,
+                ErrorReason = resp.ErrorReason,
+                FeatureDisabled = featureDisabled
+            };
+        }
+
+        public async Task<ServiceResult<Mission01StartResponse>> StartMission01Async(int seed)
+        {
+            var resp = await _client.SendAsync<Mission01StartResponse>($"/missions/{Mission01Scenario.MissionCode}/start", UnityWebRequest.kHttpVerbPOST, new Mission01StartRequest { Seed = seed });
+            var featureDisabled = false;
+            if (resp.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _flags.DisableFromForbidden(FeatureKey);
+                featureDisabled = true;
+            }
+
+            return ServiceResult<Mission01StartResponse>.FromResponse(resp, featureDisabled);
+        }
+
+        public async Task<ServiceResult<Mission01Outcome>> ResolveMission01Async(Mission01ResolveRequest request)
+        {
+            var resp = await _client.SendAsync<Mission01ResolveEnvelope>($"/missions/{Mission01Scenario.MissionCode}/resolve", UnityWebRequest.kHttpVerbPOST, request);
+            var featureDisabled = false;
+            if (resp.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _flags.DisableFromForbidden(FeatureKey);
+                featureDisabled = true;
+            }
+
+            return new ServiceResult<Mission01Outcome>
+            {
+                Data = resp.Data?.Outcome,
                 Success = resp.Success,
                 Status = resp.StatusCode,
                 ErrorReason = resp.ErrorReason,
