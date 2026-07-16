@@ -133,11 +133,20 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class SimObstacle
+    {
+        public SimVector2 Position { get; set; }
+        public int Radius { get; set; }
+    }
+
+    [Serializable]
     public sealed class SimState
     {
         public int Turn { get; set; }
         public SimWind Wind { get; set; }
         public List<SimShip> Ships { get; set; }
+        [JsonProperty("obstacles", NullValueHandling = NullValueHandling.Ignore)]
+        public List<SimObstacle> Obstacles { get; set; }
     }
 
     [Serializable]
@@ -292,6 +301,65 @@ namespace Armada.Client.Core
     public sealed class Mission01ResolveEnvelope
     {
         public Mission01Outcome Outcome { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission02Objectives
+    {
+        public int TurnLimit { get; set; }
+        public int BonusTurnTarget { get; set; }
+        public int UpwindBonusTurns { get; set; }
+        public double EnemyDamageScale { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission02StartResponse
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission02Objectives Objectives { get; set; }
+        public SimState State { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission02BonusObjectives
+    {
+        public bool HeldWeatherGage { get; set; }
+        public bool WithinTurnTarget { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission02Telemetry
+    {
+        public int RakeAttempts { get; set; }
+        public int RakeHits { get; set; }
+        public int UpwindTurns { get; set; }
+        public List<bool> UpwindByTurn { get; set; }
+    }
+
+    // Damage profile, turn records, and the resolve request shape are shared
+    // with mission 01 (Mission01DamageProfile / Mission01TurnRecord /
+    // Mission01ResolveRequest).
+    [Serializable]
+    public sealed class Mission02Outcome
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public string Result { get; set; }
+        public string FailReason { get; set; }
+        public int TurnCount { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission02BonusObjectives BonusObjectives { get; set; }
+        public Mission01DamageProfile DamageProfile { get; set; }
+        public Mission02Telemetry Telemetry { get; set; }
+        public List<Mission01TurnRecord> Turns { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission02ResolveEnvelope
+    {
+        public Mission02Outcome Outcome { get; set; }
     }
 
     [Serializable]

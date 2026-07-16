@@ -25,6 +25,12 @@ export const AI_PROFILE_DEFAULTS: Record<AiProfileName, AiProfileParams> = {
 const RAKE_AIM_OFFSET = 40;
 const MAX_TURN = 90;
 
+// Obstacle avoidance is a deterministic deflection, not pathfinding: when the
+// desired heading would reach an obstacle within one move, bear away by a
+// fixed angle on the side pointing away from the obstacle's center.
+const OBSTACLE_PROBE = 50;
+const OBSTACLE_DEFLECTION = 30;
+
 function normalizeHeading(degrees: number) {
   const normalized = ((degrees % 360) + 360) % 360;
   return Math.round(normalized);
@@ -51,6 +57,22 @@ function clampTurn(delta: number) {
 
 function turnToward(ship: ShipState, targetBearing: number) {
   return clampTurn(signedAngle(ship.heading, targetBearing));
+}
+
+function avoidObstacles(ship: ShipState, desiredBearing: number, state: SimState) {
+  for (const obstacle of state.obstacles ?? []) {
+    const radians = (desiredBearing * Math.PI) / 180;
+    const probe = {
+      x: ship.position.x + Math.round(Math.cos(radians) * OBSTACLE_PROBE),
+      y: ship.position.y + Math.round(Math.sin(radians) * OBSTACLE_PROBE)
+    };
+    if (distanceBetween(probe, obstacle.position) < obstacle.radius) {
+      const offset = signedAngle(desiredBearing, bearingBetween(ship.position, obstacle.position));
+      const away = offset >= 0 ? -OBSTACLE_DEFLECTION : OBSTACLE_DEFLECTION;
+      return normalizeHeading(desiredBearing + away);
+    }
+  }
+  return desiredBearing;
 }
 
 // Port guns face the ship's left (counterclockwise) side in the sim's
@@ -85,12 +107,12 @@ function pass(ship: ShipState): SimOrder {
   return { shipId: ship.id, action: 'pass', turnDelta: 0, speedDelta: 0 };
 }
 
-function reposition(ship: ShipState, threat: ShipState): SimOrder {
+function reposition(ship: ShipState, threat: ShipState, state: SimState): SimOrder {
   const awayBearing = normalizeHeading(bearingBetween(threat.position, ship.position));
   return {
     shipId: ship.id,
     action: 'maneuver',
-    turnDelta: turnToward(ship, awayBearing),
+    turnDelta: turnToward(ship, avoidObstacles(ship, awayBearing, state)),
     speedDelta: 1
   };
 }
@@ -111,7 +133,12 @@ function lineAdvanceOrder(ship: ShipState, target: ShipState, params: AiProfileP
   };
 }
 
-function aggressiveOrder(ship: ShipState, target: ShipState, params: AiProfileParams): SimOrder {
+function aggressiveOrder(
+  ship: ShipState,
+  target: ShipState,
+  params: AiProfileParams,
+  state: SimState
+): SimOrder {
   const range = distanceBetween(ship.position, target.position);
   if (range > params.preferredRange) {
     let aimPoint = target.position;
@@ -122,10 +149,11 @@ function aggressiveOrder(ship: ShipState, target: ShipState, params: AiProfilePa
         y: target.position.y - Math.round(Math.sin(radians) * RAKE_AIM_OFFSET)
       };
     }
+    const approachBearing = avoidObstacles(ship, bearingBetween(ship.position, aimPoint), state);
     return {
       shipId: ship.id,
       action: 'maneuver',
-      turnDelta: turnToward(ship, bearingBetween(ship.position, aimPoint)),
+      turnDelta: turnToward(ship, approachBearing),
       speedDelta: 1
     };
   }
@@ -155,7 +183,7 @@ function kitingOrder(
     return {
       shipId: ship.id,
       action: 'maneuver',
-      turnDelta: turnToward(ship, escapeBearing),
+      turnDelta: turnToward(ship, avoidObstacles(ship, escapeBearing, state)),
       speedDelta: 2
     };
   }
@@ -186,11 +214,11 @@ export function aiOrderFor(
   }
 
   if (params.retreatHullBelow > 0 && ship.hp < params.retreatHullBelow) {
-    return reposition(ship, target);
+    return reposition(ship, target, state);
   }
 
   if (profile === 'aggressive') {
-    return aggressiveOrder(ship, target, params);
+    return aggressiveOrder(ship, target, params, state);
   }
   if (profile === 'kiting') {
     return kitingOrder(ship, target, params, state);

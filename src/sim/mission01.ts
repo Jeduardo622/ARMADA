@@ -1,6 +1,7 @@
 import { aiOrderFor } from './ai.js';
-import { createDeterministicRng, resolveSimPreview } from './engine.js';
-import { SimEvent, SimOrder, SimState, SimSummary } from './types.js';
+import { createDeterministicRng } from './engine.js';
+import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
+import { SimOrder, SimState } from './types.js';
 
 // Mission 01 "Fair Wind" — docs/content/missions/mission-01-fair-wind.md
 export const MISSION_01_CODE = 'mission-01-fair-wind';
@@ -115,12 +116,7 @@ function windSpeedForTurn(seed: number, turn: number): number {
   return WIND_BASE_SPEED - 1 + Math.floor(rng() * 3);
 }
 
-export interface Mission01TurnRecord {
-  turn: number;
-  hash: string;
-  summary: SimSummary;
-  events: SimEvent[];
-}
+export type Mission01TurnRecord = MissionTurnRecord;
 
 export interface Mission01Outcome {
   missionCode: string;
@@ -144,51 +140,27 @@ export interface Mission01Outcome {
 }
 
 export function runMission01(seed: number, playerTurnOrders: SimOrder[][]): Mission01Outcome {
-  let state = createMission01State();
-  const turns: Mission01TurnRecord[] = [];
-  let result: 'win' | 'loss' = 'loss';
-  let failReason: 'timeout' | 'sunk' | null = 'timeout';
-  let turnCount = MISSION_01_TURN_LIMIT;
-
-  for (let turn = 1; turn <= MISSION_01_TURN_LIMIT; turn++) {
-    const turnState: SimState = {
-      ...state,
-      turn,
-      wind: { direction: WIND_DIRECTION, speed: windSpeedForTurn(seed, turn) }
-    };
-    const orders = [...(playerTurnOrders[turn - 1] ?? []), mission01EnemyOrder(turnState)];
-    const preview = resolveSimPreview({
-      schemaVersion: 1,
-      seed,
-      turn,
-      state: turnState,
-      orders,
-      modifiers: {
-        damageScale: { [MISSION_01_ENEMY_SHIP_ID]: MISSION_01_ENEMY_DAMAGE_SCALE },
-        // Mission resolution runs on the wind-aware rules (movement + wind curve).
-        windMovement: true
-      }
-    });
-
-    turns.push({ turn, hash: preview.hash, summary: preview.summary, events: preview.events });
-    state = preview.nextState;
-
-    if (preview.summary.enemyRemaining === 0) {
-      result = 'win';
-      failReason = null;
-      turnCount = turn;
-      break;
+  const run = runMissionLoop(seed, playerTurnOrders, {
+    turnLimit: MISSION_01_TURN_LIMIT,
+    createState: createMission01State,
+    windForTurn: (windSeed, turn) => ({
+      direction: WIND_DIRECTION,
+      speed: windSpeedForTurn(windSeed, turn)
+    }),
+    enemyOrders: (state) => [mission01EnemyOrder(state)],
+    modifiers: {
+      damageScale: { [MISSION_01_ENEMY_SHIP_ID]: MISSION_01_ENEMY_DAMAGE_SCALE },
+      // Mission resolution runs on the wind-aware rules (movement + wind curve).
+      windMovement: true
     }
-    if (preview.summary.playerRemaining === 0) {
-      result = 'loss';
-      failReason = 'sunk';
-      turnCount = turn;
-      break;
-    }
-  }
+  });
 
-  const player = state.ships.find((ship) => ship.id === MISSION_01_PLAYER_SHIP_ID);
-  const enemy = state.ships.find((ship) => ship.id === MISSION_01_ENEMY_SHIP_ID);
+  const { result, turns, turnCount } = run;
+  const failReason: 'timeout' | 'sunk' | null =
+    result === 'win' ? null : run.playerSunk ? 'sunk' : 'timeout';
+
+  const player = run.finalState.ships.find((ship) => ship.id === MISSION_01_PLAYER_SHIP_ID);
+  const enemy = run.finalState.ships.find((ship) => ship.id === MISSION_01_ENEMY_SHIP_ID);
   const playerHullDamage = PLAYER_BASE_HULL_HP - (player?.hp ?? 0);
   const playerHullDamageFraction = Math.round((playerHullDamage / PLAYER_BASE_HULL_HP) * 100) / 100;
 
