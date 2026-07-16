@@ -21,8 +21,9 @@ const WIND_DIRECTION = 0;
 const WIND_BASE_SPEED = 5;
 
 // Line-advance profile: hold the line, advance steadily, then stay
-// broadside-aligned (docs/content/ai-profiles.md).
-const LINE_ADVANCE_TURNS = 2;
+// broadside-aligned once inside preferred range (docs/content/ai-profiles.md).
+const LINE_ADVANCE_PREFERRED_RANGE = 100;
+
 
 export function createMission01State(): SimState {
   return {
@@ -103,14 +104,17 @@ export function mission01Fingerprint(start: Mission01StartResponse): string {
   ].join('|');
 }
 
-export function mission01EnemyOrder(state: SimState, turn: number): SimOrder {
+export function mission01EnemyOrder(state: SimState): SimOrder {
   const enemy = state.ships.find((ship) => ship.id === MISSION_01_ENEMY_SHIP_ID);
   const player = state.ships.find((ship) => ship.id === MISSION_01_PLAYER_SHIP_ID);
   if (!enemy || enemy.hp <= 0 || !player || player.hp <= 0) {
     return { shipId: MISSION_01_ENEMY_SHIP_ID, action: 'pass', turnDelta: 0, speedDelta: 0 };
   }
 
-  if (turn <= LINE_ADVANCE_TURNS) {
+  const dx = player.position.x - enemy.position.x;
+  const dy = player.position.y - enemy.position.y;
+  const range = Math.sqrt(dx * dx + dy * dy);
+  if (range > LINE_ADVANCE_PREFERRED_RANGE) {
     return { shipId: enemy.id, action: 'maneuver', turnDelta: 0, speedDelta: 1 };
   }
 
@@ -170,14 +174,18 @@ export function runMission01(seed: number, playerTurnOrders: SimOrder[][]): Miss
       turn,
       wind: { direction: WIND_DIRECTION, speed: windSpeedForTurn(seed, turn) }
     };
-    const orders = [...(playerTurnOrders[turn - 1] ?? []), mission01EnemyOrder(turnState, turn)];
+    const orders = [...(playerTurnOrders[turn - 1] ?? []), mission01EnemyOrder(turnState)];
     const preview = resolveSimPreview({
       schemaVersion: 1,
       seed,
       turn,
       state: turnState,
       orders,
-      modifiers: { damageScale: { [MISSION_01_ENEMY_SHIP_ID]: MISSION_01_ENEMY_DAMAGE_SCALE } }
+      modifiers: {
+        damageScale: { [MISSION_01_ENEMY_SHIP_ID]: MISSION_01_ENEMY_DAMAGE_SCALE },
+        // Mission resolution runs on the wind-aware rules (movement + wind curve).
+        windMovement: true
+      }
     });
 
     turns.push({ turn, hash: preview.hash, summary: preview.summary, events: preview.events });

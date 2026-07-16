@@ -6,10 +6,19 @@ import {
   SimPreviewResult,
   SimState,
   SimSummary,
-  ShipState
+  ShipState,
+  Wind
 } from './types.js';
 
 const MAX_SPEED = 10;
+
+// Wind impact curve (modifiers.windMovement): sailing within TAILWIND_ARC of
+// the wind direction grants a bonus, within HEADWIND_ARC of dead upwind a
+// penalty of half the wind speed; beam reaches are neutral
+// (docs/content/balance-tables.md).
+const WIND_TAILWIND_ARC = 45;
+const WIND_HEADWIND_ARC = 135;
+const MOVEMENT_SCALE = 5;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -44,6 +53,37 @@ export function createDeterministicRng(seed: number) {
   };
 }
 
+export function effectiveSpeed(ship: ShipState, wind: Wind): number {
+  if (ship.speed === 0) {
+    return 0;
+  }
+  const rawDiff = Math.abs(normalizeHeading(ship.heading - wind.direction));
+  const windAngle = Math.min(rawDiff, 360 - rawDiff);
+  let delta = 0;
+  if (windAngle <= WIND_TAILWIND_ARC) {
+    delta = Math.floor(wind.speed / 2);
+  } else if (windAngle >= WIND_HEADWIND_ARC) {
+    delta = -Math.floor(wind.speed / 2);
+  }
+  // A ship under sail keeps steerage way even dead upwind.
+  return clamp(ship.speed + delta, 1, MAX_SPEED);
+}
+
+function applyMovement(ship: ShipState, wind: Wind): SimEvent {
+  const speed = effectiveSpeed(ship, wind);
+  const radians = (ship.heading * Math.PI) / 180;
+  ship.position = {
+    x: ship.position.x + Math.round(Math.cos(radians) * speed * MOVEMENT_SCALE),
+    y: ship.position.y + Math.round(Math.sin(radians) * speed * MOVEMENT_SCALE)
+  };
+  return {
+    type: 'movement',
+    shipId: ship.id,
+    effectiveSpeed: speed,
+    position: { ...ship.position }
+  };
+}
+
 function applyManeuver(ship: ShipState, order: SimOrder): SimEvent {
   const nextHeading = normalizeHeading(ship.heading + (order.turnDelta ?? 0));
   const nextSpeed = clamp(ship.speed + (order.speedDelta ?? 0), 0, MAX_SPEED);
@@ -64,7 +104,8 @@ function resolveBroadside(
   attacker: ShipState,
   target: ShipState,
   order: SimOrder,
-  damageScale: number
+  damageScale: number,
+  attackerSpeed: number
 ): SimEvent {
   const range = distance(attacker, target);
   const bearingToTarget = angleBetween(attacker, target);
@@ -74,12 +115,12 @@ function resolveBroadside(
   const rangePenalty = Math.floor(range / 50);
   const anglePenalty = Math.floor(normalizedDiff / 15);
 
-  const baseChance = 72 - rangePenalty - anglePenalty + Math.floor(attacker.speed / 2);
+  const baseChance = 72 - rangePenalty - anglePenalty + Math.floor(attackerSpeed / 2);
   const hitChance = clamp(baseChance, 15, 95);
   const roll = Math.floor(rng() * 100);
   const hit = roll < hitChance;
 
-  const baseDamage = 18 + Math.floor(attacker.sail / 25) + Math.floor(attacker.speed * 1.5);
+  const baseDamage = 18 + Math.floor(attacker.sail / 25) + Math.floor(attackerSpeed * 1.5);
   const variance = Math.floor(rng() * 6);
   const scaledDamage = Math.floor((baseDamage + variance) * damageScale);
   const hullDamage = hit ? scaledDamage : 0;
@@ -186,6 +227,14 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
     }
   }
 
+  const windAware = input.modifiers?.windMovement === true;
+  if (windAware) {
+    for (const ship of resolutionOrder) {
+      if (ship.hp <= 0) continue;
+      events.push(applyMovement(ship, input.state.wind));
+    }
+  }
+
   for (const ship of resolutionOrder) {
     if (ship.hp <= 0) continue;
     const order = orderByShip.get(ship.id);
@@ -197,7 +246,8 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
       const target = shipById.get(order.targetShipId);
       if (target && target.hp > 0) {
         const damageScale = input.modifiers?.damageScale?.[ship.id] ?? 1;
-        events.push(resolveBroadside(rng, ship, target, order, damageScale));
+        const attackerSpeed = windAware ? effectiveSpeed(ship, input.state.wind) : ship.speed;
+        events.push(resolveBroadside(rng, ship, target, order, damageScale, attackerSpeed));
       }
     } else if (order.action === 'boarding' && order.targetShipId) {
       const target = shipById.get(order.targetShipId);
