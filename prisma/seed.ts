@@ -13,7 +13,8 @@ const missionSeeds = [
     code: 'mission-04-boarding-party',
     name: 'Boarding Party',
     description: 'Boarding risk/reward'
-  }
+  },
+  { code: 'mission-05-line-break', name: 'Line Break', description: 'Break the enemy line' }
 ];
 
 // Short codes seeded before the runtime slugs were finalized. Renamed in

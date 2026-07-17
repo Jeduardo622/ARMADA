@@ -721,6 +721,120 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MissionTurnRecord'
+    Mission05StartRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+          minimum: 0
+          default: 505
+    Mission05Objectives:
+      type: object
+      required: [turnLimit, bonusTurnTarget, flagshipHpScale]
+      properties:
+        turnLimit:
+          type: integer
+        bonusTurnTarget:
+          type: integer
+        flagshipHpScale:
+          type: number
+    Mission05StartResponse:
+      type: object
+      required: [missionCode, seed, turnLimit, objectives, state]
+      properties:
+        missionCode:
+          type: string
+          example: mission-05-line-break
+        seed:
+          type: integer
+        turnLimit:
+          type: integer
+        objectives:
+          $ref: '#/components/schemas/Mission05Objectives'
+        state:
+          $ref: '#/components/schemas/SimState'
+    Mission05ResolveRequest:
+      type: object
+      required: [seed, turns]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turns:
+          type: array
+          maxItems: 11
+          items:
+            type: array
+            maxItems: 6
+            items:
+              $ref: '#/components/schemas/SimOrder'
+    Mission05BonusObjectives:
+      type: object
+      required: [sankFlagshipFirst, withinTurnTarget]
+      properties:
+        sankFlagshipFirst:
+          type: boolean
+        withinTurnTarget:
+          type: boolean
+    Mission05Telemetry:
+      type: object
+      required: [firstSinkTarget, chokeBlockedMoves]
+      properties:
+        firstSinkTarget:
+          type: string
+          nullable: true
+        chokeBlockedMoves:
+          type: integer
+    Mission05DamageProfile:
+      type: object
+      required:
+        [playerHullDamage, playerHullDamageFraction, playerRemainingHp, enemyHullDamage, enemyRemainingHp]
+      properties:
+        playerHullDamage:
+          type: integer
+        playerHullDamageFraction:
+          type: number
+        playerRemainingHp:
+          type: integer
+        enemyHullDamage:
+          type: integer
+        enemyRemainingHp:
+          type: integer
+    Mission05Outcome:
+      type: object
+      required:
+        [missionCode, seed, result, failReason, turnCount, turnLimit, bonusObjectives, damageProfile, telemetry, turns]
+      properties:
+        missionCode:
+          type: string
+          example: mission-05-line-break
+        seed:
+          type: integer
+        result:
+          type: string
+          enum: [win, loss]
+        failReason:
+          type: string
+          enum: [timeout, sunk, flanked]
+          nullable: true
+        turnCount:
+          type: integer
+        turnLimit:
+          type: integer
+        bonusObjectives:
+          $ref: '#/components/schemas/Mission05BonusObjectives'
+        damageProfile:
+          $ref: '#/components/schemas/Mission05DamageProfile'
+        telemetry:
+          $ref: '#/components/schemas/Mission05Telemetry'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
     ConfigSnapshot:
       type: object
       properties:
@@ -1170,6 +1284,82 @@ paths:
                 properties:
                   outcome:
                     $ref: '#/components/schemas/Mission04Outcome'
+        '400':
+          description: Bad request (validation, non-player ship, or invalid target)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-05-line-break/start:
+    post:
+      summary: Start the deterministic Mission 05 "Line Break" scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission05StartRequest'
+      responses:
+        '200':
+          description: Scenario payload for the given seed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission05StartResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-05-line-break/resolve:
+    post:
+      summary: Resolve a Mission 05 run from per-turn player orders
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission05ResolveRequest'
+      responses:
+        '200':
+          description: Deterministic mission outcome with first-sink and choke telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome:
+                    $ref: '#/components/schemas/Mission05Outcome'
         '400':
           description: Bad request (validation, non-player ship, or invalid target)
           content:

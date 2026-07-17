@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aiOrderFor } from '../src/sim/ai.js';
+import { aiOrderFor, escortOrderFor } from '../src/sim/ai.js';
 import type { ShipState, SimState, Wind } from '../src/sim/types.js';
 
 function ship(overrides: Partial<ShipState> & Pick<ShipState, 'id' | 'side'>): ShipState {
@@ -96,6 +96,52 @@ describe('aggressive profile', () => {
     const weak = ship({ id: 'p2', side: 'player', position: { x: 50, y: 0 }, hp: 20 });
     const order = aiOrderFor(enemy, board([strong, weak, enemy]), 'aggressive');
     expect(order).toMatchObject({ action: 'broadside', targetShipId: 'p2' });
+  });
+});
+
+describe('flank-assist escort', () => {
+  // Leader heading west at (200,0); lateral +60 puts the station at (220,-60).
+  const leader = () => ship({ id: 'flag', side: 'enemy', position: { x: 200, y: 0 }, heading: 180 });
+
+  it('steers back toward station when out of position', () => {
+    const escort = ship({ id: 'esc', side: 'enemy', position: { x: 300, y: 100 }, heading: 180 });
+    const player = ship({ id: 'p1', side: 'player', position: { x: 0, y: 0 } });
+    const order = escortOrderFor(escort, board([player, leader(), escort]), 'flag');
+    expect(order.action).toBe('maneuver');
+    expect(order.speedDelta).toBe(1);
+  });
+
+  it('holds formation on station when no threat is in range', () => {
+    const escort = ship({ id: 'esc', side: 'enemy', position: { x: 220, y: -60 }, heading: 180 });
+    const player = ship({ id: 'p1', side: 'player', position: { x: 0, y: 0 } });
+    const order = escortOrderFor(escort, board([player, leader(), escort]), 'flag');
+    expect(order).toEqual({ shipId: 'esc', action: 'maneuver', turnDelta: 0, speedDelta: 0 });
+  });
+
+  it('engages the hostile nearest the leader once in range', () => {
+    const escort = ship({ id: 'esc', side: 'enemy', position: { x: 220, y: -60 }, heading: 180 });
+    const near = ship({ id: 'p1', side: 'player', position: { x: 180, y: -20 } });
+    const far = ship({ id: 'p2', side: 'player', position: { x: 0, y: 0 }, hp: 10 });
+    const order = escortOrderFor(escort, board([near, far, leader(), escort]), 'flag');
+    expect(order).toMatchObject({ action: 'broadside', targetShipId: 'p1', side: 'starboard' });
+  });
+
+  it('falls back to the aggressive profile when the leader is lost', () => {
+    const escort = ship({ id: 'esc', side: 'enemy', position: { x: 220, y: -60 }, heading: 180 });
+    const deadLeader = ship({ id: 'flag', side: 'enemy', position: { x: 200, y: 0 }, hp: 0 });
+    const player = ship({ id: 'p1', side: 'player', position: { x: 0, y: 0 } });
+    const order = escortOrderFor(escort, board([player, deadLeader, escort]), 'flag');
+    expect(order.action).toBe('maneuver');
+    expect(order.speedDelta).toBe(1);
+    expect(escortOrderFor(escort, board([player, deadLeader, escort]), 'flag')).toEqual(
+      aiOrderFor(escort, board([player, deadLeader, escort]), 'aggressive')
+    );
+  });
+
+  it('passes when the escort itself is sunk', () => {
+    const escort = ship({ id: 'esc', side: 'enemy', hp: 0 });
+    const player = ship({ id: 'p1', side: 'player' });
+    expect(escortOrderFor(escort, board([player, leader(), escort]), 'flag').action).toBe('pass');
   });
 });
 
