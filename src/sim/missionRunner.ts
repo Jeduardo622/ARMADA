@@ -16,7 +16,12 @@ export interface MissionRunConfig {
   createState: () => SimState;
   windForTurn: (seed: number, turn: number) => Wind;
   enemyOrders: (state: SimState) => SimOrder[];
-  modifiers: SimModifiers;
+  // Static modifiers, or a per-turn function for state-dependent effects
+  // (e.g. a boss enrage below a hull threshold).
+  modifiers: SimModifiers | ((state: SimState, turn: number) => SimModifiers);
+  // Optional pre-turn hook for scripted events such as reinforcement spawns;
+  // returns the (possibly extended) state used for the turn.
+  onTurnStart?: (state: SimState, turn: number) => SimState;
 }
 
 export interface MissionRunResult {
@@ -39,19 +44,26 @@ export function runMissionLoop(
   let turnCount = config.turnLimit;
 
   for (let turn = 1; turn <= config.turnLimit; turn++) {
+    if (config.onTurnStart) {
+      state = config.onTurnStart(state, turn);
+    }
     const turnState: SimState = {
       ...state,
       turn,
       wind: config.windForTurn(seed, turn)
     };
     const orders = [...(playerTurnOrders[turn - 1] ?? []), ...config.enemyOrders(turnState)];
+    const modifiers =
+      typeof config.modifiers === 'function'
+        ? config.modifiers(turnState, turn)
+        : config.modifiers;
     const preview = resolveSimPreview({
       schemaVersion: 1,
       seed,
       turn,
       state: turnState,
       orders,
-      modifiers: config.modifiers
+      modifiers
     });
 
     turns.push({ turn, hash: preview.hash, summary: preview.summary, events: preview.events });

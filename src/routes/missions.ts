@@ -46,6 +46,15 @@ import {
   mission05StartResponse,
   runMission05
 } from '../sim/mission05.js';
+import {
+  MISSION_06_CODE,
+  MISSION_06_DEFAULT_SEED,
+  MISSION_06_ENEMY_SHIP_IDS,
+  MISSION_06_PLAYER_SHIP_IDS,
+  MISSION_06_TURN_LIMIT,
+  mission06StartResponse,
+  runMission06
+} from '../sim/mission06.js';
 import { simOrderSchema } from '../sim/types.js';
 
 const completeSchema = z.object({
@@ -121,6 +130,20 @@ const mission05ResolveSchema = z
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(6)).max(MISSION_05_TURN_LIMIT)
+  })
+  .strict();
+
+const mission06StartSchema = z
+  .object({
+    seed: z.number().int().nonnegative().default(MISSION_06_DEFAULT_SEED)
+  })
+  .strict();
+
+const mission06ResolveSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+    seed: z.number().int().nonnegative(),
+    turns: z.array(z.array(simOrderSchema).max(6)).max(MISSION_06_TURN_LIMIT)
   })
   .strict();
 
@@ -458,6 +481,72 @@ export function registerMissionRoutes(app: FastifyInstance) {
         requestId: request.id
       },
       'mission05_resolved'
+    );
+
+    return { outcome };
+  });
+
+  app.post('/missions/mission-06-dreadnought-siege/start', async (request, reply) => {
+    if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_06_CODE }))) {
+      return;
+    }
+
+    const parsed = mission06StartSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.format() });
+    }
+
+    return mission06StartResponse(parsed.data.seed);
+  });
+
+  app.post('/missions/mission-06-dreadnought-siege/resolve', async (request, reply) => {
+    if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_06_CODE }))) {
+      return;
+    }
+
+    const parsed = mission06ResolveSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.format() });
+    }
+
+    if (!validateJsonLimit(reply, parsed.data.turns)) {
+      return;
+    }
+
+    // The turn-5 reinforcement is a valid target, so it is allowed even before
+    // it spawns.
+    const playerShipIds = new Set<string>(MISSION_06_PLAYER_SHIP_IDS);
+    const enemyShipIds = new Set<string>(MISSION_06_ENEMY_SHIP_IDS);
+    for (const turnOrders of parsed.data.turns) {
+      for (const order of turnOrders) {
+        if (!playerShipIds.has(order.shipId)) {
+          return reply.status(400).send({ error: 'invalid_order_ship', shipId: order.shipId });
+        }
+        if (order.targetShipId && !enemyShipIds.has(order.targetShipId)) {
+          return reply
+            .status(400)
+            .send({ error: 'unknown_target_in_order', shipId: order.targetShipId });
+        }
+      }
+    }
+
+    const outcome = runMission06(parsed.data.seed, parsed.data.turns);
+
+    request.log.info(
+      {
+        actor: request.user?.id,
+        missionCode: MISSION_06_CODE,
+        result: outcome.result,
+        failReason: outcome.failReason,
+        turnCount: outcome.turnCount,
+        damageProfile: outcome.damageProfile,
+        bonusObjectives: outcome.bonusObjectives,
+        phaseTransitions: outcome.telemetry.phaseTransitions,
+        enragedOnTurn: outcome.telemetry.enragedOnTurn,
+        reinforcementTurn: outcome.telemetry.reinforcementTurn,
+        requestId: request.id
+      },
+      'mission06_resolved'
     );
 
     return { outcome };

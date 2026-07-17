@@ -835,6 +835,148 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MissionTurnRecord'
+    Mission06StartRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+          minimum: 0
+          default: 606
+    Mission06Objectives:
+      type: object
+      required:
+        [turnLimit, bonusTurnTarget, bossHpScale, bossDamageScale, enrageHullFraction, reinforcementTurn, reinforcementHpScale]
+      properties:
+        turnLimit:
+          type: integer
+        bonusTurnTarget:
+          type: integer
+        bossHpScale:
+          type: number
+        bossDamageScale:
+          type: number
+        enrageHullFraction:
+          type: number
+        reinforcementTurn:
+          type: integer
+        reinforcementHpScale:
+          type: number
+    Mission06StartResponse:
+      type: object
+      required: [missionCode, seed, turnLimit, objectives, state]
+      properties:
+        missionCode:
+          type: string
+          example: mission-06-dreadnought-siege
+        seed:
+          type: integer
+        turnLimit:
+          type: integer
+        objectives:
+          $ref: '#/components/schemas/Mission06Objectives'
+        state:
+          $ref: '#/components/schemas/SimState'
+    Mission06ResolveRequest:
+      type: object
+      required: [seed, turns]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turns:
+          type: array
+          maxItems: 14
+          items:
+            type: array
+            maxItems: 6
+            items:
+              $ref: '#/components/schemas/SimOrder'
+    Mission06BonusObjectives:
+      type: object
+      required: [noShipLost, withinTurnTarget]
+      properties:
+        noShipLost:
+          type: boolean
+        withinTurnTarget:
+          type: boolean
+    Mission06PhaseTransition:
+      type: object
+      required: [turn, phase]
+      properties:
+        turn:
+          type: integer
+        phase:
+          type: integer
+    Mission06Telemetry:
+      type: object
+      required: [phaseTransitions, enragedOnTurn, reinforcementTurn, reinforcementDamageDealt]
+      properties:
+        phaseTransitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Mission06PhaseTransition'
+        enragedOnTurn:
+          type: integer
+          nullable: true
+        reinforcementTurn:
+          type: integer
+          nullable: true
+        reinforcementDamageDealt:
+          type: integer
+    Mission06DamageProfile:
+      type: object
+      required:
+        [playerHullDamage, playerHullDamageFraction, playerRemainingHp, enemyHullDamage, enemyRemainingHp, bossHullDamage, bossRemainingHp]
+      properties:
+        playerHullDamage:
+          type: integer
+        playerHullDamageFraction:
+          type: number
+        playerRemainingHp:
+          type: integer
+        enemyHullDamage:
+          type: integer
+        enemyRemainingHp:
+          type: integer
+        bossHullDamage:
+          type: integer
+        bossRemainingHp:
+          type: integer
+    Mission06Outcome:
+      type: object
+      required:
+        [missionCode, seed, result, failReason, turnCount, turnLimit, bonusObjectives, damageProfile, telemetry, turns]
+      properties:
+        missionCode:
+          type: string
+          example: mission-06-dreadnought-siege
+        seed:
+          type: integer
+        result:
+          type: string
+          enum: [win, loss]
+        failReason:
+          type: string
+          enum: [timeout, sunk, flanked]
+          nullable: true
+        turnCount:
+          type: integer
+        turnLimit:
+          type: integer
+        bonusObjectives:
+          $ref: '#/components/schemas/Mission06BonusObjectives'
+        damageProfile:
+          $ref: '#/components/schemas/Mission06DamageProfile'
+        telemetry:
+          $ref: '#/components/schemas/Mission06Telemetry'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
     ConfigSnapshot:
       type: object
       properties:
@@ -1360,6 +1502,82 @@ paths:
                 properties:
                   outcome:
                     $ref: '#/components/schemas/Mission05Outcome'
+        '400':
+          description: Bad request (validation, non-player ship, or invalid target)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-06-dreadnought-siege/start:
+    post:
+      summary: Start the deterministic Mission 06 "Dreadnought Siege" scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission06StartRequest'
+      responses:
+        '200':
+          description: Scenario payload for the given seed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission06StartResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-06-dreadnought-siege/resolve:
+    post:
+      summary: Resolve a Mission 06 run from per-turn player orders
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission06ResolveRequest'
+      responses:
+        '200':
+          description: Deterministic mission outcome with boss-phase and enrage telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome:
+                    $ref: '#/components/schemas/Mission06Outcome'
         '400':
           description: Bad request (validation, non-player ship, or invalid target)
           content:
