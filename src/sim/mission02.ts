@@ -1,7 +1,8 @@
 import { aiOrderFor } from './ai.js';
 import { createDeterministicRng } from './engine.js';
+import { classifyLoss, countRakes, heldWeatherGageOnTurn } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimEvent, SimOrder, SimState, Vector2, Wind } from './types.js';
+import { SimOrder, SimState, Wind } from './types.js';
 
 // Mission 02 "Weather Gage" — docs/content/missions/mission-02-weather-gage.md
 export const MISSION_02_CODE = 'mission-02-weather-gage';
@@ -155,68 +156,6 @@ export function mission02EnemyOrders(state: SimState): SimOrder[] {
   return orders;
 }
 
-function signedAngle(from: number, to: number) {
-  return ((to - from + 540) % 360) - 180;
-}
-
-function bearingBetween(from: Vector2, to: Vector2) {
-  const radians = Math.atan2(to.y - from.y, to.x - from.x);
-  const degrees = (radians * 180) / Math.PI;
-  return Math.round(((degrees % 360) + 360) % 360);
-}
-
-function centroid(points: Vector2[]): Vector2 | undefined {
-  if (points.length === 0) {
-    return undefined;
-  }
-  const sum = points.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), {
-    x: 0,
-    y: 0
-  });
-  return { x: sum.x / points.length, y: sum.y / points.length };
-}
-
-// Positions after each turn's movement phase, read back from movement events.
-function positionsFromEvents(events: SimEvent[], shipIds: readonly string[]): Vector2[] {
-  const positions: Vector2[] = [];
-  for (const event of events) {
-    if (event.type === 'movement' && shipIds.includes(event.shipId)) {
-      positions.push(event.position);
-    }
-  }
-  return positions;
-}
-
-function heldWeatherGageOnTurn(events: SimEvent[], wind: Wind): boolean {
-  const playerCentroid = centroid(positionsFromEvents(events, MISSION_02_PLAYER_SHIP_IDS));
-  const enemyCentroid = centroid(positionsFromEvents(events, MISSION_02_ENEMY_SHIP_IDS));
-  if (!playerCentroid || !enemyCentroid) {
-    return false;
-  }
-  const bearing = bearingBetween(playerCentroid, enemyCentroid);
-  return Math.abs(signedAngle(bearing, wind.direction)) <= UPWIND_ARC;
-}
-
-function classifyLoss(finalState: SimState, playerSunk: boolean): 'timeout' | 'sunk' | 'flanked' {
-  if (!playerSunk) {
-    return 'timeout';
-  }
-  const enemies = finalState.ships.filter(
-    (ship) => ship.side === 'enemy' && ship.hp > 0
-  );
-  if (enemies.length < 2) {
-    return 'sunk';
-  }
-  const players = finalState.ships.filter((ship) => ship.side === 'player');
-  const lastPlayer = centroid(players.map((ship) => ship.position));
-  if (!lastPlayer) {
-    return 'sunk';
-  }
-  const bearings = enemies.map((ship) => bearingBetween(lastPlayer, ship.position));
-  const spread = Math.abs(signedAngle(bearings[0], bearings[1]));
-  return spread >= FLANKED_SPREAD ? 'flanked' : 'sunk';
-}
-
 export interface Mission02Outcome {
   missionCode: string;
   seed: number;
@@ -254,31 +193,21 @@ export function runMission02(seed: number, playerTurnOrders: SimOrder[][]): Miss
   });
 
   const { result, turns, turnCount } = run;
-  const failReason = result === 'win' ? null : classifyLoss(run.finalState, run.playerSunk);
+  const failReason =
+    result === 'win' ? null : classifyLoss(run.finalState, run.playerSunk, FLANKED_SPREAD);
 
   const upwindByTurn = turns.map((turn) =>
-    heldWeatherGageOnTurn(turn.events, mission02WindForTurn(seed, turn.turn))
+    heldWeatherGageOnTurn(
+      turn.events,
+      mission02WindForTurn(seed, turn.turn),
+      MISSION_02_PLAYER_SHIP_IDS,
+      MISSION_02_ENEMY_SHIP_IDS,
+      UPWIND_ARC
+    )
   );
   const upwindTurns = upwindByTurn.filter(Boolean).length;
 
-  let rakeAttempts = 0;
-  let rakeHits = 0;
-  for (const turn of turns) {
-    for (const event of turn.events) {
-      if (
-        event.type === 'broadside' &&
-        MISSION_02_PLAYER_SHIP_IDS.includes(
-          event.shipId as (typeof MISSION_02_PLAYER_SHIP_IDS)[number]
-        ) &&
-        event.rake
-      ) {
-        rakeAttempts += 1;
-        if (event.hit) {
-          rakeHits += 1;
-        }
-      }
-    }
-  }
+  const { rakeAttempts, rakeHits } = countRakes(turns, MISSION_02_PLAYER_SHIP_IDS);
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');

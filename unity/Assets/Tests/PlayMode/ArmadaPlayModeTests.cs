@@ -158,6 +158,94 @@ namespace Armada.Client.Tests.PlayMode
             }
         }
 
+        [UnityTest]
+        public IEnumerator Mission03Flow_RunsMissionWithSeedAndScenarioParity()
+        {
+            var originalState = UnityEngine.Random.state;
+            var gameObject = new GameObject("mission03-flow-test");
+            try
+            {
+                var hooks = gameObject.AddComponent<DeterministicSimHooks>();
+
+                hooks.ApplySeed(303);
+                var expectedDraw = UnityEngine.Random.Range(0, int.MaxValue);
+
+                var flow = new Mission03Flow(new FakeMission03Client(), hooks);
+                var run = flow.RunAsync(303, new List<List<SimOrder>>());
+                while (!run.IsCompleted)
+                {
+                    yield return null;
+                }
+
+                Assert.That(run.Result.Success, Is.True, run.Result.FailureReason);
+                Assert.That(run.Result.Outcome.Result, Is.EqualTo("win"));
+                Assert.That(run.Result.Outcome.FailReason, Is.Null);
+                Assert.That(run.Result.Outcome.Telemetry.RakeHits, Is.GreaterThanOrEqualTo(Mission03Scenario.RakeHitTarget));
+
+                // The flow re-applied seed 303 through DeterministicSimHooks, so
+                // the next draw repeats the seeded sequence.
+                Assert.That(UnityEngine.Random.Range(0, int.MaxValue), Is.EqualTo(expectedDraw));
+            }
+            finally
+            {
+                UnityEngine.Random.state = originalState;
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+
+        private sealed class FakeMission03Client : IMission03Client
+        {
+            public Task<ServiceResult<Mission03StartResponse>> StartMission03Async(int seed)
+            {
+                return Task.FromResult(new ServiceResult<Mission03StartResponse>
+                {
+                    Data = Mission03Scenario.BuildExpectedStart(seed),
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<Mission03Outcome>> ResolveMission03Async(Mission01ResolveRequest request)
+            {
+                return Task.FromResult(new ServiceResult<Mission03Outcome>
+                {
+                    Data = new Mission03Outcome
+                    {
+                        MissionCode = Mission03Scenario.MissionCode,
+                        Seed = request.Seed,
+                        Result = "win",
+                        FailReason = null,
+                        TurnCount = 8,
+                        TurnLimit = Mission03Scenario.TurnLimit,
+                        BonusObjectives = new Mission03BonusObjectives
+                        {
+                            LandedRakingHits = true,
+                            WithinTurnTarget = true
+                        },
+                        DamageProfile = new Mission03DamageProfile
+                        {
+                            PlayerHullDamage = 95,
+                            PlayerHullDamageFraction = 0.4,
+                            PlayerRemainingHp = 145,
+                            EnemyHullDamage = 315,
+                            EnemyRemainingHp = 0,
+                            PerShip = new List<Mission03ShipDamage>()
+                        },
+                        Telemetry = new Mission03Telemetry
+                        {
+                            RakeAttempts = 7,
+                            RakeHits = 4,
+                            BoardingAttempts = 0,
+                            BoardingSuccesses = 0
+                        },
+                        Turns = new List<Mission01TurnRecord>()
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
         private sealed class FakeMission01Client : IMission01Client
         {
             public Task<ServiceResult<Mission01StartResponse>> StartMission01Async(int seed)
