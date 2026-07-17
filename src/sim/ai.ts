@@ -197,6 +197,86 @@ function kitingOrder(
   };
 }
 
+export interface EscortParams {
+  // Station offset in the leader's frame: forward along its heading, lateral
+  // to port (positive) or starboard (negative).
+  stationForward: number;
+  stationLateral: number;
+  stationTolerance: number;
+  preferredRange: number;
+}
+
+export const ESCORT_DEFAULTS: EscortParams = {
+  stationForward: -20,
+  stationLateral: 60,
+  stationTolerance: 40,
+  preferredRange: 80
+};
+
+// Flank-assist escort (formation_keep high, docs/content/ai-profiles.md):
+// hold station on the leader's flank, engage the hostile nearest the leader,
+// and fall back to the aggressive profile once the leader is lost — the line
+// breaks. Pure function of its inputs; no RNG.
+export function escortOrderFor(
+  ship: ShipState,
+  state: SimState,
+  leaderId: string,
+  overrides?: Partial<EscortParams>
+): SimOrder {
+  const params = { ...ESCORT_DEFAULTS, ...overrides };
+  if (ship.hp <= 0) {
+    return pass(ship);
+  }
+
+  const leader = state.ships.find(
+    (candidate) => candidate.id === leaderId && candidate.hp > 0
+  );
+  if (!leader) {
+    return aiOrderFor(ship, state, 'aggressive');
+  }
+
+  const radians = (leader.heading * Math.PI) / 180;
+  const station = {
+    x:
+      leader.position.x +
+      Math.round(Math.cos(radians) * params.stationForward - Math.sin(radians) * params.stationLateral),
+    y:
+      leader.position.y +
+      Math.round(Math.sin(radians) * params.stationForward + Math.cos(radians) * params.stationLateral)
+  };
+
+  const stationDistance = distanceBetween(ship.position, station);
+  if (stationDistance > params.stationTolerance) {
+    const bearing = avoidObstacles(ship, bearingBetween(ship.position, station), state);
+    return {
+      shipId: ship.id,
+      action: 'maneuver',
+      turnDelta: turnToward(ship, bearing),
+      speedDelta: stationDistance > 80 ? 1 : 0
+    };
+  }
+
+  const threat = pickTarget(leader, state, 'medium');
+  if (threat && distanceBetween(ship.position, threat.position) <= params.preferredRange) {
+    return {
+      shipId: ship.id,
+      action: 'broadside',
+      targetShipId: threat.id,
+      side: broadsideSide(ship, threat),
+      turnDelta: 0,
+      speedDelta: 0
+    };
+  }
+
+  // Hold formation: match the leader's heading and keep pace.
+  return {
+    shipId: ship.id,
+    action: 'maneuver',
+    turnDelta: turnToward(ship, leader.heading),
+    speedDelta: 0
+  };
+}
+
 export function aiOrderFor(
   ship: ShipState,
   state: SimState,
