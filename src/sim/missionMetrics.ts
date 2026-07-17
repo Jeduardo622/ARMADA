@@ -87,6 +87,30 @@ export interface RakeCounts {
   rakeHits: number;
 }
 
+export interface BoardingCounts {
+  boardingAttempts: number;
+  boardingSuccesses: number;
+}
+
+export function countBoardings(
+  turns: MissionTurnRecord[],
+  shipIds: readonly string[]
+): BoardingCounts {
+  let boardingAttempts = 0;
+  let boardingSuccesses = 0;
+  for (const turn of turns) {
+    for (const event of turn.events) {
+      if (event.type === 'boarding' && shipIds.includes(event.shipId)) {
+        boardingAttempts += 1;
+        if (event.success) {
+          boardingSuccesses += 1;
+        }
+      }
+    }
+  }
+  return { boardingAttempts, boardingSuccesses };
+}
+
 export function countRakes(turns: MissionTurnRecord[], shipIds: readonly string[]): RakeCounts {
   let rakeAttempts = 0;
   let rakeHits = 0;
