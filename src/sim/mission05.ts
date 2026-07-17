@@ -175,24 +175,37 @@ export function mission05EnemyOrders(state: SimState): SimOrder[] {
   for (const escortId of MISSION_05_ESCORT_SHIP_IDS) {
     const escort = state.ships.find((ship) => ship.id === escortId);
     if (escort) {
-      const lateral = escortId === MISSION_05_ESCORT_SHIP_IDS[0] ? 60 : -60;
-      orders.push(escortOrderFor(escort, state, MISSION_05_FLAGSHIP_ID, { stationLateral: lateral }));
+      // Stations match the seeded flank positions in the leader's frame: the
+      // west-heading flagship at (260,0) has escort-a at (240,60), which is
+      // 20 forward and 60 to starboard (negative lateral).
+      const lateral = escortId === MISSION_05_ESCORT_SHIP_IDS[0] ? -60 : 60;
+      orders.push(
+        escortOrderFor(escort, state, MISSION_05_FLAGSHIP_ID, {
+          stationForward: 20,
+          stationLateral: lateral
+        })
+      );
     }
   }
   return orders;
 }
 
-// First ship to appear in the cumulative per-turn sunk lists.
+// First ship killed, in combat-resolution order. Summary sunk lists follow
+// state-array order and would misreport ties within a turn, so the kill is
+// read from the event stream (a hit that leaves the target at 0 hull).
 export function firstSunkShip(turns: MissionTurnRecord[]): string | null {
-  const seen = new Set<string>();
   for (const turn of turns) {
-    for (const shipId of turn.summary.sunk) {
-      if (!seen.has(shipId)) {
-        return shipId;
+    for (const event of turn.events) {
+      if (
+        (event.type === 'broadside' || event.type === 'boarding') &&
+        event.targetRemaining.hp === 0
+      ) {
+        return event.targetShipId;
       }
     }
-    for (const shipId of turn.summary.sunk) {
-      seen.add(shipId);
+    if (turn.summary.sunk.length > 0) {
+      // Fallback for a sink without a matching kill event.
+      return turn.summary.sunk[0];
     }
   }
   return null;

@@ -140,15 +140,44 @@ describe('mission 05 scenario', () => {
     expect(typeof outcome.telemetry.chokeBlockedMoves).toBe('number');
   });
 
-  it('extracts the first sunk ship from turn summaries', () => {
-    const record = (turn: number, sunk: string[]) => ({
+  it('extracts the first kill in resolution order, not state order', () => {
+    const kill = (shipId: string, targetShipId: string, hp: number) => ({
+      type: 'broadside' as const,
+      shipId,
+      targetShipId,
+      side: 'port' as const,
+      hit: true,
+      roll: 1,
+      hitChance: 90,
+      damage: { hull: 30, sail: 18, crew: 10 },
+      targetRemaining: { hp, sail: 0, crew: 0 }
+    });
+    const record = (turn: number, sunk: string[], events: ReturnType<typeof kill>[]) => ({
       turn,
       hash: 'x',
       summary: { playerRemaining: 3, enemyRemaining: 2, sunk },
-      events: []
+      events
     });
-    expect(firstSunkShip([record(1, []), record(2, ['a']), record(3, ['a', 'b'])])).toBe('a');
-    expect(firstSunkShip([record(1, [])])).toBeNull();
+
+    // Escort and flagship both die on the same turn; the summary lists the
+    // flagship first (state-array order) but the escort was killed first in
+    // resolution order — the events must win.
+    const tieTurn = record(
+      1,
+      [MISSION_05_FLAGSHIP_ID, MISSION_05_ESCORT_SHIP_IDS[0]],
+      [
+        kill('player-sloop-a', MISSION_05_ESCORT_SHIP_IDS[0], 0),
+        kill('player-sloop-b', MISSION_05_FLAGSHIP_ID, 0)
+      ]
+    );
+    expect(firstSunkShip([tieTurn])).toBe(MISSION_05_ESCORT_SHIP_IDS[0]);
+
+    // Non-lethal hits are not kills.
+    const grazeTurn = record(1, [], [kill('player-sloop-a', MISSION_05_FLAGSHIP_ID, 50)]);
+    expect(firstSunkShip([grazeTurn])).toBeNull();
+
+    // Summary fallback when a sink has no matching kill event.
+    expect(firstSunkShip([record(2, ['a'], [])])).toBe('a');
   });
 });
 
