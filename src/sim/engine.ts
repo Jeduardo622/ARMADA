@@ -8,6 +8,7 @@ import {
   SimSummary,
   ShipState,
   Obstacle,
+  SlowZone,
   Vector2,
   Wind
 } from './types.js';
@@ -86,8 +87,26 @@ function insideObstacle(point: Vector2, obstacles: Obstacle[]) {
   });
 }
 
-function applyMovement(ship: ShipState, wind: Wind, obstacles: Obstacle[]): SimEvent {
-  const speed = effectiveSpeed(ship, wind);
+function insideSlowZone(point: Vector2, slowZones: SlowZone[]): SlowZone | undefined {
+  return slowZones.find((zone) => {
+    const dx = point.x - zone.position.x;
+    const dy = point.y - zone.position.y;
+    return Math.sqrt(dx * dx + dy * dy) < zone.radius;
+  });
+}
+
+function applyMovement(
+  ship: ShipState,
+  wind: Wind,
+  obstacles: Obstacle[],
+  slowZones: SlowZone[]
+): SimEvent {
+  let speed = effectiveSpeed(ship, wind);
+  const hazard = speed > 0 ? insideSlowZone(ship.position, slowZones) : undefined;
+  if (hazard) {
+    // Ships under way keep steerage even inside debris.
+    speed = Math.max(1, speed - hazard.speedPenalty);
+  }
   const radians = (ship.heading * Math.PI) / 180;
   const destination = {
     x: ship.position.x + Math.round(Math.cos(radians) * speed * MOVEMENT_SCALE),
@@ -102,7 +121,8 @@ function applyMovement(ship: ShipState, wind: Wind, obstacles: Obstacle[]): SimE
     shipId: ship.id,
     effectiveSpeed: speed,
     position: { ...ship.position },
-    ...(blocked ? { blocked: true } : {})
+    ...(blocked ? { blocked: true } : {}),
+    ...(hazard ? { slowedByHazard: true } : {})
   };
 }
 
@@ -193,7 +213,8 @@ function resolveBroadside(
 function resolveBoarding(
   rng: () => number,
   attacker: ShipState,
-  target: ShipState
+  target: ShipState,
+  boardingBonus: number
 ): SimEvent {
   const range = distance(attacker, target);
   const roll = Math.floor(rng() * 100);
@@ -201,7 +222,12 @@ function resolveBoarding(
   const power = Math.max(5, attacker.crew - proximityPenalty);
   const defense = Math.max(5, target.crew);
 
-  const successChance = clamp(60 + power - defense / 2 - proximityPenalty * 2, 10, 90);
+  const bonusPoints = Math.round(boardingBonus * 100);
+  const successChance = clamp(
+    60 + power - defense / 2 - proximityPenalty * 2 + bonusPoints,
+    10,
+    90
+  );
   const success = roll < successChance;
 
   const attackerLoss = Math.floor((defense / 8 + rng() * 3) * (success ? 0.5 : 1.2));
@@ -268,9 +294,10 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
   const windAware = input.modifiers?.windMovement === true;
   if (windAware) {
     const obstacles = input.state.obstacles ?? [];
+    const slowZones = input.state.slowZones ?? [];
     for (const ship of resolutionOrder) {
       if (ship.hp <= 0) continue;
-      events.push(applyMovement(ship, input.state.wind, obstacles));
+      events.push(applyMovement(ship, input.state.wind, obstacles, slowZones));
     }
   }
 
@@ -292,7 +319,8 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
     } else if (order.action === 'boarding' && order.targetShipId) {
       const target = shipById.get(order.targetShipId);
       if (target && target.hp > 0) {
-        events.push(resolveBoarding(rng, ship, target));
+        const boardingBonus = input.modifiers?.boardingBonus?.[ship.id] ?? 0;
+        events.push(resolveBoarding(rng, ship, target, boardingBonus));
       }
     }
   }

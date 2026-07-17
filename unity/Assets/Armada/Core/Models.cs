@@ -140,6 +140,14 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class SimSlowZone
+    {
+        public SimVector2 Position { get; set; }
+        public int Radius { get; set; }
+        public int SpeedPenalty { get; set; }
+    }
+
+    [Serializable]
     public sealed class SimState
     {
         public int Turn { get; set; }
@@ -147,6 +155,8 @@ namespace Armada.Client.Core
         public List<SimShip> Ships { get; set; }
         [JsonProperty("obstacles", NullValueHandling = NullValueHandling.Ignore)]
         public List<SimObstacle> Obstacles { get; set; }
+        [JsonProperty("slowZones", NullValueHandling = NullValueHandling.Ignore)]
+        public List<SimSlowZone> SlowZones { get; set; }
     }
 
     [Serializable]
@@ -437,6 +447,62 @@ namespace Armada.Client.Core
     public sealed class Mission03ResolveEnvelope
     {
         public Mission03Outcome Outcome { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission04Objectives
+    {
+        public int TurnLimit { get; set; }
+        public double EnemyCrewScale { get; set; }
+        public double PlayerBoardingBonus { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission04StartResponse
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission04Objectives Objectives { get; set; }
+        public SimState State { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission04BonusObjectives
+    {
+        public bool SuccessfulBoarding { get; set; }
+        public bool NoShipLost { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission04Telemetry
+    {
+        public int BoardingAttempts { get; set; }
+        public int BoardingSuccesses { get; set; }
+    }
+
+    // Damage profile, turn records, and the resolve request shape are shared
+    // with mission 01 (Mission01DamageProfile / Mission01TurnRecord /
+    // Mission01ResolveRequest).
+    [Serializable]
+    public sealed class Mission04Outcome
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public string Result { get; set; }
+        public string FailReason { get; set; }
+        public int TurnCount { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission04BonusObjectives BonusObjectives { get; set; }
+        public Mission01DamageProfile DamageProfile { get; set; }
+        public Mission04Telemetry Telemetry { get; set; }
+        public List<Mission01TurnRecord> Turns { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission04ResolveEnvelope
+    {
+        public Mission04Outcome Outcome { get; set; }
     }
 
     [Serializable]

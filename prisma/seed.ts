@@ -6,7 +6,12 @@ const prisma = new PrismaClient();
 const missionSeeds = [
   { code: 'mission-01', name: 'Fair Wind', description: 'Intro mission' },
   { code: 'mission-02', name: 'Weather Gage', description: 'Wind awareness' },
-  { code: 'mission-03', name: 'Raking Shot', description: 'Positioning drill' }
+  { code: 'mission-03', name: 'Raking Shot', description: 'Positioning drill' },
+  {
+    code: 'mission-04-boarding-party',
+    name: 'Boarding Party',
+    description: 'Boarding risk/reward'
+  }
 ];
 
 const configContent = {

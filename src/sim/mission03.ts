@@ -1,6 +1,6 @@
 import { aiOrderFor } from './ai.js';
 import { createDeterministicRng } from './engine.js';
-import { classifyLoss, countRakes } from './missionMetrics.js';
+import { classifyLoss, countBoardings, countRakes } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
 import { SimOrder, SimState, Wind } from './types.js';
 
@@ -201,23 +201,10 @@ export function runMission03(seed: number, playerTurnOrders: SimOrder[][]): Miss
 
   const { rakeAttempts, rakeHits } = countRakes(turns, MISSION_03_PLAYER_SHIP_IDS);
 
-  let boardingAttempts = 0;
-  let boardingSuccesses = 0;
-  for (const turn of turns) {
-    for (const event of turn.events) {
-      if (
-        event.type === 'boarding' &&
-        MISSION_03_PLAYER_SHIP_IDS.includes(
-          event.shipId as (typeof MISSION_03_PLAYER_SHIP_IDS)[number]
-        )
-      ) {
-        boardingAttempts += 1;
-        if (event.success) {
-          boardingSuccesses += 1;
-        }
-      }
-    }
-  }
+  const { boardingAttempts, boardingSuccesses } = countBoardings(
+    turns,
+    MISSION_03_PLAYER_SHIP_IDS
+  );
 
   const initialByShip = new Map(
     createMission03State().ships.map((ship) => [ship.id, ship.hp] as const)
