@@ -3,15 +3,26 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
+// Codes must match the runtime mission slugs (MISSION_0X_CODE in
+// src/sim/mission0X.ts); tests/seed-catalog.test.ts pins the alignment.
 const missionSeeds = [
-  { code: 'mission-01', name: 'Fair Wind', description: 'Intro mission' },
-  { code: 'mission-02', name: 'Weather Gage', description: 'Wind awareness' },
-  { code: 'mission-03', name: 'Raking Shot', description: 'Positioning drill' },
+  { code: 'mission-01-fair-wind', name: 'Fair Wind', description: 'Intro mission' },
+  { code: 'mission-02-weather-gage', name: 'Weather Gage', description: 'Wind awareness' },
+  { code: 'mission-03-raking-shot', name: 'Raking Shot', description: 'Positioning drill' },
   {
     code: 'mission-04-boarding-party',
     name: 'Boarding Party',
     description: 'Boarding risk/reward'
   }
+];
+
+// Short codes seeded before the runtime slugs were finalized. Renamed in
+// place so existing MissionProgress rows keep their mission references; the
+// rename is skipped once a row with the full slug exists.
+const legacyMissionCodes = [
+  { from: 'mission-01', to: 'mission-01-fair-wind' },
+  { from: 'mission-02', to: 'mission-02-weather-gage' },
+  { from: 'mission-03', to: 'mission-03-raking-shot' }
 ];
 
 const configContent = {
@@ -33,6 +44,13 @@ function checksum(content: unknown) {
 }
 
 async function main() {
+  for (const { from, to } of legacyMissionCodes) {
+    const target = await prisma.mission.findUnique({ where: { code: to } });
+    if (!target) {
+      await prisma.mission.updateMany({ where: { code: from }, data: { code: to } });
+    }
+  }
+
   for (const mission of missionSeeds) {
     await prisma.mission.upsert({
       where: { code: mission.code },
