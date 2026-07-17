@@ -221,7 +221,10 @@ export function registerMissionRoutes(app: FastifyInstance) {
     return { outcome };
   });
 
-  app.post(`/missions/${MISSION_03_CODE}/start`, async (request, reply) => {
+  // Plain path literal (not a template) so verify-contracts can match the
+  // documented operation; tests derive the URL from MISSION_03_CODE to guard
+  // against drift.
+  app.post('/missions/mission-03-raking-shot/start', async (request, reply) => {
     if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_03_CODE }))) {
       return;
     }
@@ -234,7 +237,7 @@ export function registerMissionRoutes(app: FastifyInstance) {
     return mission03StartResponse(parsed.data.seed);
   });
 
-  app.post(`/missions/${MISSION_03_CODE}/resolve`, async (request, reply) => {
+  app.post('/missions/mission-03-raking-shot/resolve', async (request, reply) => {
     if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_03_CODE }))) {
       return;
     }

@@ -321,6 +321,9 @@ components:
                   type: integer
                 crew:
                   type: integer
+            rake:
+              type: string
+              enum: [bow, stern]
         - type: object
           required:
             [type, shipId, targetShipId, success, roll, crewLoss, targetCrewLoss, targetRemaining]
@@ -349,6 +352,20 @@ components:
                   type: integer
                 crew:
                   type: integer
+        - type: object
+          required: [type, shipId, effectiveSpeed, position]
+          properties:
+            type:
+              type: string
+              enum: [movement]
+            shipId:
+              type: string
+            effectiveSpeed:
+              type: integer
+            position:
+              $ref: '#/components/schemas/Vector2'
+            blocked:
+              type: boolean
         - type: object
           required: [type, shipId, status]
           properties:
@@ -409,6 +426,154 @@ components:
           $ref: '#/components/schemas/SimSummary'
         hash:
           type: string
+    MissionTurnRecord:
+      type: object
+      required: [turn, hash, summary, events]
+      properties:
+        turn:
+          type: integer
+          minimum: 1
+        hash:
+          type: string
+        summary:
+          $ref: '#/components/schemas/SimSummary'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimEvent'
+    Mission03StartRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+          minimum: 0
+          default: 303
+    Mission03Objectives:
+      type: object
+      required: [turnLimit, bonusTurnTarget, rakeHitTarget, enemyDamageScale]
+      properties:
+        turnLimit:
+          type: integer
+        bonusTurnTarget:
+          type: integer
+        rakeHitTarget:
+          type: integer
+        enemyDamageScale:
+          type: number
+    Mission03StartResponse:
+      type: object
+      required: [missionCode, seed, turnLimit, objectives, state]
+      properties:
+        missionCode:
+          type: string
+          example: mission-03-raking-shot
+        seed:
+          type: integer
+        turnLimit:
+          type: integer
+        objectives:
+          $ref: '#/components/schemas/Mission03Objectives'
+        state:
+          $ref: '#/components/schemas/SimState'
+    Mission03ResolveRequest:
+      type: object
+      required: [seed, turns]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turns:
+          type: array
+          maxItems: 10
+          items:
+            type: array
+            maxItems: 4
+            items:
+              $ref: '#/components/schemas/SimOrder'
+    Mission03BonusObjectives:
+      type: object
+      required: [landedRakingHits, withinTurnTarget]
+      properties:
+        landedRakingHits:
+          type: boolean
+        withinTurnTarget:
+          type: boolean
+    Mission03ShipDamage:
+      type: object
+      required: [shipId, hullDamage, remainingHp]
+      properties:
+        shipId:
+          type: string
+        hullDamage:
+          type: integer
+        remainingHp:
+          type: integer
+    Mission03DamageProfile:
+      type: object
+      required:
+        [playerHullDamage, playerHullDamageFraction, playerRemainingHp, enemyHullDamage, enemyRemainingHp, perShip]
+      properties:
+        playerHullDamage:
+          type: integer
+        playerHullDamageFraction:
+          type: number
+        playerRemainingHp:
+          type: integer
+        enemyHullDamage:
+          type: integer
+        enemyRemainingHp:
+          type: integer
+        perShip:
+          type: array
+          items:
+            $ref: '#/components/schemas/Mission03ShipDamage'
+    Mission03Telemetry:
+      type: object
+      required: [rakeAttempts, rakeHits, boardingAttempts, boardingSuccesses]
+      properties:
+        rakeAttempts:
+          type: integer
+        rakeHits:
+          type: integer
+        boardingAttempts:
+          type: integer
+        boardingSuccesses:
+          type: integer
+    Mission03Outcome:
+      type: object
+      required:
+        [missionCode, seed, result, failReason, turnCount, turnLimit, bonusObjectives, damageProfile, telemetry, turns]
+      properties:
+        missionCode:
+          type: string
+          example: mission-03-raking-shot
+        seed:
+          type: integer
+        result:
+          type: string
+          enum: [win, loss]
+        failReason:
+          type: string
+          enum: [timeout, sunk, flanked]
+          nullable: true
+        turnCount:
+          type: integer
+        turnLimit:
+          type: integer
+        bonusObjectives:
+          $ref: '#/components/schemas/Mission03BonusObjectives'
+        damageProfile:
+          $ref: '#/components/schemas/Mission03DamageProfile'
+        telemetry:
+          $ref: '#/components/schemas/Mission03Telemetry'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
     ConfigSnapshot:
       type: object
       properties:
@@ -720,6 +885,82 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Mission or player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-03-raking-shot/start:
+    post:
+      summary: Start the deterministic Mission 03 "Raking Shot" scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission03StartRequest'
+      responses:
+        '200':
+          description: Scenario payload for the given seed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission03StartResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-03-raking-shot/resolve:
+    post:
+      summary: Resolve a Mission 03 run from per-turn player orders (boarding allowed)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission03ResolveRequest'
+      responses:
+        '200':
+          description: Deterministic mission outcome with telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome:
+                    $ref: '#/components/schemas/Mission03Outcome'
+        '400':
+          description: Bad request (validation, non-player ship, or invalid target)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
           content:
             application/json:
               schema:
