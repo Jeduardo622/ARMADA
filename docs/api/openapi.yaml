@@ -227,6 +227,28 @@ components:
               type: integer
               minimum: 0
               maximum: 10
+    SimObstacle:
+      type: object
+      required: [position, radius]
+      properties:
+        position:
+          $ref: '#/components/schemas/Vector2'
+        radius:
+          type: integer
+          minimum: 1
+    SimSlowZone:
+      type: object
+      required: [position, radius, speedPenalty]
+      properties:
+        position:
+          $ref: '#/components/schemas/Vector2'
+        radius:
+          type: integer
+          minimum: 1
+        speedPenalty:
+          type: integer
+          minimum: 1
+          maximum: 5
     SimState:
       type: object
       required: [turn, wind, ships]
@@ -241,6 +263,16 @@ components:
           items:
             $ref: '#/components/schemas/SimShip'
           minItems: 1
+        obstacles:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/SimObstacle'
+        slowZones:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/SimSlowZone'
     SimOrder:
       type: object
       required: [shipId, action]
@@ -365,6 +397,8 @@ components:
             position:
               $ref: '#/components/schemas/Vector2'
             blocked:
+              type: boolean
+            slowedByHazard:
               type: boolean
         - type: object
           required: [type, shipId, status]
@@ -570,6 +604,119 @@ components:
           $ref: '#/components/schemas/Mission03DamageProfile'
         telemetry:
           $ref: '#/components/schemas/Mission03Telemetry'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
+    Mission04StartRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+          minimum: 0
+          default: 404
+    Mission04Objectives:
+      type: object
+      required: [turnLimit, enemyCrewScale, playerBoardingBonus]
+      properties:
+        turnLimit:
+          type: integer
+        enemyCrewScale:
+          type: number
+        playerBoardingBonus:
+          type: number
+    Mission04StartResponse:
+      type: object
+      required: [missionCode, seed, turnLimit, objectives, state]
+      properties:
+        missionCode:
+          type: string
+          example: mission-04-boarding-party
+        seed:
+          type: integer
+        turnLimit:
+          type: integer
+        objectives:
+          $ref: '#/components/schemas/Mission04Objectives'
+        state:
+          $ref: '#/components/schemas/SimState'
+    Mission04ResolveRequest:
+      type: object
+      required: [seed, turns]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turns:
+          type: array
+          maxItems: 10
+          items:
+            type: array
+            maxItems: 4
+            items:
+              $ref: '#/components/schemas/SimOrder'
+    Mission04BonusObjectives:
+      type: object
+      required: [successfulBoarding, noShipLost]
+      properties:
+        successfulBoarding:
+          type: boolean
+        noShipLost:
+          type: boolean
+    Mission04DamageProfile:
+      type: object
+      required:
+        [playerHullDamage, playerHullDamageFraction, playerRemainingHp, enemyHullDamage, enemyRemainingHp]
+      properties:
+        playerHullDamage:
+          type: integer
+        playerHullDamageFraction:
+          type: number
+        playerRemainingHp:
+          type: integer
+        enemyHullDamage:
+          type: integer
+        enemyRemainingHp:
+          type: integer
+    Mission04Telemetry:
+      type: object
+      required: [boardingAttempts, boardingSuccesses]
+      properties:
+        boardingAttempts:
+          type: integer
+        boardingSuccesses:
+          type: integer
+    Mission04Outcome:
+      type: object
+      required:
+        [missionCode, seed, result, failReason, turnCount, turnLimit, bonusObjectives, damageProfile, telemetry, turns]
+      properties:
+        missionCode:
+          type: string
+          example: mission-04-boarding-party
+        seed:
+          type: integer
+        result:
+          type: string
+          enum: [win, loss]
+        failReason:
+          type: string
+          enum: [timeout, sunk, flanked]
+          nullable: true
+        turnCount:
+          type: integer
+        turnLimit:
+          type: integer
+        bonusObjectives:
+          $ref: '#/components/schemas/Mission04BonusObjectives'
+        damageProfile:
+          $ref: '#/components/schemas/Mission04DamageProfile'
+        telemetry:
+          $ref: '#/components/schemas/Mission04Telemetry'
         turns:
           type: array
           items:
@@ -947,6 +1094,82 @@ paths:
                 properties:
                   outcome:
                     $ref: '#/components/schemas/Mission03Outcome'
+        '400':
+          description: Bad request (validation, non-player ship, or invalid target)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-04-boarding-party/start:
+    post:
+      summary: Start the deterministic Mission 04 "Boarding Party" scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission04StartRequest'
+      responses:
+        '200':
+          description: Scenario payload for the given seed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission04StartResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-04-boarding-party/resolve:
+    post:
+      summary: Resolve a Mission 04 run from per-turn player orders (boarding allowed)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission04ResolveRequest'
+      responses:
+        '200':
+          description: Deterministic mission outcome with boarding telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome:
+                    $ref: '#/components/schemas/Mission04Outcome'
         '400':
           description: Bad request (validation, non-player ship, or invalid target)
           content:

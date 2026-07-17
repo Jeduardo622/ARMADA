@@ -313,7 +313,7 @@ export function registerMissionRoutes(app: FastifyInstance) {
     return { outcome };
   });
 
-  app.post(`/missions/${MISSION_04_CODE}/start`, async (request, reply) => {
+  app.post('/missions/mission-04-boarding-party/start', async (request, reply) => {
     if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_04_CODE }))) {
       return;
     }
@@ -326,7 +326,7 @@ export function registerMissionRoutes(app: FastifyInstance) {
     return mission04StartResponse(parsed.data.seed);
   });
 
-  app.post(`/missions/${MISSION_04_CODE}/resolve`, async (request, reply) => {
+  app.post('/missions/mission-04-boarding-party/resolve', async (request, reply) => {
     if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_04_CODE }))) {
       return;
     }
