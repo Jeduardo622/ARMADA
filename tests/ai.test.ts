@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { aiOrderFor, escortOrderFor } from '../src/sim/ai.js';
+import { aiOrderFor, bossOrderFor, bossPhaseIndex, escortOrderFor } from '../src/sim/ai.js';
+import type { BossParams } from '../src/sim/ai.js';
 import type { ShipState, SimState, Wind } from '../src/sim/types.js';
 
 function ship(overrides: Partial<ShipState> & Pick<ShipState, 'id' | 'side'>): ShipState {
@@ -17,6 +18,48 @@ function ship(overrides: Partial<ShipState> & Pick<ShipState, 'id' | 'side'>): S
 function board(ships: ShipState[], wind: Wind = { direction: 0, speed: 5 }): SimState {
   return { turn: 1, wind, ships };
 }
+
+describe('boss template', () => {
+  const params: BossParams = {
+    baseHull: 200,
+    phases: [
+      { hullAbove: 0.6, profile: 'line-advance' },
+      { hullAbove: 0, profile: 'aggressive', overrides: { rakeBias: 'high' } }
+    ]
+  };
+
+  it('selects the phase from hull fraction', () => {
+    expect(bossPhaseIndex(200, params)).toBe(0);
+    expect(bossPhaseIndex(121, params)).toBe(0);
+    expect(bossPhaseIndex(120, params)).toBe(1);
+    expect(bossPhaseIndex(1, params)).toBe(1);
+    expect(bossPhaseIndex(0, params)).toBe(1);
+  });
+
+  it('follows the phase-1 profile while healthy', () => {
+    const boss = ship({ id: 'b', side: 'enemy', position: { x: 150, y: 0 }, heading: 180, hp: 200 });
+    const player = ship({ id: 'p1', side: 'player' });
+    const state = board([player, boss]);
+    expect(bossOrderFor(boss, state, params)).toEqual(
+      aiOrderFor(boss, state, 'line-advance')
+    );
+  });
+
+  it('switches to the phase-2 profile once wounded', () => {
+    const boss = ship({ id: 'b', side: 'enemy', position: { x: 150, y: 0 }, heading: 180, hp: 100 });
+    const player = ship({ id: 'p1', side: 'player' });
+    const state = board([player, boss]);
+    expect(bossOrderFor(boss, state, params)).toEqual(
+      aiOrderFor(boss, state, 'aggressive', { rakeBias: 'high' })
+    );
+  });
+
+  it('passes when sunk', () => {
+    const boss = ship({ id: 'b', side: 'enemy', hp: 0 });
+    const player = ship({ id: 'p1', side: 'player' });
+    expect(bossOrderFor(boss, board([player, boss]), params).action).toBe('pass');
+  });
+});
 
 describe('line-advance profile', () => {
   it('advances without turning while outside preferred range', () => {

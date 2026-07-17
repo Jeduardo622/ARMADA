@@ -14,7 +14,12 @@ const missionSeeds = [
     name: 'Boarding Party',
     description: 'Boarding risk/reward'
   },
-  { code: 'mission-05-line-break', name: 'Line Break', description: 'Break the enemy line' }
+  { code: 'mission-05-line-break', name: 'Line Break', description: 'Break the enemy line' },
+  {
+    code: 'mission-06-dreadnought-siege',
+    name: 'Dreadnought Siege',
+    description: 'Boss encounter with phases'
+  }
 ];
 
 // Short codes seeded before the runtime slugs were finalized. Renamed in

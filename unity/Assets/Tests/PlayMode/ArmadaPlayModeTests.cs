@@ -265,6 +265,99 @@ namespace Armada.Client.Tests.PlayMode
             }
         }
 
+        [UnityTest]
+        public IEnumerator Mission06Flow_RunsMissionWithSeedAndScenarioParity()
+        {
+            var originalState = UnityEngine.Random.state;
+            var gameObject = new GameObject("mission06-flow-test");
+            try
+            {
+                var hooks = gameObject.AddComponent<DeterministicSimHooks>();
+
+                hooks.ApplySeed(606);
+                var expectedDraw = UnityEngine.Random.Range(0, int.MaxValue);
+
+                var flow = new Mission06Flow(new FakeMission06Client(), hooks);
+                var run = flow.RunAsync(606, new List<List<SimOrder>>());
+                while (!run.IsCompleted)
+                {
+                    yield return null;
+                }
+
+                Assert.That(run.Result.Success, Is.True, run.Result.FailureReason);
+                Assert.That(run.Result.Outcome.Result, Is.EqualTo("win"));
+                Assert.That(run.Result.Outcome.FailReason, Is.Null);
+                Assert.That(run.Result.Outcome.Telemetry.PhaseTransitions.Count, Is.GreaterThanOrEqualTo(2));
+
+                // The flow re-applied seed 606 through DeterministicSimHooks, so
+                // the next draw repeats the seeded sequence.
+                Assert.That(UnityEngine.Random.Range(0, int.MaxValue), Is.EqualTo(expectedDraw));
+            }
+            finally
+            {
+                UnityEngine.Random.state = originalState;
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+
+        private sealed class FakeMission06Client : IMission06Client
+        {
+            public Task<ServiceResult<Mission06StartResponse>> StartMission06Async(int seed)
+            {
+                return Task.FromResult(new ServiceResult<Mission06StartResponse>
+                {
+                    Data = Mission06Scenario.BuildExpectedStart(seed),
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<Mission06Outcome>> ResolveMission06Async(Mission01ResolveRequest request)
+            {
+                return Task.FromResult(new ServiceResult<Mission06Outcome>
+                {
+                    Data = new Mission06Outcome
+                    {
+                        MissionCode = Mission06Scenario.MissionCode,
+                        Seed = request.Seed,
+                        Result = "win",
+                        FailReason = null,
+                        TurnCount = 9,
+                        TurnLimit = Mission06Scenario.TurnLimit,
+                        BonusObjectives = new Mission06BonusObjectives
+                        {
+                            NoShipLost = true,
+                            WithinTurnTarget = true
+                        },
+                        DamageProfile = new Mission06DamageProfile
+                        {
+                            PlayerHullDamage = 69,
+                            PlayerHullDamageFraction = 0.19,
+                            PlayerRemainingHp = 291,
+                            EnemyHullDamage = 468,
+                            EnemyRemainingHp = 0,
+                            BossHullDamage = 468,
+                            BossRemainingHp = 0
+                        },
+                        Telemetry = new Mission06Telemetry
+                        {
+                            PhaseTransitions = new List<Mission06PhaseTransition>
+                            {
+                                new Mission06PhaseTransition { Turn = 1, Phase = 1 },
+                                new Mission06PhaseTransition { Turn = 5, Phase = 2 }
+                            },
+                            EnragedOnTurn = 6,
+                            ReinforcementTurn = Mission06Scenario.ReinforcementTurn,
+                            ReinforcementDamageDealt = 0
+                        },
+                        Turns = new List<Mission01TurnRecord>()
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
         private sealed class FakeMission05Client : IMission05Client
         {
             public Task<ServiceResult<Mission05StartResponse>> StartMission05Async(int seed)

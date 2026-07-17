@@ -277,6 +277,39 @@ export function escortOrderFor(
   };
 }
 
+// Boss template (docs/content/ai-profiles.md): scripted phases keyed to hull
+// fraction, each delegating to a reusable profile. Phase selection is shared
+// with mission telemetry via bossPhaseIndex.
+export interface BossPhase {
+  // Active while hull fraction is strictly above this threshold.
+  hullAbove: number;
+  profile: AiProfileName;
+  overrides?: Partial<AiProfileParams>;
+}
+
+export interface BossParams {
+  baseHull: number;
+  phases: BossPhase[];
+}
+
+export function bossPhaseIndex(hull: number, params: BossParams): number {
+  const fraction = params.baseHull > 0 ? hull / params.baseHull : 0;
+  for (let i = 0; i < params.phases.length; i++) {
+    if (fraction > params.phases[i].hullAbove) {
+      return i;
+    }
+  }
+  return Math.max(0, params.phases.length - 1);
+}
+
+export function bossOrderFor(ship: ShipState, state: SimState, params: BossParams): SimOrder {
+  if (ship.hp <= 0) {
+    return pass(ship);
+  }
+  const phase = params.phases[bossPhaseIndex(ship.hp, params)];
+  return aiOrderFor(ship, state, phase.profile, phase.overrides);
+}
+
 export function aiOrderFor(
   ship: ShipState,
   state: SimState,

@@ -105,7 +105,9 @@ export const simModifiersSchema = z
     // multiplied damage. Absent or false keeps the legacy damage rules.
     rakingFire: z.boolean().optional(),
     // Per-ship boarding success-chance bonus as a fraction (0.1 = +10 points).
-    boardingBonus: z.record(z.string(), z.number().min(-0.5).max(0.5)).optional()
+    boardingBonus: z.record(z.string(), z.number().min(-0.5).max(0.5)).optional(),
+    // Per-ship broadside hit-chance bonus in percentage points (e.g. enrage).
+    accuracyBonus: z.record(z.string(), z.number().int().min(-50).max(50)).optional()
   })
   .strict();
 

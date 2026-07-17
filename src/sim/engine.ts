@@ -148,7 +148,8 @@ function resolveBroadside(
   order: SimOrder,
   damageScale: number,
   attackerSpeed: number,
-  rakingEnabled: boolean
+  rakingEnabled: boolean,
+  accuracyBonus: number
 ): SimEvent {
   const range = distance(attacker, target);
   const bearingToTarget = angleBetween(attacker, target);
@@ -169,7 +170,8 @@ function resolveBroadside(
   const rangePenalty = Math.floor(range / 50);
   const anglePenalty = Math.floor(normalizedDiff / 15);
 
-  const baseChance = 72 - rangePenalty - anglePenalty + Math.floor(attackerSpeed / 2);
+  const baseChance =
+    72 - rangePenalty - anglePenalty + Math.floor(attackerSpeed / 2) + accuracyBonus;
   const hitChance = clamp(baseChance, 15, 95);
   const roll = Math.floor(rng() * 100);
   const hit = roll < hitChance;
@@ -314,7 +316,10 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
         const damageScale = input.modifiers?.damageScale?.[ship.id] ?? 1;
         const attackerSpeed = windAware ? effectiveSpeed(ship, input.state.wind) : ship.speed;
         const rakingEnabled = input.modifiers?.rakingFire === true;
-        events.push(resolveBroadside(rng, ship, target, order, damageScale, attackerSpeed, rakingEnabled));
+        const accuracyBonus = input.modifiers?.accuracyBonus?.[ship.id] ?? 0;
+        events.push(
+          resolveBroadside(rng, ship, target, order, damageScale, attackerSpeed, rakingEnabled, accuracyBonus)
+        );
       }
     } else if (order.action === 'boarding' && order.targetShipId) {
       const target = shipById.get(order.targetShipId);
