@@ -48,6 +48,14 @@ export const obstacleSchema = z
   })
   .strict();
 
+export const slowZoneSchema = z
+  .object({
+    position: vectorSchema,
+    radius: z.number().int().min(1),
+    speedPenalty: z.number().int().min(1).max(5)
+  })
+  .strict();
+
 export const simStateSchema = z
   .object({
     turn: z.number().int().min(1),
@@ -55,7 +63,10 @@ export const simStateSchema = z
     ships: z.array(shipSchema).min(1),
     // Impassable terrain (e.g. islands). Movement halts at the edge instead
     // of entering. Only meaningful with modifiers.windMovement.
-    obstacles: z.array(obstacleSchema).max(8).optional()
+    obstacles: z.array(obstacleSchema).max(8).optional(),
+    // Hazard areas (e.g. debris fields) that slow ships moving inside them.
+    // Only meaningful with modifiers.windMovement.
+    slowZones: z.array(slowZoneSchema).max(8).optional()
   })
   .strict();
 
@@ -92,7 +103,9 @@ export const simModifiersSchema = z
     windMovement: z.boolean().optional(),
     // Opt-in raking fire: broadsides aligned with the target's keel line deal
     // multiplied damage. Absent or false keeps the legacy damage rules.
-    rakingFire: z.boolean().optional()
+    rakingFire: z.boolean().optional(),
+    // Per-ship boarding success-chance bonus as a fraction (0.1 = +10 points).
+    boardingBonus: z.record(z.string(), z.number().min(-0.5).max(0.5)).optional()
   })
   .strict();
 
@@ -109,6 +122,7 @@ export const simPreviewSchema = z
 
 export type SimModifiers = z.infer<typeof simModifiersSchema>;
 export type Obstacle = z.infer<typeof obstacleSchema>;
+export type SlowZone = z.infer<typeof slowZoneSchema>;
 export type Vector2 = z.infer<typeof vectorSchema>;
 export type Wind = z.infer<typeof windSchema>;
 export type ShipStatus = z.infer<typeof shipStatusSchema>;
@@ -166,6 +180,7 @@ export type SimEvent =
       effectiveSpeed: number;
       position: Vector2;
       blocked?: boolean;
+      slowedByHazard?: boolean;
     }
   | {
       type: 'status';

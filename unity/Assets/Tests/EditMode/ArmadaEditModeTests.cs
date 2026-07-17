@@ -142,6 +142,25 @@ namespace Armada.Client.Tests.EditMode
                 Is.EqualTo(expected));
         }
 
+        [Test]
+        public void Mission04Scenario_FingerprintMatchesBackendPin()
+        {
+            // Must equal EXPECTED_FINGERPRINT in tests/mission04.test.ts so the
+            // client and server pin the identical deterministic scenario.
+            const string expected =
+                "mission-04-boarding-party|turnLimit=10|crewScale=0.9|boardBonus=0.1|wind=180:3|" +
+                "debris=130,0:r45:p2|" +
+                "enemy-frigate-a:enemy:220,40:h180:v2:hp180:sl90:cw54|" +
+                "enemy-frigate-b:enemy:260,-40:h180:v2:hp180:sl90:cw54|" +
+                "player-sloop-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
+                "player-sloop-b:player:0,-30:h0:v3:hp120:sl80:cw50";
+
+            Assert.That(Mission04Scenario.Fingerprint(), Is.EqualTo(expected));
+            Assert.That(
+                Mission04Scenario.FingerprintOf(Mission04Scenario.BuildExpectedStart(404)),
+                Is.EqualTo(expected));
+        }
+
         private static TelemetryEvent Event(string type, string value)
         {
             return new TelemetryEvent

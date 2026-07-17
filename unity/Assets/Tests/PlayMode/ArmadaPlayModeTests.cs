@@ -193,6 +193,92 @@ namespace Armada.Client.Tests.PlayMode
             }
         }
 
+        [UnityTest]
+        public IEnumerator Mission04Flow_RunsMissionWithSeedAndScenarioParity()
+        {
+            var originalState = UnityEngine.Random.state;
+            var gameObject = new GameObject("mission04-flow-test");
+            try
+            {
+                var hooks = gameObject.AddComponent<DeterministicSimHooks>();
+
+                hooks.ApplySeed(404);
+                var expectedDraw = UnityEngine.Random.Range(0, int.MaxValue);
+
+                var flow = new Mission04Flow(new FakeMission04Client(), hooks);
+                var run = flow.RunAsync(404, new List<List<SimOrder>>());
+                while (!run.IsCompleted)
+                {
+                    yield return null;
+                }
+
+                Assert.That(run.Result.Success, Is.True, run.Result.FailureReason);
+                Assert.That(run.Result.Outcome.Result, Is.EqualTo("win"));
+                Assert.That(run.Result.Outcome.FailReason, Is.Null);
+                Assert.That(run.Result.Outcome.BonusObjectives.SuccessfulBoarding, Is.True);
+                Assert.That(run.Result.Outcome.Telemetry.BoardingSuccesses, Is.GreaterThan(0));
+
+                // The flow re-applied seed 404 through DeterministicSimHooks, so
+                // the next draw repeats the seeded sequence.
+                Assert.That(UnityEngine.Random.Range(0, int.MaxValue), Is.EqualTo(expectedDraw));
+            }
+            finally
+            {
+                UnityEngine.Random.state = originalState;
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+
+        private sealed class FakeMission04Client : IMission04Client
+        {
+            public Task<ServiceResult<Mission04StartResponse>> StartMission04Async(int seed)
+            {
+                return Task.FromResult(new ServiceResult<Mission04StartResponse>
+                {
+                    Data = Mission04Scenario.BuildExpectedStart(seed),
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<Mission04Outcome>> ResolveMission04Async(Mission01ResolveRequest request)
+            {
+                return Task.FromResult(new ServiceResult<Mission04Outcome>
+                {
+                    Data = new Mission04Outcome
+                    {
+                        MissionCode = Mission04Scenario.MissionCode,
+                        Seed = request.Seed,
+                        Result = "win",
+                        FailReason = null,
+                        TurnCount = 9,
+                        TurnLimit = Mission04Scenario.TurnLimit,
+                        BonusObjectives = new Mission04BonusObjectives
+                        {
+                            SuccessfulBoarding = true,
+                            NoShipLost = true
+                        },
+                        DamageProfile = new Mission01DamageProfile
+                        {
+                            PlayerHullDamage = 60,
+                            PlayerHullDamageFraction = 0.25,
+                            PlayerRemainingHp = 180,
+                            EnemyHullDamage = 360,
+                            EnemyRemainingHp = 0
+                        },
+                        Telemetry = new Mission04Telemetry
+                        {
+                            BoardingAttempts = 10,
+                            BoardingSuccesses = 8
+                        },
+                        Turns = new List<Mission01TurnRecord>()
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
         private sealed class FakeMission03Client : IMission03Client
         {
             public Task<ServiceResult<Mission03StartResponse>> StartMission03Async(int seed)
