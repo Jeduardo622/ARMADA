@@ -126,6 +126,21 @@ components:
         bestScore:
           type: integer
           minimum: 1
+        seed:
+          type: integer
+          minimum: 0
+          description: >-
+            Seed of the winning run. Required with turns for reward-bearing
+            missions; the server re-simulates the run to verify the win.
+        turns:
+          type: array
+          maxItems: 20
+          description: Per-turn order lists of the winning run.
+          items:
+            type: array
+            maxItems: 6
+            items:
+              $ref: '#/components/schemas/SimOrder'
     InventoryItem:
       type: object
       properties:

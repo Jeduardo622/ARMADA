@@ -55,14 +55,27 @@ import {
   mission06StartResponse,
   runMission06
 } from '../sim/mission06.js';
-import { simOrderSchema } from '../sim/types.js';
+import { simOrderSchema, type SimOrder } from '../sim/types.js';
 import { missionRewardsForCode } from '../economy/missionRewards.js';
 
 const completeSchema = z.object({
   playerId: z.string().uuid(),
   result: z.record(z.any()).optional(),
-  bestScore: z.number().int().positive().optional()
+  bestScore: z.number().int().positive().optional(),
+  seed: z.number().int().nonnegative().optional(),
+  turns: z.array(z.array(simOrderSchema).max(6)).max(20).optional()
 });
+
+// Completion of a reward-bearing mission must carry the winning run itself
+// (seed + turns); the server re-simulates it and applies the same order
+// constraints as the mission's /resolve route, so rewards cannot be claimed
+// without a server-verified win.
+type MissionWinProofConfig = {
+  run: (seed: number, turns: SimOrder[][]) => { result: 'win' | 'loss' };
+  playerShipIds: ReadonlySet<string>;
+  enemyShipIds: ReadonlySet<string>;
+  allowBoarding: boolean;
+};
 
 const mission01StartSchema = z
   .object({
@@ -147,6 +160,45 @@ const mission06ResolveSchema = z
     turns: z.array(z.array(simOrderSchema).max(6)).max(MISSION_06_TURN_LIMIT)
   })
   .strict();
+
+const missionWinProofConfigs: Record<string, MissionWinProofConfig> = {
+  [MISSION_01_CODE]: {
+    run: runMission01,
+    playerShipIds: new Set([MISSION_01_PLAYER_SHIP_ID]),
+    enemyShipIds: new Set([MISSION_01_ENEMY_SHIP_ID]),
+    allowBoarding: false
+  },
+  [MISSION_02_CODE]: {
+    run: runMission02,
+    playerShipIds: new Set(MISSION_02_PLAYER_SHIP_IDS),
+    enemyShipIds: new Set(MISSION_02_ENEMY_SHIP_IDS),
+    allowBoarding: false
+  },
+  [MISSION_03_CODE]: {
+    run: runMission03,
+    playerShipIds: new Set(MISSION_03_PLAYER_SHIP_IDS),
+    enemyShipIds: new Set(MISSION_03_ENEMY_SHIP_IDS),
+    allowBoarding: true
+  },
+  [MISSION_04_CODE]: {
+    run: runMission04,
+    playerShipIds: new Set(MISSION_04_PLAYER_SHIP_IDS),
+    enemyShipIds: new Set(MISSION_04_ENEMY_SHIP_IDS),
+    allowBoarding: true
+  },
+  [MISSION_05_CODE]: {
+    run: runMission05,
+    playerShipIds: new Set(MISSION_05_PLAYER_SHIP_IDS),
+    enemyShipIds: new Set(MISSION_05_ENEMY_SHIP_IDS),
+    allowBoarding: true
+  },
+  [MISSION_06_CODE]: {
+    run: runMission06,
+    playerShipIds: new Set(MISSION_06_PLAYER_SHIP_IDS),
+    enemyShipIds: new Set(MISSION_06_ENEMY_SHIP_IDS),
+    allowBoarding: true
+  }
+};
 
 export function registerMissionRoutes(app: FastifyInstance) {
   app.get('/missions', async (request, reply) => {
@@ -586,52 +638,119 @@ export function registerMissionRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'player_not_found' });
     }
 
-    // Rewards are granted only on the first transition to COMPLETED so repeat
-    // completions stay idempotent for the economy.
-    const existingProgress = await app.prisma.missionProgress.findUnique({
-      where: { playerId_missionId: { playerId: player.id, missionId: mission.id } }
-    });
-    const firstCompletion = existingProgress?.status !== 'COMPLETED';
-    const rewardsGranted = firstCompletion ? missionRewardsForCode(params.data.code) : [];
+    // Reward-bearing missions require the winning run as proof; the server
+    // re-simulates it under the same order constraints as /resolve.
+    const proofConfig = missionWinProofConfigs[params.data.code];
+    if (proofConfig) {
+      if (parsed.data.seed === undefined || parsed.data.turns === undefined) {
+        return reply.status(400).send({ error: 'win_proof_required' });
+      }
 
-    const [progress] = await app.prisma.$transaction([
-      app.prisma.missionProgress.upsert({
-        where: { playerId_missionId: { playerId: player.id, missionId: mission.id } },
-        update: {
-          status: 'COMPLETED',
-          bestScore: parsed.data.bestScore ?? undefined,
-          lastResult: parsed.data.result ?? undefined
-        },
-        create: {
-          playerId: player.id,
-          missionId: mission.id,
-          status: 'COMPLETED',
-          bestScore: parsed.data.bestScore,
-          lastResult: parsed.data.result
+      if (!validateJsonLimit(reply, parsed.data.turns)) {
+        return;
+      }
+
+      for (const turnOrders of parsed.data.turns) {
+        for (const order of turnOrders) {
+          if (!proofConfig.playerShipIds.has(order.shipId)) {
+            return reply.status(400).send({ error: 'invalid_order_ship', shipId: order.shipId });
+          }
+          if (!proofConfig.allowBoarding && order.action === 'boarding') {
+            return reply.status(400).send({ error: 'boarding_disabled' });
+          }
+          if (order.targetShipId && !proofConfig.enemyShipIds.has(order.targetShipId)) {
+            return reply
+              .status(400)
+              .send({ error: 'unknown_target_in_order', shipId: order.targetShipId });
+          }
         }
-      }),
-      ...rewardsGranted.map((reward) =>
-        app.prisma.inventoryItem.upsert({
-          where: { playerId_itemKey: { playerId: player.id, itemKey: reward.itemKey } },
-          update: { quantity: { increment: reward.quantity } },
-          create: { playerId: player.id, itemKey: reward.itemKey, quantity: reward.quantity }
-        })
-      )
-    ]);
+      }
+
+      const outcome = proofConfig.run(parsed.data.seed, parsed.data.turns);
+      if (outcome.result !== 'win') {
+        return reply.status(400).send({ error: 'mission_not_won' });
+      }
+    }
+
+    const rewards = missionRewardsForCode(params.data.code);
+    const progressKey = { playerId_missionId: { playerId: player.id, missionId: mission.id } };
+    const completionUpdate = {
+      status: 'COMPLETED' as const,
+      bestScore: parsed.data.bestScore ?? undefined,
+      lastResult: parsed.data.result ?? undefined
+    };
+
+    // Rewards are granted only on the first transition to COMPLETED. The
+    // conditional updateMany claims that transition atomically inside the
+    // transaction, so concurrent completions cannot both grant.
+    const completeAndGrant = () =>
+      app.prisma.$transaction(async (tx) => {
+        const claimed = await tx.missionProgress.updateMany({
+          where: { playerId: player.id, missionId: mission.id, status: { not: 'COMPLETED' } },
+          data: completionUpdate
+        });
+
+        let firstCompletion = claimed.count === 1;
+        if (!firstCompletion) {
+          const existing = await tx.missionProgress.findUnique({ where: progressKey });
+          if (existing) {
+            await tx.missionProgress.update({ where: progressKey, data: completionUpdate });
+          } else {
+            // The unique constraint makes the loser of a concurrent create
+            // throw P2002, which retries below against the committed row.
+            await tx.missionProgress.create({
+              data: {
+                playerId: player.id,
+                missionId: mission.id,
+                status: 'COMPLETED',
+                bestScore: parsed.data.bestScore,
+                lastResult: parsed.data.result
+              }
+            });
+            firstCompletion = true;
+          }
+        }
+
+        const rewardsGranted = firstCompletion ? rewards : [];
+        for (const reward of rewardsGranted) {
+          await tx.inventoryItem.upsert({
+            where: { playerId_itemKey: { playerId: player.id, itemKey: reward.itemKey } },
+            update: { quantity: { increment: reward.quantity } },
+            create: { playerId: player.id, itemKey: reward.itemKey, quantity: reward.quantity }
+          });
+        }
+
+        const progress = await tx.missionProgress.findUnique({ where: progressKey });
+        return { progress, rewardsGranted, firstCompletion };
+      });
+
+    let completion;
+    try {
+      completion = await completeAndGrant();
+    } catch (error) {
+      const lostCreateRace =
+        typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002';
+      if (!lostCreateRace) {
+        throw error;
+      }
+      completion = await completeAndGrant();
+    }
 
     request.log.info(
       {
         actor: request.user?.id,
         playerId: player.id,
         missionCode: params.data.code,
-        rewardsGranted,
-        firstCompletion,
+        rewardsGranted: completion.rewardsGranted,
+        firstCompletion: completion.firstCompletion,
         requestId: request.id
       },
       'mission_completed'
     );
 
-    return reply.status(200).send({ progress, rewardsGranted });
+    return reply
+      .status(200)
+      .send({ progress: completion.progress, rewardsGranted: completion.rewardsGranted });
   });
 }
 
