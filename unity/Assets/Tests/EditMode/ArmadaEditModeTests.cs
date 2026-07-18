@@ -222,6 +222,31 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(response.RewardsGranted[1].Quantity, Is.EqualTo(50));
         }
 
+        [Test]
+        public void SimStatusEvent_DeserializesStatusEffectCounters()
+        {
+            // Mirrors the SimShipStatus schema in docs/api/openapi.yaml: the
+            // booleans stay the wire truth and the remaining-turn counters
+            // added by the status-effects slice are optional.
+            const string json =
+                "{\"type\":\"status\",\"shipId\":\"player-sloop\"," +
+                "\"status\":{\"onFire\":true,\"fireTurnsRemaining\":2,\"slowed\":true,\"slowTurnsRemaining\":1}}";
+
+            var statusEvent = JsonConvert.DeserializeObject<SimEvent>(json);
+
+            Assert.That(statusEvent.Type, Is.EqualTo("status"));
+            Assert.That(statusEvent.ShipId, Is.EqualTo("player-sloop"));
+            Assert.That(statusEvent.Status.OnFire, Is.True);
+            Assert.That(statusEvent.Status.FireTurnsRemaining, Is.EqualTo(2));
+            Assert.That(statusEvent.Status.Slowed, Is.True);
+            Assert.That(statusEvent.Status.SlowTurnsRemaining, Is.EqualTo(1));
+
+            var cleared = JsonConvert.DeserializeObject<SimShipStatus>("{}");
+            Assert.That(cleared.OnFire, Is.Null);
+            Assert.That(cleared.FireTurnsRemaining, Is.Null);
+            Assert.That(cleared.SlowTurnsRemaining, Is.Null);
+        }
+
         private static TelemetryEvent Event(string type, string value)
         {
             return new TelemetryEvent

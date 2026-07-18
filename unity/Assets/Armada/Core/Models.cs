@@ -129,6 +129,8 @@ namespace Armada.Client.Core
     {
         [JsonProperty("onFire")] public bool? OnFire { get; set; }
         [JsonProperty("slowed")] public bool? Slowed { get; set; }
+        [JsonProperty("fireTurnsRemaining")] public int? FireTurnsRemaining { get; set; }
+        [JsonProperty("slowTurnsRemaining")] public int? SlowTurnsRemaining { get; set; }
     }
 
     [Serializable]

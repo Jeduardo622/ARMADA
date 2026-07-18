@@ -30,6 +30,20 @@ const MOVEMENT_SCALE = 5;
 const RAKE_ARC = 20;
 const RAKE_MULTIPLIER = 1.5;
 
+// Status effects (modifiers.statusEffects): fire applies a per-turn hull DoT
+// and a broadside accuracy penalty while burning; slow reduces speed and turn
+// rate while sails are shredded. Counters tick down at the start of each turn
+// and re-application refreshes the duration instead of stacking
+// (docs/content/balance-tables.md, status effects). Values are design-tunable.
+const FIRE_IGNITION_CHANCE = 25;
+const FIRE_DURATION_TURNS = 3;
+const FIRE_HULL_DAMAGE_PER_TURN = 5;
+const FIRE_ACCURACY_PENALTY = 15;
+const SLOW_SAIL_FRACTION = 0.5;
+const SLOW_DURATION_TURNS = 2;
+const SLOW_SPEED_PENALTY = 2;
+const SLOW_TURN_RATE_LIMIT = 45;
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -95,17 +109,74 @@ function insideSlowZone(point: Vector2, slowZones: SlowZone[]): SlowZone | undef
   });
 }
 
+// Start-of-turn tick for modifiers.statusEffects: fire burns hull and both
+// counters count down; a counter already at zero clears its flag before any
+// phase runs, so an effect stays active for exactly its remaining turns.
+function tickShipStatus(ship: ShipState, events: SimEvent[]) {
+  const status = ship.status;
+  if (!status) return;
+  let changed = false;
+  if (status.onFire) {
+    const remaining = status.fireTurnsRemaining ?? 0;
+    if (remaining <= 0) {
+      delete status.onFire;
+      delete status.fireTurnsRemaining;
+    } else {
+      ship.hp = clamp(ship.hp - FIRE_HULL_DAMAGE_PER_TURN, 0, ship.hp);
+      status.fireTurnsRemaining = remaining - 1;
+    }
+    changed = true;
+  }
+  if (status.slowed) {
+    const remaining = status.slowTurnsRemaining ?? 0;
+    if (remaining <= 0) {
+      delete status.slowed;
+      delete status.slowTurnsRemaining;
+    } else {
+      status.slowTurnsRemaining = remaining - 1;
+    }
+    changed = true;
+  }
+  if (changed) {
+    events.push({ type: 'status', shipId: ship.id, status: { ...status } });
+  }
+}
+
+function refreshFire(ship: ShipState): boolean {
+  const status = (ship.status ??= {});
+  if (status.onFire === true && status.fireTurnsRemaining === FIRE_DURATION_TURNS) {
+    return false;
+  }
+  status.onFire = true;
+  status.fireTurnsRemaining = FIRE_DURATION_TURNS;
+  return true;
+}
+
+function refreshSlow(ship: ShipState): boolean {
+  const status = (ship.status ??= {});
+  if (status.slowed === true && status.slowTurnsRemaining === SLOW_DURATION_TURNS) {
+    return false;
+  }
+  status.slowed = true;
+  status.slowTurnsRemaining = SLOW_DURATION_TURNS;
+  return true;
+}
+
 function applyMovement(
   ship: ShipState,
   wind: Wind,
   obstacles: Obstacle[],
-  slowZones: SlowZone[]
+  slowZones: SlowZone[],
+  statusSpeedPenalty: number
 ): SimEvent {
   let speed = effectiveSpeed(ship, wind);
   const hazard = speed > 0 ? insideSlowZone(ship.position, slowZones) : undefined;
   if (hazard) {
     // Ships under way keep steerage even inside debris.
     speed = Math.max(1, speed - hazard.speedPenalty);
+  }
+  if (statusSpeedPenalty > 0 && speed > 0) {
+    speed = Math.max(1, speed - statusSpeedPenalty);
   }
   const radians = (ship.heading * Math.PI) / 180;
   const destination = {
@@ -126,8 +197,12 @@ function applyMovement(
   };
 }
 
-function applyManeuver(ship: ShipState, order: SimOrder): SimEvent {
-  const nextHeading = normalizeHeading(ship.heading + (order.turnDelta ?? 0));
+function applyManeuver(ship: ShipState, order: SimOrder, slowed: boolean): SimEvent {
+  const requestedTurn = order.turnDelta ?? 0;
+  const turnDelta = slowed
+    ? clamp(requestedTurn, -SLOW_TURN_RATE_LIMIT, SLOW_TURN_RATE_LIMIT)
+    : requestedTurn;
+  const nextHeading = normalizeHeading(ship.heading + turnDelta);
   const nextSpeed = clamp(ship.speed + (order.speedDelta ?? 0), 0, MAX_SPEED);
   ship.heading = nextHeading;
   ship.speed = nextSpeed;
@@ -136,7 +211,7 @@ function applyManeuver(ship: ShipState, order: SimOrder): SimEvent {
     shipId: ship.id,
     heading: nextHeading,
     speed: nextSpeed,
-    turnDelta: order.turnDelta ?? 0,
+    turnDelta,
     speedDelta: order.speedDelta ?? 0
   };
 }
@@ -269,7 +344,9 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
   const rng = createDeterministicRng(input.seed + input.turn);
   const ships: ShipState[] = input.state.ships.map((ship) => ({
     ...ship,
-    status: ship.status ?? {},
+    // Copy rather than alias: status effects mutate this object and must
+    // never write back into the caller's input state.
+    status: { ...ship.status },
     cooldowns: ship.cooldowns ?? {}
   }));
 
@@ -286,10 +363,22 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
   const events: SimEvent[] = [];
   const resolutionOrder = [...ships].sort((a, b) => a.id.localeCompare(b.id));
 
+  const statusEffects = input.modifiers?.statusEffects === true;
+  const sailAtTurnStart = statusEffects
+    ? new Map(ships.map((ship) => [ship.id, ship.sail]))
+    : undefined;
+  if (statusEffects) {
+    for (const ship of resolutionOrder) {
+      if (ship.hp <= 0) continue;
+      tickShipStatus(ship, events);
+    }
+  }
+  const isSlowed = (ship: ShipState) => statusEffects && ship.status?.slowed === true;
+
   for (const ship of resolutionOrder) {
     const order = orderByShip.get(ship.id);
     if (order) {
-      events.push(applyManeuver(ship, order));
+      events.push(applyManeuver(ship, order, isSlowed(ship)));
     }
   }
 
@@ -299,7 +388,15 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
     const slowZones = input.state.slowZones ?? [];
     for (const ship of resolutionOrder) {
       if (ship.hp <= 0) continue;
-      events.push(applyMovement(ship, input.state.wind, obstacles, slowZones));
+      events.push(
+        applyMovement(
+          ship,
+          input.state.wind,
+          obstacles,
+          slowZones,
+          isSlowed(ship) ? SLOW_SPEED_PENALTY : 0
+        )
+      );
     }
   }
 
@@ -314,12 +411,41 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
       const target = shipById.get(order.targetShipId);
       if (target && target.hp > 0) {
         const damageScale = input.modifiers?.damageScale?.[ship.id] ?? 1;
-        const attackerSpeed = windAware ? effectiveSpeed(ship, input.state.wind) : ship.speed;
+        let attackerSpeed = windAware ? effectiveSpeed(ship, input.state.wind) : ship.speed;
+        if (isSlowed(ship)) {
+          attackerSpeed = Math.max(0, attackerSpeed - SLOW_SPEED_PENALTY);
+        }
         const rakingEnabled = input.modifiers?.rakingFire === true;
-        const accuracyBonus = input.modifiers?.accuracyBonus?.[ship.id] ?? 0;
-        events.push(
-          resolveBroadside(rng, ship, target, order, damageScale, attackerSpeed, rakingEnabled, accuracyBonus)
+        const firePenalty =
+          statusEffects && ship.status?.onFire === true ? FIRE_ACCURACY_PENALTY : 0;
+        const accuracyBonus = (input.modifiers?.accuracyBonus?.[ship.id] ?? 0) - firePenalty;
+        const event = resolveBroadside(
+          rng,
+          ship,
+          target,
+          order,
+          damageScale,
+          attackerSpeed,
+          rakingEnabled,
+          accuracyBonus
         );
+        events.push(event);
+        if (statusEffects && event.type === 'broadside' && event.hit) {
+          // The ignition roll is consumed on every landed hit so the rng
+          // stream does not depend on the target's current status.
+          const ignitionRoll = Math.floor(rng() * 100);
+          if (event.damage.hull > 0 && ignitionRoll < FIRE_IGNITION_CHANCE && refreshFire(target)) {
+            events.push({ type: 'status', shipId: target.id, status: { ...target.status } });
+          }
+          const startSail = sailAtTurnStart?.get(target.id) ?? target.sail;
+          if (
+            event.damage.sail > 0 &&
+            target.sail < startSail * SLOW_SAIL_FRACTION &&
+            refreshSlow(target)
+          ) {
+            events.push({ type: 'status', shipId: target.id, status: { ...target.status } });
+          }
+        }
       }
     } else if (order.action === 'boarding' && order.targetShipId) {
       const target = shipById.get(order.targetShipId);
