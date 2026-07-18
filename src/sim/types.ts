@@ -17,7 +17,11 @@ export const windSchema = z
 export const shipStatusSchema = z
   .object({
     onFire: z.boolean().optional(),
-    slowed: z.boolean().optional()
+    slowed: z.boolean().optional(),
+    // Remaining-turn counters for modifiers.statusEffects; the booleans stay
+    // the wire truth clients read (mirrors the cooldowns.boarding precedent).
+    fireTurnsRemaining: z.number().int().min(0).max(10).optional(),
+    slowTurnsRemaining: z.number().int().min(0).max(10).optional()
   })
   .strict();
 
@@ -107,7 +111,11 @@ export const simModifiersSchema = z
     // Per-ship boarding success-chance bonus as a fraction (0.1 = +10 points).
     boardingBonus: z.record(z.string(), z.number().min(-0.5).max(0.5)).optional(),
     // Per-ship broadside hit-chance bonus in percentage points (e.g. enrage).
-    accuracyBonus: z.record(z.string(), z.number().int().min(-50).max(50)).optional()
+    accuracyBonus: z.record(z.string(), z.number().int().min(-50).max(50)).optional(),
+    // Opt-in status effects: fire deals per-turn hull damage plus an accuracy
+    // penalty; slow reduces speed and turn rate. Absent or false keeps the
+    // legacy rules and never mutates ship status.
+    statusEffects: z.boolean().optional()
   })
   .strict();
 

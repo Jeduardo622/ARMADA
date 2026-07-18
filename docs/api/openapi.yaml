@@ -211,6 +211,14 @@ components:
           type: boolean
         slowed:
           type: boolean
+        fireTurnsRemaining:
+          type: integer
+          minimum: 0
+          maximum: 10
+        slowTurnsRemaining:
+          type: integer
+          minimum: 0
+          maximum: 10
     SimShip:
       type: object
       required:
@@ -322,6 +330,33 @@ components:
         side:
           type: string
           enum: [port, starboard]
+    SimModifiers:
+      type: object
+      properties:
+        damageScale:
+          type: object
+          additionalProperties:
+            type: number
+            minimum: 0
+            maximum: 2
+        windMovement:
+          type: boolean
+        rakingFire:
+          type: boolean
+        boardingBonus:
+          type: object
+          additionalProperties:
+            type: number
+            minimum: -0.5
+            maximum: 0.5
+        accuracyBonus:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: -50
+            maximum: 50
+        statusEffects:
+          type: boolean
     SimEvent:
       oneOf:
         - type: object
@@ -469,6 +504,8 @@ components:
           maxItems: 32
           items:
             $ref: '#/components/schemas/SimOrder'
+        modifiers:
+          $ref: '#/components/schemas/SimModifiers'
     SimPreviewResult:
       type: object
       required: [turn, nextState, events, summary, hash]
