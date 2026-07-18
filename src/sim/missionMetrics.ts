@@ -1,3 +1,4 @@
+import { FIRE_DURATION_TURNS, SLOW_DURATION_TURNS } from './engine.js';
 import { MissionTurnRecord } from './missionRunner.js';
 import { SimEvent, SimState, Vector2, Wind } from './types.js';
 
@@ -109,6 +110,38 @@ export function countBoardings(
     }
   }
   return { boardingAttempts, boardingSuccesses };
+}
+
+export interface StatusApplicationCounts {
+  ignitions: number;
+  slows: number;
+}
+
+// Fresh fire/slow applications on the given ships. Application (and refresh)
+// events carry the counter at full duration; per-turn ticks and expiries
+// always carry less, so they are not counted. Deduplicated per ship and turn
+// because a later same-turn status snapshot repeats the full counter.
+export function countStatusApplications(
+  turns: MissionTurnRecord[],
+  shipIds: readonly string[]
+): StatusApplicationCounts {
+  const ignitions = new Set<string>();
+  const slows = new Set<string>();
+  for (const turn of turns) {
+    for (const event of turn.events) {
+      if (event.type !== 'status' || !shipIds.includes(event.shipId)) {
+        continue;
+      }
+      const key = `${turn.turn}:${event.shipId}`;
+      if (event.status.onFire === true && event.status.fireTurnsRemaining === FIRE_DURATION_TURNS) {
+        ignitions.add(key);
+      }
+      if (event.status.slowed === true && event.status.slowTurnsRemaining === SLOW_DURATION_TURNS) {
+        slows.add(key);
+      }
+    }
+  }
+  return { ignitions: ignitions.size, slows: slows.size };
 }
 
 export function countRakes(turns: MissionTurnRecord[], shipIds: readonly string[]): RakeCounts {

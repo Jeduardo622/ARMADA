@@ -36,11 +36,13 @@ const RAKE_MULTIPLIER = 1.5;
 // and re-application refreshes the duration instead of stacking
 // (docs/content/balance-tables.md, status effects). Values are design-tunable.
 const FIRE_IGNITION_CHANCE = 25;
-const FIRE_DURATION_TURNS = 3;
+// The duration constants are exported so mission telemetry can tell an
+// ignition/application event (counter at full duration) from a tick.
+export const FIRE_DURATION_TURNS = 3;
 const FIRE_HULL_DAMAGE_PER_TURN = 5;
 const FIRE_ACCURACY_PENALTY = 15;
 const SLOW_SAIL_FRACTION = 0.5;
-const SLOW_DURATION_TURNS = 2;
+export const SLOW_DURATION_TURNS = 2;
 const SLOW_SPEED_PENALTY = 2;
 const SLOW_TURN_RATE_LIMIT = 45;
 
