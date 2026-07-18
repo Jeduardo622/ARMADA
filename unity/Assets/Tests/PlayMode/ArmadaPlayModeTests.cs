@@ -301,6 +301,86 @@ namespace Armada.Client.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator Mission07Flow_RunsMissionWithSeedAndScenarioParity()
+        {
+            var originalState = UnityEngine.Random.state;
+            var gameObject = new GameObject("mission07-flow-test");
+            try
+            {
+                var hooks = gameObject.AddComponent<DeterministicSimHooks>();
+
+                hooks.ApplySeed(707);
+                var expectedDraw = UnityEngine.Random.Range(0, int.MaxValue);
+
+                var flow = new Mission07Flow(new FakeMission07Client(), hooks);
+                var run = flow.RunAsync(707, new List<List<SimOrder>>());
+                while (!run.IsCompleted)
+                {
+                    yield return null;
+                }
+
+                Assert.That(run.Result.Success, Is.True, run.Result.FailureReason);
+                Assert.That(run.Result.Outcome.Result, Is.EqualTo("win"));
+                Assert.That(run.Result.Outcome.FailReason, Is.Null);
+                Assert.That(run.Result.Outcome.BonusObjectives.EnemyIgnited, Is.True);
+                Assert.That(run.Result.Outcome.Telemetry.IgnitionsInflicted, Is.GreaterThan(0));
+
+                // The flow re-applied seed 707 through DeterministicSimHooks, so
+                // the next draw repeats the seeded sequence.
+                Assert.That(UnityEngine.Random.Range(0, int.MaxValue), Is.EqualTo(expectedDraw));
+            }
+            finally
+            {
+                UnityEngine.Random.state = originalState;
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+
+        private sealed class FakeMission07Client : IMission07Client
+        {
+            public Task<ServiceResult<Mission07StartResponse>> StartMission07Async(int seed)
+            {
+                return Task.FromResult(new ServiceResult<Mission07StartResponse>
+                {
+                    Data = Mission07Scenario.BuildExpectedStart(seed),
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<Mission07Outcome>> ResolveMission07Async(Mission01ResolveRequest request)
+            {
+                // Mirrors the seed-21 gunnery outcome pinned in
+                // tests/mission07.test.ts.
+                return Task.FromResult(new ServiceResult<Mission07Outcome>
+                {
+                    Data = new Mission07Outcome
+                    {
+                        MissionCode = Mission07Scenario.MissionCode,
+                        Seed = request.Seed,
+                        Result = "win",
+                        FailReason = null,
+                        TurnCount = 9,
+                        TurnLimit = Mission07Scenario.TurnLimit,
+                        BonusObjectives = new Mission07BonusObjectives
+                        {
+                            EnemyIgnited = true,
+                            Unscorched = true
+                        },
+                        Telemetry = new Mission07Telemetry
+                        {
+                            IgnitionsInflicted = 6,
+                            IgnitionsSuffered = 0,
+                            SlowsInflicted = 4
+                        }
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
+        [UnityTest]
         public IEnumerator UpgradesFlow_PurchasesNextSequentialTier()
         {
             var flow = new UpgradesFlow(new FakeUpgradesClient());

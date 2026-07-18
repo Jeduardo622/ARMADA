@@ -1129,6 +1129,121 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MissionTurnRecord'
+    Mission07StartRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+          minimum: 0
+          default: 707
+    Mission07Objectives:
+      type: object
+      required: [turnLimit, enemySailScale, ignitionTarget]
+      properties:
+        turnLimit:
+          type: integer
+        enemySailScale:
+          type: number
+        ignitionTarget:
+          type: integer
+    Mission07StartResponse:
+      type: object
+      required: [missionCode, seed, turnLimit, objectives, state]
+      properties:
+        missionCode:
+          type: string
+          example: mission-07-burning-seas
+        seed:
+          type: integer
+        turnLimit:
+          type: integer
+        objectives:
+          $ref: '#/components/schemas/Mission07Objectives'
+        state:
+          $ref: '#/components/schemas/SimState'
+    Mission07ResolveRequest:
+      type: object
+      required: [seed, turns]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turns:
+          type: array
+          maxItems: 10
+          items:
+            type: array
+            maxItems: 4
+            items:
+              $ref: '#/components/schemas/SimOrder'
+    Mission07BonusObjectives:
+      type: object
+      required: [enemyIgnited, unscorched]
+      properties:
+        enemyIgnited:
+          type: boolean
+        unscorched:
+          type: boolean
+    Mission07DamageProfile:
+      type: object
+      required:
+        [playerHullDamage, playerHullDamageFraction, playerRemainingHp, enemyHullDamage, enemyRemainingHp]
+      properties:
+        playerHullDamage:
+          type: integer
+        playerHullDamageFraction:
+          type: number
+        playerRemainingHp:
+          type: integer
+        enemyHullDamage:
+          type: integer
+        enemyRemainingHp:
+          type: integer
+    Mission07Telemetry:
+      type: object
+      required: [ignitionsInflicted, ignitionsSuffered, slowsInflicted]
+      properties:
+        ignitionsInflicted:
+          type: integer
+        ignitionsSuffered:
+          type: integer
+        slowsInflicted:
+          type: integer
+    Mission07Outcome:
+      type: object
+      required:
+        [missionCode, seed, result, failReason, turnCount, turnLimit, bonusObjectives, damageProfile, telemetry, turns]
+      properties:
+        missionCode:
+          type: string
+          example: mission-07-burning-seas
+        seed:
+          type: integer
+        result:
+          type: string
+          enum: [win, loss]
+        failReason:
+          type: string
+          enum: [timeout, sunk, flanked]
+          nullable: true
+        turnCount:
+          type: integer
+        turnLimit:
+          type: integer
+        bonusObjectives:
+          $ref: '#/components/schemas/Mission07BonusObjectives'
+        damageProfile:
+          $ref: '#/components/schemas/Mission07DamageProfile'
+        telemetry:
+          $ref: '#/components/schemas/Mission07Telemetry'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
     ConfigSnapshot:
       type: object
       properties:
@@ -1807,6 +1922,82 @@ paths:
                 properties:
                   outcome:
                     $ref: '#/components/schemas/Mission06Outcome'
+        '400':
+          description: Bad request (validation, non-player ship, or invalid target)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-07-burning-seas/start:
+    post:
+      summary: Start the deterministic Mission 07 "Burning Seas" scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission07StartRequest'
+      responses:
+        '200':
+          description: Scenario payload for the given seed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission07StartResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-07-burning-seas/resolve:
+    post:
+      summary: Resolve a Mission 07 run from per-turn player orders (status effects active)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission07ResolveRequest'
+      responses:
+        '200':
+          description: Deterministic mission outcome with fire and slow telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome:
+                    $ref: '#/components/schemas/Mission07Outcome'
         '400':
           description: Bad request (validation, non-player ship, or invalid target)
           content:
