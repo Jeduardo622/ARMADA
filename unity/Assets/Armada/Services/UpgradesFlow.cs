@@ -44,7 +44,8 @@ namespace Armada.Client.Services
             var purchase = await _client.PurchaseAsync(new UpgradePurchaseRequest
             {
                 PlayerId = playerId,
-                Component = component
+                Component = component,
+                Tier = expectedTier
             });
             if (!purchase.Success || purchase.Data == null)
             {

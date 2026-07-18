@@ -149,6 +149,9 @@ namespace Armada.Client.Core
     {
         public string PlayerId { get; set; }
         public string Component { get; set; }
+        // The tier being purchased; the backend rejects any value that is not
+        // the player's current tier + 1, so replays cannot double-charge.
+        public int Tier { get; set; }
     }
 
     [Serializable]

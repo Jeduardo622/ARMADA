@@ -242,7 +242,7 @@ components:
             $ref: '#/components/schemas/OwnedUpgrade'
     UpgradePurchaseRequest:
       type: object
-      required: [playerId, component]
+      required: [playerId, component, tier]
       properties:
         playerId:
           type: string
@@ -250,6 +250,14 @@ components:
         component:
           type: string
           enum: [cannon, sail, hull]
+        tier:
+          type: integer
+          minimum: 1
+          maximum: 3
+          description: >-
+            The tier being purchased; must equal the player's current tier + 1.
+            Binding the request to a tier makes retries safe — a replayed
+            purchase returns 409 instead of charging the next tier.
     UpgradePurchaseResponse:
       type: object
       required: [upgrade, spent]
@@ -1429,7 +1437,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
   /inventory/{playerId}/grant:
     post:
-      summary: Grant inventory item (server-authoritative)
+      summary: Grant inventory item (trusted-service only; inventory_grant_api is seeded disabled)
       parameters:
         - in: path
           name: playerId
@@ -1546,7 +1554,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Concurrent purchase conflict
+          description: Tier conflict (concurrent, replayed, or out-of-sequence purchase)
           content:
             application/json:
               schema:

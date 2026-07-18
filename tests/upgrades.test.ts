@@ -156,7 +156,7 @@ const purchase = (overrides: Record<string, unknown> = {}) =>
   app.inject({
     method: 'POST',
     url: '/upgrades/purchase',
-    payload: { playerId: PLAYER_ID, component: 'cannon', ...overrides }
+    payload: { playerId: PLAYER_ID, component: 'cannon', tier: 1, ...overrides }
   });
 
 describe('upgrade catalog', () => {
@@ -207,7 +207,7 @@ describe('upgrade purchase', () => {
     expect(inventoryStore.get('gold')).toBe(900);
     expect(inventoryStore.get('ore')).toBe(480);
 
-    const second = await purchase();
+    const second = await purchase({ tier: 2 });
     expect(second.statusCode).toBe(200);
     expect(second.json().upgrade.tier).toBe(2);
     expect(second.json().spent).toEqual(upgradeCostsFor('cannon', 2));
@@ -233,7 +233,13 @@ describe('upgrade purchase', () => {
     seedInventory({ gold: 10_000, ore: 10_000 });
     upgradeStore.set('cannon', 1);
 
-    const res = await purchase();
+    const skipped = await purchase({ tier: 3 });
+    expect(skipped.statusCode).toBe(409);
+    expect(skipped.json()).toEqual({ error: 'tier_conflict', component: 'cannon', currentTier: 1 });
+    expect(upgradeStore.get('cannon')).toBe(1);
+    expect(inventoryStore.get('gold')).toBe(10_000);
+
+    const res = await purchase({ tier: 2 });
     expect(res.statusCode).toBe(200);
     expect(res.json().upgrade.tier).toBe(2);
     // The claim is a conditional tier transition, not a read-then-write.
@@ -248,11 +254,28 @@ describe('upgrade purchase', () => {
     });
 
     upgradeStore.set('cannon', MAX_UPGRADE_TIER);
-    const capped = await purchase();
+    const capped = await purchase({ tier: MAX_UPGRADE_TIER });
     expect(capped.statusCode).toBe(400);
     expect(capped.json().error).toBe('max_tier_reached');
     expect(upgradeStore.get('cannon')).toBe(MAX_UPGRADE_TIER);
     expect(inventoryStore.get('gold')).toBe(9750);
+  });
+
+  it('rejects a replayed purchase without charging the next tier', async () => {
+    seedInventory({ gold: 1000, ore: 500 });
+
+    const first = await purchase({ tier: 1 });
+    expect(first.statusCode).toBe(200);
+    expect(inventoryStore.get('gold')).toBe(900);
+
+    // A lost response or double-click replays the same request; the committed
+    // tier no longer matches tier + 1, so nothing is charged again.
+    const replay = await purchase({ tier: 1 });
+    expect(replay.statusCode).toBe(409);
+    expect(replay.json()).toEqual({ error: 'tier_conflict', component: 'cannon', currentTier: 1 });
+    expect(upgradeStore.get('cannon')).toBe(1);
+    expect(inventoryStore.get('gold')).toBe(900);
+    expect(inventoryStore.get('ore')).toBe(480);
   });
 
   it('claims once when concurrent purchases race on an existing tier', async () => {
@@ -260,7 +283,7 @@ describe('upgrade purchase', () => {
     upgradeStore.set('cannon', 1);
     simulateClaimConflict = true;
 
-    const res = await purchase();
+    const res = await purchase({ tier: 2 });
     expect(res.statusCode).toBe(409);
     expect(res.json().error).toBe('upgrade_conflict');
     expect(upgradeStore.get('cannon')).toBe(1);
@@ -290,13 +313,49 @@ describe('upgrade purchase', () => {
     expect(transactionCalls).toBe(0);
   });
 
-  it('rejects unknown components without touching state', async () => {
+  it('rejects unknown components and out-of-range tiers without touching state', async () => {
     seedInventory({ gold: 1000 });
 
-    const res = await purchase({ component: 'mast' });
-    expect(res.statusCode).toBe(400);
+    const badComponent = await purchase({ component: 'mast' });
+    expect(badComponent.statusCode).toBe(400);
+    const badTier = await purchase({ tier: MAX_UPGRADE_TIER + 1 });
+    expect(badTier.statusCode).toBe(400);
     expect(transactionCalls).toBe(0);
     expect(inventoryStore.get('gold')).toBe(1000);
     expect(upgradeStore.size).toBe(0);
+  });
+});
+
+describe('inventory grant gating', () => {
+  it('keeps grants behind the trusted-service flag, separate from inventory_api', async () => {
+    // The mint route must not ride the player-facing inventory_api flag:
+    // emulate production where inventory_api is on and inventory_grant_api
+    // is seeded disabled.
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const flags = app.flags as any;
+    const originalIsEnabled = flags.isEnabled;
+    const originalFlagLookup = prisma.featureFlag.findUnique;
+    flags.isEnabled = (name: string) => name !== 'inventory_grant_api';
+    prisma.featureFlag.findUnique = async (args: any) =>
+      args?.where?.name === 'inventory_grant_api' ? { enabled: false } : { enabled: true };
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    try {
+      const grant = await app.inject({
+        method: 'POST',
+        url: `/inventory/${PLAYER_ID}/grant`,
+        payload: { itemKey: 'gold', quantity: 1_000_000 }
+      });
+      expect(grant.statusCode).toBe(403);
+      expect(grant.json()).toEqual({ error: 'feature_disabled', flag: 'inventory_grant_api' });
+
+      // Purchasing stays available under inventory_api alone.
+      seedInventory({ gold: 1000, ore: 500 });
+      const res = await purchase({ tier: 1 });
+      expect(res.statusCode).toBe(200);
+    } finally {
+      flags.isEnabled = originalIsEnabled;
+      prisma.featureFlag.findUnique = originalFlagLookup;
+    }
   });
 });

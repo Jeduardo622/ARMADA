@@ -448,7 +448,7 @@ namespace Armada.Client.Tests.PlayMode
                         {
                             PlayerId = request.PlayerId,
                             Component = request.Component,
-                            Tier = 2
+                            Tier = request.Tier
                         },
                         Spent = new List<UpgradeCost>
                         {

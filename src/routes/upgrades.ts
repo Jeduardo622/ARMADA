@@ -10,7 +10,12 @@ import {
 
 const purchaseSchema = z.object({
   playerId: z.string().uuid(),
-  component: z.enum(UPGRADE_COMPONENTS)
+  component: z.enum(UPGRADE_COMPONENTS),
+  // The tier the client confirmed it is buying. Binding the purchase to it
+  // makes retries and double-clicks idempotent-safe: once the tier commits, a
+  // replayed request no longer matches currentTier + 1 and is rejected
+  // instead of silently charging the next tier.
+  tier: z.number().int().min(1).max(MAX_UPGRADE_TIER)
 });
 
 // Thrown inside the purchase transaction so every partial write rolls back
@@ -26,13 +31,15 @@ class PurchaseRejection extends Error {
 
 export function registerUpgradeRoutes(app: FastifyInstance) {
   app.get('/upgrades', async (request, reply) => {
-    if (!(await ensureFlag(app, reply, 'inventory_api'))) {
-      return;
-    }
-
     const playerId = request.user?.id;
     if (!playerId) {
       return reply.status(401).send({ error: 'unauthorized' });
+    }
+
+    // Same player context as the purchase route, so a player-scoped rollout
+    // strategy cannot enable purchasing while denying the catalog.
+    if (!(await ensureFlag(app, reply, 'inventory_api', { playerId }))) {
+      return;
     }
 
     const rows = await app.prisma.playerShipUpgrade.findMany({ where: { playerId } });
@@ -81,6 +88,9 @@ export function registerUpgradeRoutes(app: FastifyInstance) {
           throw new PurchaseRejection(400, { error: 'max_tier_reached', component });
         }
         const targetTier = currentTier + 1;
+        if (parsed.data.tier !== targetTier) {
+          throw new PurchaseRejection(409, { error: 'tier_conflict', component, currentTier });
+        }
         const costs = upgradeCostsFor(component, targetTier);
 
         if (existing) {
