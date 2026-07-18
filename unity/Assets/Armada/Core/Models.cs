@@ -102,6 +102,63 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class ShipUpgrade
+    {
+        public string PlayerId { get; set; }
+        public string Component { get; set; }
+        public int Tier { get; set; }
+    }
+
+    [Serializable]
+    public sealed class OwnedUpgrade
+    {
+        public string Component { get; set; }
+        public int Tier { get; set; }
+    }
+
+    [Serializable]
+    public sealed class UpgradeCost
+    {
+        public string ItemKey { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    [Serializable]
+    public sealed class UpgradeCatalogTier
+    {
+        public int Tier { get; set; }
+        public List<UpgradeCost> Costs { get; set; }
+    }
+
+    [Serializable]
+    public sealed class UpgradeCatalogEntry
+    {
+        public string Component { get; set; }
+        public List<UpgradeCatalogTier> Tiers { get; set; }
+    }
+
+    [Serializable]
+    public sealed class UpgradesResponse
+    {
+        public List<UpgradeCatalogEntry> Catalog { get; set; }
+        public List<OwnedUpgrade> Owned { get; set; }
+    }
+
+    [Serializable]
+    public sealed class UpgradePurchaseRequest
+    {
+        public string PlayerId { get; set; }
+        public string Component { get; set; }
+    }
+
+    [Serializable]
+    public sealed class UpgradePurchaseResponse
+    {
+        public ShipUpgrade Upgrade { get; set; }
+        public List<UpgradeCost> Spent { get; set; }
+    }
+
+    [Serializable]
     public sealed class TelemetryIngestRequest
     {
         public int SchemaVersion { get; set; } = 1;

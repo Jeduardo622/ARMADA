@@ -17,6 +17,7 @@ import { registerHealthRoutes } from './routes/health.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerPlayerRoutes } from './routes/player.js';
 import { registerInventoryRoutes } from './routes/inventory.js';
+import { registerUpgradeRoutes } from './routes/upgrades.js';
 import { registerMissionRoutes } from './routes/missions.js';
 import { registerSimRoutes } from './routes/sim.js';
 import { registerTelemetryRoutes } from './routes/telemetry.js';
@@ -50,6 +51,12 @@ export function buildServer(options?: BuildOptions) {
       mission: { findMany: async () => [], findFirst: async () => null },
       missionProgress: { upsert: async (data: unknown) => data },
       inventoryItem: { findMany: async () => [], upsert: async (data: unknown) => data },
+      playerShipUpgrade: {
+        findMany: async () => [],
+        findUnique: async () => null,
+        updateMany: async () => ({ count: 0 }),
+        create: async (data: unknown) => data
+      },
       configSnapshot: { findFirst: async () => null, findUnique: async () => null },
       featureFlag: { findUnique: async () => ({ enabled: true }) }
     } as unknown as PrismaClient);
@@ -85,6 +92,7 @@ export function buildServer(options?: BuildOptions) {
   registerAuthRoutes(app);
   registerPlayerRoutes(app);
   registerInventoryRoutes(app);
+  registerUpgradeRoutes(app);
   registerMissionRoutes(app);
   registerSimRoutes(app);
   registerTelemetryRoutes(app);

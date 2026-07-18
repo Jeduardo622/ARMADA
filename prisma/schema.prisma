@@ -24,6 +24,7 @@ model Player {
   inventory   InventoryItem[]
   missions    MissionProgress[]
   telemetry   TelemetryEvent[]
+  upgrades    PlayerShipUpgrade[]
 }
 
 model InventoryItem {
@@ -37,6 +38,19 @@ model InventoryItem {
   updatedAt DateTime @updatedAt
 
   @@unique([playerId, itemKey])
+  @@index([playerId])
+}
+
+model PlayerShipUpgrade {
+  id        String   @id @default(uuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  component String
+  tier      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, component])
   @@index([playerId])
 }
 

@@ -223,6 +223,39 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void UpgradeResponses_DeserializeBackendPayloads()
+        {
+            // Mirrors the /upgrades and /upgrades/purchase response contracts
+            // in docs/api/openapi.yaml (camelCase; catalog tiers carry costs,
+            // purchase returns the upgrade with the spent costs).
+            const string listJson =
+                "{\"catalog\":[{\"component\":\"cannon\",\"tiers\":[" +
+                "{\"tier\":1,\"costs\":[{\"itemKey\":\"gold\",\"quantity\":100},{\"itemKey\":\"ore\",\"quantity\":20}]}]}]," +
+                "\"owned\":[{\"component\":\"cannon\",\"tier\":1},{\"component\":\"sail\",\"tier\":0}]}";
+            const string purchaseJson =
+                "{\"upgrade\":{\"playerId\":\"11111111-1111-1111-1111-111111111111\"," +
+                "\"component\":\"cannon\",\"tier\":2}," +
+                "\"spent\":[{\"itemKey\":\"gold\",\"quantity\":250},{\"itemKey\":\"ore\",\"quantity\":50}]}";
+
+            var list = JsonConvert.DeserializeObject<UpgradesResponse>(listJson);
+            Assert.That(list.Catalog, Has.Count.EqualTo(1));
+            Assert.That(list.Catalog[0].Component, Is.EqualTo("cannon"));
+            Assert.That(list.Catalog[0].Tiers[0].Tier, Is.EqualTo(1));
+            Assert.That(list.Catalog[0].Tiers[0].Costs[1].ItemKey, Is.EqualTo("ore"));
+            Assert.That(list.Catalog[0].Tiers[0].Costs[1].Quantity, Is.EqualTo(20));
+            Assert.That(list.Owned, Has.Count.EqualTo(2));
+            Assert.That(list.Owned[0].Tier, Is.EqualTo(1));
+            Assert.That(list.Owned[1].Tier, Is.EqualTo(0));
+
+            var purchase = JsonConvert.DeserializeObject<UpgradePurchaseResponse>(purchaseJson);
+            Assert.That(purchase.Upgrade.Component, Is.EqualTo("cannon"));
+            Assert.That(purchase.Upgrade.Tier, Is.EqualTo(2));
+            Assert.That(purchase.Spent, Has.Count.EqualTo(2));
+            Assert.That(purchase.Spent[0].ItemKey, Is.EqualTo("gold"));
+            Assert.That(purchase.Spent[0].Quantity, Is.EqualTo(250));
+        }
+
+        [Test]
         public void SimStatusEvent_DeserializesStatusEffectCounters()
         {
             // Mirrors the SimShipStatus schema in docs/api/openapi.yaml: the
