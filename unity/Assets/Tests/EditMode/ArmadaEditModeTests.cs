@@ -202,6 +202,24 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void Mission07Scenario_FingerprintMatchesBackendPin()
+        {
+            // Must equal EXPECTED_FINGERPRINT in tests/mission07.test.ts so the
+            // client and server pin the identical deterministic scenario.
+            const string expected =
+                "mission-07-burning-seas|turnLimit=10|sailScale=0.85|ignitionTarget=1|wind=0:4|" +
+                "enemy-frigate-a:enemy:220,40:h180:v2:hp180:sl76:cw60|" +
+                "enemy-frigate-b:enemy:220,-40:h180:v2:hp180:sl76:cw60|" +
+                "player-sloop-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
+                "player-sloop-b:player:0,-30:h0:v3:hp120:sl80:cw50";
+
+            Assert.That(Mission07Scenario.Fingerprint(), Is.EqualTo(expected));
+            Assert.That(
+                Mission07Scenario.FingerprintOf(Mission07Scenario.BuildExpectedStart(707)),
+                Is.EqualTo(expected));
+        }
+
+        [Test]
         public void MissionCompleteResponse_DeserializesBackendPayload()
         {
             // Mirrors the /missions/{code}/complete response contract in

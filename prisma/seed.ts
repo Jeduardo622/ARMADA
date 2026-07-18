@@ -19,6 +19,11 @@ const missionSeeds = [
     code: 'mission-06-dreadnought-siege',
     name: 'Dreadnought Siege',
     description: 'Boss encounter with phases'
+  },
+  {
+    code: 'mission-07-burning-seas',
+    name: 'Burning Seas',
+    description: 'Status effects: fire and slow'
   }
 ];
 

@@ -16,6 +16,7 @@ import { MISSION_03_CODE } from '../src/sim/mission03.js';
 import { MISSION_04_CODE } from '../src/sim/mission04.js';
 import { MISSION_05_CODE } from '../src/sim/mission05.js';
 import { MISSION_06_CODE } from '../src/sim/mission06.js';
+import { MISSION_07_CODE } from '../src/sim/mission07.js';
 
 const PLAYER_ID = '11111111-1111-1111-1111-111111111111';
 const ALL_MISSION_CODES = [
@@ -24,7 +25,8 @@ const ALL_MISSION_CODES = [
   MISSION_03_CODE,
   MISSION_04_CODE,
   MISSION_05_CODE,
-  MISSION_06_CODE
+  MISSION_06_CODE,
+  MISSION_07_CODE
 ];
 const REWARD_ITEM_KEYS = ['gold', 'timber', 'ore', 'captain_shard', 'cosmetic_token'];
 
@@ -176,7 +178,7 @@ const complete = (code: string, overrides: Record<string, unknown> = {}) =>
   });
 
 describe('mission reward table', () => {
-  it('covers exactly the six runtime mission codes', () => {
+  it('covers exactly the seven runtime mission codes', () => {
     expect(Object.keys(MISSION_REWARD_TABLE).sort()).toEqual([...ALL_MISSION_CODES].sort());
   });
 

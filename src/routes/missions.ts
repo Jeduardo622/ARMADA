@@ -55,6 +55,15 @@ import {
   mission06StartResponse,
   runMission06
 } from '../sim/mission06.js';
+import {
+  MISSION_07_CODE,
+  MISSION_07_DEFAULT_SEED,
+  MISSION_07_ENEMY_SHIP_IDS,
+  MISSION_07_PLAYER_SHIP_IDS,
+  MISSION_07_TURN_LIMIT,
+  mission07StartResponse,
+  runMission07
+} from '../sim/mission07.js';
 import { simOrderSchema, type SimOrder } from '../sim/types.js';
 import { missionRewardsForCode } from '../economy/missionRewards.js';
 
@@ -161,6 +170,20 @@ const mission06ResolveSchema = z
   })
   .strict();
 
+const mission07StartSchema = z
+  .object({
+    seed: z.number().int().nonnegative().default(MISSION_07_DEFAULT_SEED)
+  })
+  .strict();
+
+const mission07ResolveSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+    seed: z.number().int().nonnegative(),
+    turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_07_TURN_LIMIT)
+  })
+  .strict();
+
 const missionWinProofConfigs: Record<string, MissionWinProofConfig> = {
   [MISSION_01_CODE]: {
     run: runMission01,
@@ -196,6 +219,12 @@ const missionWinProofConfigs: Record<string, MissionWinProofConfig> = {
     run: runMission06,
     playerShipIds: new Set(MISSION_06_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_06_ENEMY_SHIP_IDS),
+    allowBoarding: true
+  },
+  [MISSION_07_CODE]: {
+    run: runMission07,
+    playerShipIds: new Set(MISSION_07_PLAYER_SHIP_IDS),
+    enemyShipIds: new Set(MISSION_07_ENEMY_SHIP_IDS),
     allowBoarding: true
   }
 };
@@ -600,6 +629,70 @@ export function registerMissionRoutes(app: FastifyInstance) {
         requestId: request.id
       },
       'mission06_resolved'
+    );
+
+    return { outcome };
+  });
+
+  app.post('/missions/mission-07-burning-seas/start', async (request, reply) => {
+    if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_07_CODE }))) {
+      return;
+    }
+
+    const parsed = mission07StartSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.format() });
+    }
+
+    return mission07StartResponse(parsed.data.seed);
+  });
+
+  app.post('/missions/mission-07-burning-seas/resolve', async (request, reply) => {
+    if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_07_CODE }))) {
+      return;
+    }
+
+    const parsed = mission07ResolveSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.format() });
+    }
+
+    if (!validateJsonLimit(reply, parsed.data.turns)) {
+      return;
+    }
+
+    const playerShipIds = new Set<string>(MISSION_07_PLAYER_SHIP_IDS);
+    const enemyShipIds = new Set<string>(MISSION_07_ENEMY_SHIP_IDS);
+    for (const turnOrders of parsed.data.turns) {
+      for (const order of turnOrders) {
+        if (!playerShipIds.has(order.shipId)) {
+          return reply.status(400).send({ error: 'invalid_order_ship', shipId: order.shipId });
+        }
+        if (order.targetShipId && !enemyShipIds.has(order.targetShipId)) {
+          return reply
+            .status(400)
+            .send({ error: 'unknown_target_in_order', shipId: order.targetShipId });
+        }
+      }
+    }
+
+    const outcome = runMission07(parsed.data.seed, parsed.data.turns);
+
+    request.log.info(
+      {
+        actor: request.user?.id,
+        missionCode: MISSION_07_CODE,
+        result: outcome.result,
+        failReason: outcome.failReason,
+        turnCount: outcome.turnCount,
+        damageProfile: outcome.damageProfile,
+        bonusObjectives: outcome.bonusObjectives,
+        ignitionsInflicted: outcome.telemetry.ignitionsInflicted,
+        ignitionsSuffered: outcome.telemetry.ignitionsSuffered,
+        slowsInflicted: outcome.telemetry.slowsInflicted,
+        requestId: request.id
+      },
+      'mission07_resolved'
     );
 
     return { outcome };
