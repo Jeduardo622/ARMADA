@@ -88,6 +88,19 @@ async function main() {
       create: { ...flag, enabled: true }
     });
   }
+
+  // Trusted-service gate for POST /inventory/{playerId}/grant: seeded disabled
+  // and never force-enabled, so players cannot mint economy materials unless
+  // an operator deliberately flips it (update: {} preserves that choice).
+  await prisma.featureFlag.upsert({
+    where: { name: 'inventory_grant_api' },
+    update: {},
+    create: {
+      name: 'inventory_grant_api',
+      description: 'Enable trusted-service inventory grants (mints items; keep off in production)',
+      enabled: false
+    }
+  });
 }
 
 main()

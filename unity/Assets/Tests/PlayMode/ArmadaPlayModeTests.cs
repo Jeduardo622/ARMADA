@@ -380,6 +380,88 @@ namespace Armada.Client.Tests.PlayMode
             }
         }
 
+        [UnityTest]
+        public IEnumerator UpgradesFlow_PurchasesNextSequentialTier()
+        {
+            var flow = new UpgradesFlow(new FakeUpgradesClient());
+            var run = flow.PurchaseNextTierAsync("11111111-1111-1111-1111-111111111111", "cannon");
+            while (!run.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.That(run.Result.Success, Is.True, run.Result.FailureReason);
+            Assert.That(run.Result.Purchase.Upgrade.Component, Is.EqualTo("cannon"));
+            Assert.That(run.Result.Purchase.Upgrade.Tier, Is.EqualTo(2));
+            Assert.That(run.Result.Purchase.Spent, Has.Count.EqualTo(2));
+            Assert.That(run.Result.Purchase.Spent[0].ItemKey, Is.EqualTo("gold"));
+        }
+
+        private sealed class FakeUpgradesClient : IUpgradesClient
+        {
+            // Backend-shaped fixture: cannon already at tier 1, so the next
+            // sequential purchase returns tier 2 with the tier-2 costs.
+            public Task<ServiceResult<UpgradesResponse>> GetUpgradesAsync()
+            {
+                return Task.FromResult(new ServiceResult<UpgradesResponse>
+                {
+                    Data = new UpgradesResponse
+                    {
+                        Catalog = new List<UpgradeCatalogEntry>
+                        {
+                            new UpgradeCatalogEntry
+                            {
+                                Component = "cannon",
+                                Tiers = new List<UpgradeCatalogTier>
+                                {
+                                    new UpgradeCatalogTier
+                                    {
+                                        Tier = 2,
+                                        Costs = new List<UpgradeCost>
+                                        {
+                                            new UpgradeCost { ItemKey = "gold", Quantity = 250 },
+                                            new UpgradeCost { ItemKey = "ore", Quantity = 50 }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        Owned = new List<OwnedUpgrade>
+                        {
+                            new OwnedUpgrade { Component = "cannon", Tier = 1 },
+                            new OwnedUpgrade { Component = "sail", Tier = 0 },
+                            new OwnedUpgrade { Component = "hull", Tier = 0 }
+                        }
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<UpgradePurchaseResponse>> PurchaseAsync(UpgradePurchaseRequest request)
+            {
+                return Task.FromResult(new ServiceResult<UpgradePurchaseResponse>
+                {
+                    Data = new UpgradePurchaseResponse
+                    {
+                        Upgrade = new ShipUpgrade
+                        {
+                            PlayerId = request.PlayerId,
+                            Component = request.Component,
+                            Tier = request.Tier
+                        },
+                        Spent = new List<UpgradeCost>
+                        {
+                            new UpgradeCost { ItemKey = "gold", Quantity = 250 },
+                            new UpgradeCost { ItemKey = "ore", Quantity = 50 }
+                        }
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
         private sealed class FakeMission06Client : IMission06Client
         {
             public Task<ServiceResult<Mission06StartResponse>> StartMission06Async(int seed)

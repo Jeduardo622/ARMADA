@@ -40,7 +40,10 @@ export function registerInventoryRoutes(app: FastifyInstance) {
       return;
     }
 
-    if (!(await ensureFlag(app, reply, 'inventory_api', { playerId: params.data.playerId }))) {
+    // Grants mint currency, so they sit behind their own trusted-service flag
+    // (seeded disabled) instead of the player-facing inventory_api flag:
+    // otherwise any authenticated player could mint upgrade materials.
+    if (!(await ensureFlag(app, reply, 'inventory_grant_api', { playerId: params.data.playerId }))) {
       return;
     }
 
