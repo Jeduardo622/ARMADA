@@ -201,6 +201,27 @@ namespace Armada.Client.Tests.EditMode
                 Is.EqualTo(expected));
         }
 
+        [Test]
+        public void MissionCompleteResponse_DeserializesBackendPayload()
+        {
+            // Mirrors the /missions/{code}/complete response contract in
+            // docs/api/openapi.yaml (camelCase, rewardsGranted sibling of progress).
+            const string json =
+                "{\"progress\":{\"playerId\":\"11111111-1111-1111-1111-111111111111\"," +
+                "\"missionId\":\"22222222-2222-2222-2222-222222222222\",\"status\":\"COMPLETED\",\"bestScore\":42}," +
+                "\"rewardsGranted\":[{\"itemKey\":\"gold\",\"quantity\":100},{\"itemKey\":\"timber\",\"quantity\":50}]}";
+
+            var response = JsonConvert.DeserializeObject<MissionCompleteResponse>(json);
+
+            Assert.That(response.Progress.Status, Is.EqualTo("COMPLETED"));
+            Assert.That(response.Progress.BestScore, Is.EqualTo(42));
+            Assert.That(response.RewardsGranted, Has.Count.EqualTo(2));
+            Assert.That(response.RewardsGranted[0].ItemKey, Is.EqualTo("gold"));
+            Assert.That(response.RewardsGranted[0].Quantity, Is.EqualTo(100));
+            Assert.That(response.RewardsGranted[1].ItemKey, Is.EqualTo("timber"));
+            Assert.That(response.RewardsGranted[1].Quantity, Is.EqualTo(50));
+        }
+
         private static TelemetryEvent Event(string type, string value)
         {
             return new TelemetryEvent

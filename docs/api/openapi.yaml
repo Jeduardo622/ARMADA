@@ -103,6 +103,16 @@ components:
           type: object
           additionalProperties: true
           nullable: true
+    RewardGrant:
+      type: object
+      required: [itemKey, quantity]
+      properties:
+        itemKey:
+          type: string
+          enum: [gold, timber, ore, captain_shard, cosmetic_token]
+        quantity:
+          type: integer
+          minimum: 1
     MissionCompleteRequest:
       type: object
       required: [playerId]
@@ -116,6 +126,21 @@ components:
         bestScore:
           type: integer
           minimum: 1
+        seed:
+          type: integer
+          minimum: 0
+          description: >-
+            Seed of the winning run. Required with turns for reward-bearing
+            missions; the server re-simulates the run to verify the win.
+        turns:
+          type: array
+          maxItems: 20
+          description: Per-turn order lists of the winning run.
+          items:
+            type: array
+            maxItems: 6
+            items:
+              $ref: '#/components/schemas/SimOrder'
     InventoryItem:
       type: object
       properties:
@@ -1268,6 +1293,11 @@ paths:
                 properties:
                   progress:
                     $ref: '#/components/schemas/MissionProgress'
+                  rewardsGranted:
+                    type: array
+                    description: Rewards granted for a first completion; empty on repeats.
+                    items:
+                      $ref: '#/components/schemas/RewardGrant'
         '400':
           description: Bad request
           content:

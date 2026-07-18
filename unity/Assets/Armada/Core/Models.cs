@@ -57,11 +57,31 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class RewardGrant
+    {
+        public string ItemKey { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    [Serializable]
+    public sealed class MissionCompleteResponse
+    {
+        public MissionProgress Progress { get; set; }
+        public List<RewardGrant> RewardsGranted { get; set; }
+    }
+
+    [Serializable]
     public sealed class MissionCompleteRequest
     {
         public string PlayerId { get; set; }
         public Dictionary<string, object> Result { get; set; }
         public int? BestScore { get; set; }
+        // Win proof: the backend re-simulates seed + turns and rejects
+        // completion of reward-bearing missions without a verified win.
+        [JsonProperty("seed", NullValueHandling = NullValueHandling.Ignore)]
+        public int? Seed { get; set; }
+        [JsonProperty("turns", NullValueHandling = NullValueHandling.Ignore)]
+        public List<List<SimOrder>> Turns { get; set; }
     }
 
     [Serializable]

@@ -32,7 +32,7 @@ namespace Armada.Client.UI
             SetStatus($"Loaded {result.Data?.Count ?? 0} missions");
         }
 
-        public async void CompleteMission(string code, Dictionary<string, object> result, int? bestScore = null)
+        public async void CompleteMission(string code, Dictionary<string, object> result, int? bestScore = null, int? seed = null, List<List<SimOrder>> turns = null)
         {
             var player = authService.CurrentPlayer;
             if (player == null)
@@ -45,7 +45,9 @@ namespace Armada.Client.UI
             {
                 PlayerId = player.Id,
                 Result = result,
-                BestScore = bestScore
+                BestScore = bestScore,
+                Seed = seed,
+                Turns = turns
             });
 
             if (!progressResult.Success || progressResult.FeatureDisabled)
@@ -54,7 +56,8 @@ namespace Armada.Client.UI
             }
             else
             {
-                SetStatus($"Mission {code} saved (status {progressResult.Data?.Status})");
+                var rewardCount = progressResult.Data?.RewardsGranted?.Count ?? 0;
+                SetStatus($"Mission {code} saved (status {progressResult.Data?.Progress?.Status}, rewards {rewardCount})");
             }
         }
 

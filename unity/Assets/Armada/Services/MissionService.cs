@@ -273,9 +273,9 @@ namespace Armada.Client.Services
             };
         }
 
-        public async Task<ServiceResult<MissionProgress>> CompleteAsync(string code, MissionCompleteRequest request)
+        public async Task<ServiceResult<MissionCompleteResponse>> CompleteAsync(string code, MissionCompleteRequest request)
         {
-            var resp = await _client.SendAsync<Dictionary<string, MissionProgress>>($"/missions/{code}/complete", UnityWebRequest.kHttpVerbPOST, request);
+            var resp = await _client.SendAsync<MissionCompleteResponse>($"/missions/{code}/complete", UnityWebRequest.kHttpVerbPOST, request);
             var featureDisabled = false;
             if (resp.StatusCode == HttpStatusCode.Forbidden)
             {
@@ -283,17 +283,7 @@ namespace Armada.Client.Services
                 featureDisabled = true;
             }
 
-            var progressDict = resp.Data ?? new Dictionary<string, MissionProgress>();
-            progressDict.TryGetValue("progress", out var progress);
-
-            return new ServiceResult<MissionProgress>
-            {
-                Data = progress,
-                Success = resp.Success,
-                Status = resp.StatusCode,
-                ErrorReason = resp.ErrorReason,
-                FeatureDisabled = featureDisabled
-            };
+            return ServiceResult<MissionCompleteResponse>.FromResponse(resp, featureDisabled);
         }
     }
 }
