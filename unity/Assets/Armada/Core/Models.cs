@@ -57,6 +57,20 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class RewardGrant
+    {
+        public string ItemKey { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    [Serializable]
+    public sealed class MissionCompleteResponse
+    {
+        public MissionProgress Progress { get; set; }
+        public List<RewardGrant> RewardsGranted { get; set; }
+    }
+
+    [Serializable]
     public sealed class MissionCompleteRequest
     {
         public string PlayerId { get; set; }

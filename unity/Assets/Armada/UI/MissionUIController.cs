@@ -54,7 +54,8 @@ namespace Armada.Client.UI
             }
             else
             {
-                SetStatus($"Mission {code} saved (status {progressResult.Data?.Status})");
+                var rewardCount = progressResult.Data?.RewardsGranted?.Count ?? 0;
+                SetStatus($"Mission {code} saved (status {progressResult.Data?.Progress?.Status}, rewards {rewardCount})");
             }
         }
 

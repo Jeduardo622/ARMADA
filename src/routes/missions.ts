@@ -56,6 +56,7 @@ import {
   runMission06
 } from '../sim/mission06.js';
 import { simOrderSchema } from '../sim/types.js';
+import { missionRewardsForCode } from '../economy/missionRewards.js';
 
 const completeSchema = z.object({
   playerId: z.string().uuid(),
@@ -585,33 +586,52 @@ export function registerMissionRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'player_not_found' });
     }
 
-    const progress = await app.prisma.missionProgress.upsert({
-      where: { playerId_missionId: { playerId: player.id, missionId: mission.id } },
-      update: {
-        status: 'COMPLETED',
-        bestScore: parsed.data.bestScore ?? undefined,
-        lastResult: parsed.data.result ?? undefined
-      },
-      create: {
-        playerId: player.id,
-        missionId: mission.id,
-        status: 'COMPLETED',
-        bestScore: parsed.data.bestScore,
-        lastResult: parsed.data.result
-      }
+    // Rewards are granted only on the first transition to COMPLETED so repeat
+    // completions stay idempotent for the economy.
+    const existingProgress = await app.prisma.missionProgress.findUnique({
+      where: { playerId_missionId: { playerId: player.id, missionId: mission.id } }
     });
+    const firstCompletion = existingProgress?.status !== 'COMPLETED';
+    const rewardsGranted = firstCompletion ? missionRewardsForCode(params.data.code) : [];
+
+    const [progress] = await app.prisma.$transaction([
+      app.prisma.missionProgress.upsert({
+        where: { playerId_missionId: { playerId: player.id, missionId: mission.id } },
+        update: {
+          status: 'COMPLETED',
+          bestScore: parsed.data.bestScore ?? undefined,
+          lastResult: parsed.data.result ?? undefined
+        },
+        create: {
+          playerId: player.id,
+          missionId: mission.id,
+          status: 'COMPLETED',
+          bestScore: parsed.data.bestScore,
+          lastResult: parsed.data.result
+        }
+      }),
+      ...rewardsGranted.map((reward) =>
+        app.prisma.inventoryItem.upsert({
+          where: { playerId_itemKey: { playerId: player.id, itemKey: reward.itemKey } },
+          update: { quantity: { increment: reward.quantity } },
+          create: { playerId: player.id, itemKey: reward.itemKey, quantity: reward.quantity }
+        })
+      )
+    ]);
 
     request.log.info(
       {
         actor: request.user?.id,
         playerId: player.id,
         missionCode: params.data.code,
+        rewardsGranted,
+        firstCompletion,
         requestId: request.id
       },
       'mission_completed'
     );
 
-    return reply.status(200).send({ progress });
+    return reply.status(200).send({ progress, rewardsGranted });
   });
 }
 

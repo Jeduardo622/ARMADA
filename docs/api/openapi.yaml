@@ -103,6 +103,16 @@ components:
           type: object
           additionalProperties: true
           nullable: true
+    RewardGrant:
+      type: object
+      required: [itemKey, quantity]
+      properties:
+        itemKey:
+          type: string
+          enum: [gold, timber, ore, captain_shard, cosmetic_token]
+        quantity:
+          type: integer
+          minimum: 1
     MissionCompleteRequest:
       type: object
       required: [playerId]
@@ -1268,6 +1278,11 @@ paths:
                 properties:
                   progress:
                     $ref: '#/components/schemas/MissionProgress'
+                  rewardsGranted:
+                    type: array
+                    description: Rewards granted for a first completion; empty on repeats.
+                    items:
+                      $ref: '#/components/schemas/RewardGrant'
         '400':
           description: Bad request
           content:
