@@ -208,6 +208,39 @@ describe('engine slow effect (modifiers.statusEffects)', () => {
   });
 });
 
+describe('engine status effects on sunk ships', () => {
+  it('sinks a burning ship at the tick and skips its orders', () => {
+    const result = resolveSimPreview(
+      duelPreview(7, attackerShip({ hp: 5, status: { onFire: true, fireTurnsRemaining: 1 } }), targetShip(), {
+        modifiers: { statusEffects: true }
+      })
+    );
+
+    expect(shipIn(result, ATTACKER_ID).hp).toBe(0);
+    expect(result.summary.sunk).toContain(ATTACKER_ID);
+    // The sunk ship's broadside order produces neither a maneuver nor an attack.
+    expect(result.events.filter((event) => event.type === 'maneuver')).toHaveLength(0);
+    expect(result.events.filter((event) => event.type === 'broadside')).toHaveLength(0);
+  });
+
+  it('does not refresh fire or slow on a target sunk by the broadside', () => {
+    // Seed 4 ignites a surviving target (see the ignition test); a killing
+    // hit must leave the sunk target's status untouched instead.
+    const result = resolveSimPreview(
+      duelPreview(4, attackerShip(), targetShip({ hp: 10, sail: 20 }), {
+        modifiers: { statusEffects: true }
+      })
+    );
+
+    const broadside = broadsideEvent(result);
+    expect(broadside.hit).toBe(true);
+    expect(broadside.targetRemaining.hp).toBe(0);
+    expect(result.summary.sunk).toContain(TARGET_ID);
+    expect(shipIn(result, TARGET_ID).status).toEqual({});
+    expect(statusEvents(result)).toHaveLength(0);
+  });
+});
+
 describe('engine status effect durations', () => {
   it('expires effects after their remaining turns and emits the cleared status', () => {
     const first = resolveSimPreview(

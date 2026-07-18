@@ -376,6 +376,10 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
   const isSlowed = (ship: ShipState) => statusEffects && ship.status?.slowed === true;
 
   for (const ship of resolutionOrder) {
+    // A ship the fire tick just sank takes no further actions. Gated on the
+    // flag: legacy resolution never hp-checked maneuvers and the flag-off
+    // hash chains must stay byte-identical.
+    if (statusEffects && ship.hp <= 0) continue;
     const order = orderByShip.get(ship.id);
     if (order) {
       events.push(applyManeuver(ship, order, isSlowed(ship)));
@@ -432,13 +436,21 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
         events.push(event);
         if (statusEffects && event.type === 'broadside' && event.hit) {
           // The ignition roll is consumed on every landed hit so the rng
-          // stream does not depend on the target's current status.
+          // stream does not depend on the target's current status. A killing
+          // hit leaves the sunk target's status untouched.
           const ignitionRoll = Math.floor(rng() * 100);
-          if (event.damage.hull > 0 && ignitionRoll < FIRE_IGNITION_CHANCE && refreshFire(target)) {
+          const targetAfloat = target.hp > 0;
+          if (
+            targetAfloat &&
+            event.damage.hull > 0 &&
+            ignitionRoll < FIRE_IGNITION_CHANCE &&
+            refreshFire(target)
+          ) {
             events.push({ type: 'status', shipId: target.id, status: { ...target.status } });
           }
           const startSail = sailAtTurnStart?.get(target.id) ?? target.sail;
           if (
+            targetAfloat &&
             event.damage.sail > 0 &&
             target.sail < startSail * SLOW_SAIL_FRACTION &&
             refreshSlow(target)
