@@ -813,7 +813,7 @@ namespace Armada.Client.Tests.PlayMode
                             ChainShotOrders = 6,
                             ChainShotHits = 4,
                             RoundShotHits = 7,
-                            ChainSailDamageDealt = 174
+                            ChainSailDamageDealt = 110
                         }
                     },
                     Success = true,

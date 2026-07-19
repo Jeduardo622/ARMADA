@@ -175,11 +175,14 @@ describe('mission 10 scenario', () => {
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
     expect(outcome.turnCount).toBe(8);
+    // The four chain hits strip clipper A's entire 110 sail; the telemetry
+    // counts the applied loss, not the larger nominal rolls the engine
+    // clamped at zero.
     expect(outcome.telemetry).toEqual({
       chainShotOrders: 6,
       chainShotHits: 4,
       roundShotHits: 7,
-      chainSailDamageDealt: 174
+      chainSailDamageDealt: 110
     });
     expect(outcome.bonusObjectives).toEqual({ sailShredder: true, mixedBattery: true });
     expect(outcome.damageProfile.enemyRemainingHp).toBe(0);
@@ -222,7 +225,9 @@ describe('mission 10 scenario', () => {
     expect(outcome.failReason).toBe('timeout');
     expect(outcome.bonusObjectives).toEqual({ sailShredder: false, mixedBattery: false });
     expect(outcome.telemetry.roundShotHits).toBe(0);
-    expect(outcome.telemetry.chainSailDamageDealt).toBe(526);
+    // Applied sail damage saturates at the fleet's total canvas (2 x 110);
+    // twelve chain hits cannot shred more sail than the clippers carry.
+    expect(outcome.telemetry.chainSailDamageDealt).toBe(220);
     expect(outcome.turns).toHaveLength(MISSION_10_TURN_LIMIT);
   });
 });
@@ -257,7 +262,7 @@ describe('mission 10 routes', () => {
     const outcome = res.json().outcome;
     expect(outcome.result).toBe('win');
     expect(outcome.telemetry.chainShotHits).toBe(4);
-    expect(outcome.telemetry.chainSailDamageDealt).toBe(174);
+    expect(outcome.telemetry.chainSailDamageDealt).toBe(110);
   });
 
   it('rejects orders for ships the player does not control', async () => {

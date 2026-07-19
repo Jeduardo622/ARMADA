@@ -202,7 +202,12 @@ export function runMission10(seed: number, playerTurnOrders: SimOrder[][]): Miss
   const failReason =
     result === 'win' ? null : classifyLoss(run.finalState, run.playerSunk, FLANKED_SPREAD);
 
-  const ammo = countAmmoProfile(turns, playerTurnOrders, MISSION_10_PLAYER_SHIP_IDS);
+  const ammo = countAmmoProfile(
+    turns,
+    playerTurnOrders,
+    MISSION_10_PLAYER_SHIP_IDS,
+    createMission10State()
+  );
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
