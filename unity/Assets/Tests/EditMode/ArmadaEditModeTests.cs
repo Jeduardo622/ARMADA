@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Armada.Client.Core;
+using Armada.Client.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using NUnit.Framework;
@@ -163,6 +164,50 @@ namespace Armada.Client.Tests.EditMode
             StringAssert.DoesNotContain(
                 "upgrades",
                 JsonConvert.SerializeObject(legacyResolve, settings));
+        }
+
+        [Test]
+        public void Mission07Flow_MapsOwnedTiersToRequestUpgradesAndOmitsWhenNothingOwned()
+        {
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver()
+            };
+            var resolve = new Mission01ResolveRequest
+            {
+                Seed = 21,
+                Turns = new List<List<SimOrder>>(),
+                Upgrades = Mission07Flow.MapOwnedTiers(new List<OwnedUpgrade>
+                {
+                    new OwnedUpgrade { Component = "cannon", Tier = 3 },
+                    new OwnedUpgrade { Component = "sail", Tier = 1 },
+                    new OwnedUpgrade { Component = "hull", Tier = 2 }
+                })
+            };
+
+            StringAssert.Contains(
+                "\"upgrades\":{\"cannon\":3,\"sail\":1,\"hull\":2}",
+                JsonConvert.SerializeObject(resolve, settings));
+
+            // Nothing owned maps to null, so the serialized request stays
+            // byte-identical to the legacy payload.
+            var unowned = new Mission01ResolveRequest
+            {
+                Seed = 21,
+                Turns = new List<List<SimOrder>>(),
+                Upgrades = Mission07Flow.MapOwnedTiers(new List<OwnedUpgrade>
+                {
+                    new OwnedUpgrade { Component = "cannon", Tier = 0 },
+                    new OwnedUpgrade { Component = "sail", Tier = 0 },
+                    new OwnedUpgrade { Component = "hull", Tier = 0 }
+                })
+            };
+
+            StringAssert.DoesNotContain(
+                "upgrades",
+                JsonConvert.SerializeObject(unowned, settings));
+            Assert.That(Mission07Flow.MapOwnedTiers(null), Is.Null);
+            Assert.That(Mission07Flow.MapOwnedTiers(new List<OwnedUpgrade>()), Is.Null);
         }
 
         [Test]

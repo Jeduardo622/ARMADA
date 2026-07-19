@@ -338,6 +338,8 @@ namespace Armada.Client.Tests.PlayMode
 
         private sealed class FakeMission07Client : IMission07Client
         {
+            public Mission01ResolveRequest LastResolveRequest;
+
             public Task<ServiceResult<Mission07StartResponse>> StartMission07Async(int seed)
             {
                 return Task.FromResult(new ServiceResult<Mission07StartResponse>
@@ -350,6 +352,7 @@ namespace Armada.Client.Tests.PlayMode
 
             public Task<ServiceResult<Mission07Outcome>> ResolveMission07Async(Mission01ResolveRequest request)
             {
+                LastResolveRequest = request;
                 // Mirrors the seed-21 gunnery outcome pinned in
                 // tests/mission07.test.ts.
                 return Task.FromResult(new ServiceResult<Mission07Outcome>
@@ -374,6 +377,100 @@ namespace Armada.Client.Tests.PlayMode
                             SlowsInflicted = 4
                         }
                     },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Mission07Flow_SendsSameOwnedTiersOnResolveAndComplete()
+        {
+            var missionClient = new FakeMission07Client();
+            var upgradesClient = new FakeFullTierUpgradesClient();
+            var completionClient = new FakeMissionCompletionClient();
+            var flow = new Mission07Flow(missionClient, null, upgradesClient, completionClient);
+
+            // Seed 5 loses unupgraded but wins with cannon/sail/hull all at
+            // tier 3 (tests/mission07.test.ts), so the attached tiers are
+            // load-bearing for the server-side win proof.
+            var callerTurns = new List<List<SimOrder>>();
+            var run = flow.RunAsync(5, callerTurns);
+            while (!run.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.That(run.Result.Success, Is.True, run.Result.FailureReason);
+            Assert.That(missionClient.LastResolveRequest.Upgrades, Is.Not.Null);
+            Assert.That(missionClient.LastResolveRequest.Upgrades.Cannon, Is.EqualTo(3));
+            Assert.That(missionClient.LastResolveRequest.Upgrades.Sail, Is.EqualTo(3));
+            Assert.That(missionClient.LastResolveRequest.Upgrades.Hull, Is.EqualTo(3));
+
+            var complete = flow.CompleteAsync(
+                "11111111-1111-1111-1111-111111111111",
+                new Dictionary<string, object> { ["outcome"] = "win" });
+            while (!complete.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.That(complete.Result.Success, Is.True, complete.Result.ErrorReason);
+            Assert.That(completionClient.LastCode, Is.EqualTo(Mission07Scenario.MissionCode));
+            Assert.That(completionClient.LastRequest.Seed, Is.EqualTo(5));
+            // The flow snapshots the caller's turns so later mutations cannot
+            // desync the completion proof from the resolved run.
+            Assert.That(missionClient.LastResolveRequest.Turns, Is.Not.SameAs(callerTurns));
+            Assert.That(completionClient.LastRequest.Turns, Is.SameAs(missionClient.LastResolveRequest.Turns));
+            // The complete proof must carry the exact tiers the run resolved
+            // with; mismatched tiers change the re-simulated outcome.
+            Assert.That(completionClient.LastRequest.Upgrades, Is.SameAs(missionClient.LastResolveRequest.Upgrades));
+        }
+
+        private sealed class FakeFullTierUpgradesClient : IUpgradesClient
+        {
+            public Task<ServiceResult<UpgradesResponse>> GetUpgradesAsync()
+            {
+                // Owned tiers mirror the fully upgraded seed-5 fixture in
+                // tests/mission07.test.ts.
+                return Task.FromResult(new ServiceResult<UpgradesResponse>
+                {
+                    Data = new UpgradesResponse
+                    {
+                        Owned = new List<OwnedUpgrade>
+                        {
+                            new OwnedUpgrade { Component = "cannon", Tier = 3 },
+                            new OwnedUpgrade { Component = "sail", Tier = 3 },
+                            new OwnedUpgrade { Component = "hull", Tier = 3 }
+                        }
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<UpgradePurchaseResponse>> PurchaseAsync(UpgradePurchaseRequest request)
+            {
+                return Task.FromResult(new ServiceResult<UpgradePurchaseResponse>
+                {
+                    Success = false,
+                    Status = HttpStatusCode.BadRequest
+                });
+            }
+        }
+
+        private sealed class FakeMissionCompletionClient : IMissionCompletionClient
+        {
+            public string LastCode;
+            public MissionCompleteRequest LastRequest;
+
+            public Task<ServiceResult<MissionCompleteResponse>> CompleteAsync(string code, MissionCompleteRequest request)
+            {
+                LastCode = code;
+                LastRequest = request;
+                return Task.FromResult(new ServiceResult<MissionCompleteResponse>
+                {
+                    Data = new MissionCompleteResponse(),
                     Success = true,
                     Status = HttpStatusCode.OK
                 });
