@@ -697,7 +697,7 @@ namespace Armada.Client.Tests.PlayMode
                         {
                             RamsInflicted = 2,
                             RamsSuffered = 0,
-                            RamHullDamageDealt = 92,
+                            RamHullDamageDealt = 69,
                             RamHullDamageTaken = 46
                         }
                     },
