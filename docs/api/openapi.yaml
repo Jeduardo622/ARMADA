@@ -141,6 +141,13 @@ components:
             maxItems: 6
             items:
               $ref: '#/components/schemas/SimOrder'
+        upgrades:
+          allOf:
+            - $ref: '#/components/schemas/ShipUpgradeTiers'
+          description: >-
+            Upgrade tiers the winning run was played with. Only accepted for
+            missions that support upgrades; the server rejects tiers above the
+            player's owned upgrades before re-simulating the proof.
     InventoryItem:
       type: object
       properties:
@@ -1210,6 +1217,8 @@ components:
             maxItems: 4
             items:
               $ref: '#/components/schemas/SimOrder'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
     Mission07BonusObjectives:
       type: object
       required: [enemyIgnited, unscorched]

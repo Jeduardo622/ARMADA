@@ -10,7 +10,7 @@ import {
   mission07StartResponse,
   runMission07
 } from '../src/sim/mission07.js';
-import type { SimOrder } from '../src/sim/types.js';
+import type { ShipUpgradeTiers, SimOrder } from '../src/sim/types.js';
 
 const app = buildServer({ testing: true });
 
@@ -121,6 +121,40 @@ describe('mission 07 scenario', () => {
   });
 });
 
+describe('mission 07 ship upgrades', () => {
+  const fullTiers: ShipUpgradeTiers = { cannon: 3, sail: 3, hull: 3 };
+  const zeroTiers: ShipUpgradeTiers = { cannon: 0, sail: 0, hull: 0 };
+
+  it('keeps all-zero tiers hash-identical to a run without upgrades', () => {
+    const base = runMission07(21, gunneryOrders);
+    const zero = runMission07(21, gunneryOrders, zeroTiers);
+    expect(zero.turns.map((turn) => turn.hash)).toEqual(base.turns.map((turn) => turn.hash));
+    expect(zero).toEqual(base);
+  });
+
+  it('changes the hash chain deterministically under full tiers', () => {
+    const base = runMission07(21, gunneryOrders);
+    const first = runMission07(21, gunneryOrders, fullTiers);
+    const second = runMission07(21, gunneryOrders, fullTiers);
+    expect(first.turns[0].hash).not.toBe(base.turns[0].hash);
+    expect(second).toEqual(first);
+  });
+
+  it('scales the damage baseline with hull tiers so upgraded runs stay non-negative', () => {
+    const outcome = runMission07(21, gunneryOrders, { cannon: 0, sail: 0, hull: 3 });
+    // Two sloops at floor(120 * 1.3) = 156 battle-start hull each.
+    expect(outcome.damageProfile.playerHullDamage).toBeGreaterThanOrEqual(0);
+    expect(outcome.damageProfile.playerHullDamageFraction).toBeGreaterThanOrEqual(0);
+    expect(outcome.damageProfile.playerRemainingHp).toBeLessThanOrEqual(312);
+  });
+
+  it('turns the seed 5 timeout loss into a win with full tiers', () => {
+    expect(runMission07(5, gunneryOrders).result).toBe('loss');
+    const upgraded = runMission07(5, gunneryOrders, fullTiers);
+    expect(upgraded.result).toBe('win');
+  });
+});
+
 describe('mission 07 routes', () => {
   it('starts deterministically with the scenario payload', async () => {
     const res1 = await app.inject({ method: 'POST', url: `/missions/${MISSION_07_CODE}/start` });
@@ -164,5 +198,42 @@ describe('mission 07 routes', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe('invalid_order_ship');
+  });
+
+  it('resolves with upgrade tiers and reflects them in the outcome', async () => {
+    const withUpgrades = await app.inject({
+      method: 'POST',
+      url: `/missions/${MISSION_07_CODE}/resolve`,
+      payload: {
+        schemaVersion: 1,
+        seed: 21,
+        turns: gunneryOrders,
+        upgrades: { cannon: 3, sail: 3, hull: 3 }
+      }
+    });
+    expect(withUpgrades.statusCode).toBe(200);
+    const outcome = withUpgrades.json().outcome;
+    expect(outcome.result).toBe('win');
+
+    const baseline = await app.inject({
+      method: 'POST',
+      url: `/missions/${MISSION_07_CODE}/resolve`,
+      payload: { schemaVersion: 1, seed: 21, turns: gunneryOrders }
+    });
+    expect(outcome.turns[0].hash).not.toBe(baseline.json().outcome.turns[0].hash);
+  });
+
+  it('rejects upgrade tiers outside the owned range', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/missions/${MISSION_07_CODE}/resolve`,
+      payload: {
+        schemaVersion: 1,
+        seed: 21,
+        turns: gunneryOrders,
+        upgrades: { cannon: 4 }
+      }
+    });
+    expect(res.statusCode).toBe(400);
   });
 });

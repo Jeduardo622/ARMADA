@@ -2,7 +2,8 @@ import { aiOrderFor } from './ai.js';
 import { createDeterministicRng } from './engine.js';
 import { classifyLoss, countStatusApplications } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState, Wind } from './types.js';
+import { SimOrder, SimState, ShipUpgradeTiers, Wind } from './types.js';
+import { upgradedHullHp } from './upgradeEffects.js';
 
 // Mission 07 "Burning Seas" — docs/content/missions/mission-07-burning-seas.md
 // First mission to adopt modifiers.statusEffects (fire and slow).
@@ -171,7 +172,14 @@ export interface Mission07Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission07(seed: number, playerTurnOrders: SimOrder[][]): Mission07Outcome {
+// First mission to accept modifiers.shipUpgrades: optional owned tiers scale
+// the player sloops. Resolve trusts the caller; completion validates the
+// claimed tiers against the player's owned upgrades before rewards.
+export function runMission07(
+  seed: number,
+  playerTurnOrders: SimOrder[][],
+  upgrades?: ShipUpgradeTiers
+): Mission07Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
     turnLimit: MISSION_07_TURN_LIMIT,
     createState: createMission07State,
@@ -181,7 +189,8 @@ export function runMission07(seed: number, playerTurnOrders: SimOrder[][]): Miss
       windMovement: true,
       rakingFire: true,
       statusEffects: true
-    }
+    },
+    ...(upgrades ? { upgrades } : {})
   });
 
   const { result, turns, turnCount } = run;
@@ -193,7 +202,12 @@ export function runMission07(seed: number, playerTurnOrders: SimOrder[][]): Miss
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
-  const playerBaseHull = PLAYER_BASE_HULL_HP * MISSION_07_PLAYER_SHIP_IDS.length;
+  // Hull tiers raise battle-start hp, so the damage baseline must scale with
+  // them or upgraded runs would report negative hull damage.
+  const playerStartHull = upgrades
+    ? upgradedHullHp(PLAYER_BASE_HULL_HP, upgrades.hull)
+    : PLAYER_BASE_HULL_HP;
+  const playerBaseHull = playerStartHull * MISSION_07_PLAYER_SHIP_IDS.length;
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull = FRIGATE_HULL_HP * MISSION_07_ENEMY_SHIP_IDS.length;
   const enemyRemainingHp = enemies.reduce((sum, ship) => sum + ship.hp, 0);

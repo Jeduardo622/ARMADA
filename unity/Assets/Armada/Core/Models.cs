@@ -82,6 +82,10 @@ namespace Armada.Client.Core
         public int? Seed { get; set; }
         [JsonProperty("turns", NullValueHandling = NullValueHandling.Ignore)]
         public List<List<SimOrder>> Turns { get; set; }
+        // Tiers the winning run was played with; the backend validates them
+        // against the player's owned upgrades before granting rewards.
+        [JsonProperty("upgrades", NullValueHandling = NullValueHandling.Ignore)]
+        public SimShipUpgrades Upgrades { get; set; }
     }
 
     [Serializable]
@@ -369,6 +373,10 @@ namespace Armada.Client.Core
         [JsonProperty("schemaVersion")] public int SchemaVersion { get; set; } = 1;
         public int Seed { get; set; }
         public List<List<SimOrder>> Turns { get; set; }
+        // Only accepted by missions that support upgrades (07 onward); leave
+        // null elsewhere so the payload matches the strict backend schemas.
+        [JsonProperty("upgrades", NullValueHandling = NullValueHandling.Ignore)]
+        public SimShipUpgrades Upgrades { get; set; }
     }
 
     [Serializable]

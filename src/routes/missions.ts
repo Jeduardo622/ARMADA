@@ -64,15 +64,24 @@ import {
   mission07StartResponse,
   runMission07
 } from '../sim/mission07.js';
-import { simOrderSchema, type SimOrder } from '../sim/types.js';
+import {
+  shipUpgradeTiersSchema,
+  simOrderSchema,
+  type ShipUpgradeTiers,
+  type SimOrder
+} from '../sim/types.js';
 import { missionRewardsForCode } from '../economy/missionRewards.js';
+import { UPGRADE_COMPONENTS } from '../economy/upgrades.js';
 
 const completeSchema = z.object({
   playerId: z.string().uuid(),
   result: z.record(z.any()).optional(),
   bestScore: z.number().int().positive().optional(),
   seed: z.number().int().nonnegative().optional(),
-  turns: z.array(z.array(simOrderSchema).max(6)).max(20).optional()
+  turns: z.array(z.array(simOrderSchema).max(6)).max(20).optional(),
+  // Upgrade tiers the winning run was played with; only accepted for
+  // missions that support upgrades and validated against owned tiers.
+  upgrades: shipUpgradeTiersSchema.optional()
 });
 
 // Completion of a reward-bearing mission must carry the winning run itself
@@ -80,10 +89,17 @@ const completeSchema = z.object({
 // constraints as the mission's /resolve route, so rewards cannot be claimed
 // without a server-verified win.
 type MissionWinProofConfig = {
-  run: (seed: number, turns: SimOrder[][]) => { result: 'win' | 'loss' };
+  run: (
+    seed: number,
+    turns: SimOrder[][],
+    upgrades?: ShipUpgradeTiers
+  ) => { result: 'win' | 'loss' };
   playerShipIds: ReadonlySet<string>;
   enemyShipIds: ReadonlySet<string>;
   allowBoarding: boolean;
+  // Missions that pass modifiers.shipUpgrades through their run loop; proofs
+  // for other missions must not carry upgrade tiers.
+  supportsUpgrades: boolean;
 };
 
 const mission01StartSchema = z
@@ -180,7 +196,10 @@ const mission07ResolveSchema = z
   .object({
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
-    turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_07_TURN_LIMIT)
+    turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_07_TURN_LIMIT),
+    // Practice resolution trusts the caller's tiers; completion re-validates
+    // them against owned upgrades before any reward is granted.
+    upgrades: shipUpgradeTiersSchema.optional()
   })
   .strict();
 
@@ -189,43 +208,50 @@ const missionWinProofConfigs: Record<string, MissionWinProofConfig> = {
     run: runMission01,
     playerShipIds: new Set([MISSION_01_PLAYER_SHIP_ID]),
     enemyShipIds: new Set([MISSION_01_ENEMY_SHIP_ID]),
-    allowBoarding: false
+    allowBoarding: false,
+    supportsUpgrades: false
   },
   [MISSION_02_CODE]: {
     run: runMission02,
     playerShipIds: new Set(MISSION_02_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_02_ENEMY_SHIP_IDS),
-    allowBoarding: false
+    allowBoarding: false,
+    supportsUpgrades: false
   },
   [MISSION_03_CODE]: {
     run: runMission03,
     playerShipIds: new Set(MISSION_03_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_03_ENEMY_SHIP_IDS),
-    allowBoarding: true
+    allowBoarding: true,
+    supportsUpgrades: false
   },
   [MISSION_04_CODE]: {
     run: runMission04,
     playerShipIds: new Set(MISSION_04_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_04_ENEMY_SHIP_IDS),
-    allowBoarding: true
+    allowBoarding: true,
+    supportsUpgrades: false
   },
   [MISSION_05_CODE]: {
     run: runMission05,
     playerShipIds: new Set(MISSION_05_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_05_ENEMY_SHIP_IDS),
-    allowBoarding: true
+    allowBoarding: true,
+    supportsUpgrades: false
   },
   [MISSION_06_CODE]: {
     run: runMission06,
     playerShipIds: new Set(MISSION_06_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_06_ENEMY_SHIP_IDS),
-    allowBoarding: true
+    allowBoarding: true,
+    supportsUpgrades: false
   },
   [MISSION_07_CODE]: {
     run: runMission07,
     playerShipIds: new Set(MISSION_07_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_07_ENEMY_SHIP_IDS),
-    allowBoarding: true
+    allowBoarding: true,
+    supportsUpgrades: true
   }
 };
 
@@ -676,7 +702,7 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission07(parsed.data.seed, parsed.data.turns);
+    const outcome = runMission07(parsed.data.seed, parsed.data.turns, parsed.data.upgrades);
 
     request.log.info(
       {
@@ -759,7 +785,34 @@ export function registerMissionRoutes(app: FastifyInstance) {
         }
       }
 
-      const outcome = proofConfig.run(parsed.data.seed, parsed.data.turns);
+      const upgrades = parsed.data.upgrades;
+      if (upgrades && !proofConfig.supportsUpgrades) {
+        return reply.status(400).send({ error: 'upgrades_not_supported' });
+      }
+
+      if (upgrades) {
+        // Tier authenticity: the proof may only claim tiers the player owns
+        // (row absence = tier 0), so the re-simulated win cannot borrow
+        // stats the player never purchased.
+        const ownedRows = await app.prisma.playerShipUpgrade.findMany({
+          where: { playerId: player.id }
+        });
+        const owned = new Map(ownedRows.map((row) => [row.component, row.tier]));
+        for (const component of UPGRADE_COMPONENTS) {
+          const claimed = upgrades[component];
+          const ownedTier = owned.get(component) ?? 0;
+          if (claimed > ownedTier) {
+            return reply.status(409).send({
+              error: 'upgrade_tiers_exceed_owned',
+              component,
+              claimed,
+              owned: ownedTier
+            });
+          }
+        }
+      }
+
+      const outcome = proofConfig.run(parsed.data.seed, parsed.data.turns, upgrades);
       if (outcome.result !== 'win') {
         return reply.status(400).send({ error: 'mission_not_won' });
       }
