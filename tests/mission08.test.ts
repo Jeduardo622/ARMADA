@@ -207,6 +207,20 @@ describe('mission 08 scenario', () => {
     expect(outcome.bonusObjectives).toEqual({ cleanTack: false, swiftVictory: true });
   });
 
+  it('judges clamping against the last duplicate order, matching engine resolution', () => {
+    // Two orders for the same sloop in one turn: the engine's orderByShip
+    // map executes the last one (60°, clamped upwind to 30°), so telemetry
+    // must count the clamp even though the first order (20°) was legal.
+    const duplicateOrders: SimOrder[][] = [
+      [
+        fire(MISSION_08_PLAYER_SHIP_IDS[0], MISSION_08_ENEMY_SHIP_IDS[0], 20),
+        fire(MISSION_08_PLAYER_SHIP_IDS[0], MISSION_08_ENEMY_SHIP_IDS[0], 60)
+      ]
+    ];
+    const outcome = runMission08(9, duplicateOrders);
+    expect(outcome.telemetry.clampedManeuvers).toBe(1);
+  });
+
   it('denies both bonuses on a timeout loss', () => {
     const outcome = runMission08(3, tackingOrders);
     expect(outcome.result).toBe('loss');

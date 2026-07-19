@@ -165,13 +165,19 @@ export function countManeuverWindProfile(
   let upwindManeuvers = 0;
   let downwindManeuvers = 0;
   for (const turn of turns) {
-    const orders = playerTurnOrders[turn.turn - 1] ?? [];
+    // Last order per ship wins, mirroring how resolveSimPreview builds its
+    // orderByShip map, so duplicate-order turns compare against the order
+    // that actually executed.
+    const requestedByShip = new Map<string, number>();
+    for (const order of playerTurnOrders[turn.turn - 1] ?? []) {
+      requestedByShip.set(order.shipId, order.turnDelta ?? 0);
+    }
     const wind = windForTurn(turn.turn);
     for (const event of turn.events) {
       if (event.type !== 'maneuver' || !shipIds.includes(event.shipId)) {
         continue;
       }
-      const requested = orders.find((order) => order.shipId === event.shipId)?.turnDelta ?? 0;
+      const requested = requestedByShip.get(event.shipId) ?? 0;
       if (event.turnDelta !== requested) {
         clampedManeuvers += 1;
       }
