@@ -1675,6 +1675,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            Proof upgrade tiers exceed the player's owned tiers
+            (upgrade_tiers_exceed_owned; the body names the offending
+            component with the claimed and owned tier).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /missions/mission-03-raking-shot/start:
     post:
       summary: Start the deterministic Mission 03 "Raking Shot" scenario
