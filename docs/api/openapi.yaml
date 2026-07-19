@@ -466,6 +466,8 @@ components:
           type: boolean
         windTurnRate:
           type: boolean
+        ramming:
+          type: boolean
     ShipUpgradeTiers:
       type: object
       properties:
@@ -597,6 +599,41 @@ components:
               type: string
             status:
               $ref: '#/components/schemas/SimShipStatus'
+        - type: object
+          required:
+            [type, shipId, targetShipId, effectiveSpeed, hullDamage, selfHullDamage, targetRemaining, rammerRemaining]
+          properties:
+            type:
+              type: string
+              enum: [ram]
+            shipId:
+              type: string
+            targetShipId:
+              type: string
+            effectiveSpeed:
+              type: integer
+            hullDamage:
+              type: integer
+            selfHullDamage:
+              type: integer
+            targetRemaining:
+              type: object
+              properties:
+                hp:
+                  type: integer
+                sail:
+                  type: integer
+                crew:
+                  type: integer
+            rammerRemaining:
+              type: object
+              properties:
+                hp:
+                  type: integer
+                sail:
+                  type: integer
+                crew:
+                  type: integer
     SimSummary:
       type: object
       required: [playerRemaining, enemyRemaining, sunk]
@@ -1398,6 +1435,123 @@ components:
           $ref: '#/components/schemas/Mission08DamageProfile'
         telemetry:
           $ref: '#/components/schemas/Mission08Telemetry'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
+    Mission09StartRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+          minimum: 0
+          default: 909
+    Mission09Objectives:
+      type: object
+      required: [turnLimit, ramContactRange, ramTarget]
+      properties:
+        turnLimit:
+          type: integer
+        ramContactRange:
+          type: integer
+        ramTarget:
+          type: integer
+    Mission09StartResponse:
+      type: object
+      required: [missionCode, seed, turnLimit, objectives, state]
+      properties:
+        missionCode:
+          type: string
+          example: mission-09-iron-bow
+        seed:
+          type: integer
+        turnLimit:
+          type: integer
+        objectives:
+          $ref: '#/components/schemas/Mission09Objectives'
+        state:
+          $ref: '#/components/schemas/SimState'
+    Mission09ResolveRequest:
+      type: object
+      required: [seed, turns]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turns:
+          type: array
+          maxItems: 10
+          items:
+            type: array
+            maxItems: 4
+            items:
+              $ref: '#/components/schemas/SimOrder'
+    Mission09BonusObjectives:
+      type: object
+      required: [hullBreaker, unrammed]
+      properties:
+        hullBreaker:
+          type: boolean
+        unrammed:
+          type: boolean
+    Mission09DamageProfile:
+      type: object
+      required:
+        [playerHullDamage, playerHullDamageFraction, playerRemainingHp, enemyHullDamage, enemyRemainingHp]
+      properties:
+        playerHullDamage:
+          type: integer
+        playerHullDamageFraction:
+          type: number
+        playerRemainingHp:
+          type: integer
+        enemyHullDamage:
+          type: integer
+        enemyRemainingHp:
+          type: integer
+    Mission09Telemetry:
+      type: object
+      required: [ramsInflicted, ramsSuffered, ramHullDamageDealt, ramHullDamageTaken]
+      properties:
+        ramsInflicted:
+          type: integer
+        ramsSuffered:
+          type: integer
+        ramHullDamageDealt:
+          type: integer
+        ramHullDamageTaken:
+          type: integer
+    Mission09Outcome:
+      type: object
+      required:
+        [missionCode, seed, result, failReason, turnCount, turnLimit, bonusObjectives, damageProfile, telemetry, turns]
+      properties:
+        missionCode:
+          type: string
+          example: mission-09-iron-bow
+        seed:
+          type: integer
+        result:
+          type: string
+          enum: [win, loss]
+        failReason:
+          type: string
+          enum: [timeout, sunk, flanked]
+          nullable: true
+        turnCount:
+          type: integer
+        turnLimit:
+          type: integer
+        bonusObjectives:
+          $ref: '#/components/schemas/Mission09BonusObjectives'
+        damageProfile:
+          $ref: '#/components/schemas/Mission09DamageProfile'
+        telemetry:
+          $ref: '#/components/schemas/Mission09Telemetry'
         turns:
           type: array
           items:
@@ -2241,6 +2395,82 @@ paths:
                 properties:
                   outcome:
                     $ref: '#/components/schemas/Mission08Outcome'
+        '400':
+          description: Bad request (validation, non-player ship, or invalid target)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-09-iron-bow/start:
+    post:
+      summary: Start the deterministic Mission 09 "Iron Bow" scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission09StartRequest'
+      responses:
+        '200':
+          description: Scenario payload for the given seed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission09StartResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-09-iron-bow/resolve:
+    post:
+      summary: Resolve a Mission 09 run from per-turn player orders (ramming active)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission09ResolveRequest'
+      responses:
+        '200':
+          description: Deterministic mission outcome with ram telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome:
+                    $ref: '#/components/schemas/Mission09Outcome'
         '400':
           description: Bad request (validation, non-player ship, or invalid target)
           content:

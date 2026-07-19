@@ -869,6 +869,64 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class Mission09Objectives
+    {
+        public int TurnLimit { get; set; }
+        public int RamContactRange { get; set; }
+        public int RamTarget { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission09StartResponse
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission09Objectives Objectives { get; set; }
+        public SimState State { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission09BonusObjectives
+    {
+        public bool HullBreaker { get; set; }
+        public bool Unrammed { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission09Telemetry
+    {
+        public int RamsInflicted { get; set; }
+        public int RamsSuffered { get; set; }
+        public int RamHullDamageDealt { get; set; }
+        public int RamHullDamageTaken { get; set; }
+    }
+
+    // Damage profile, turn records, and the resolve request shape are shared
+    // with mission 01 (Mission01DamageProfile / Mission01TurnRecord /
+    // Mission01ResolveRequest).
+    [Serializable]
+    public sealed class Mission09Outcome
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public string Result { get; set; }
+        public string FailReason { get; set; }
+        public int TurnCount { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission09BonusObjectives BonusObjectives { get; set; }
+        public Mission01DamageProfile DamageProfile { get; set; }
+        public Mission09Telemetry Telemetry { get; set; }
+        public List<Mission01TurnRecord> Turns { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission09ResolveEnvelope
+    {
+        public Mission09Outcome Outcome { get; set; }
+    }
+
+    [Serializable]
     public sealed class ConfigSnapshot
     {
         public string Namespace { get; set; }

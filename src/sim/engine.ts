@@ -40,6 +40,23 @@ export const WIND_TURN_UPWIND_LIMIT = 30;
 export const WIND_TURN_BEAM_LIMIT = 60;
 export const WIND_TURN_DOWNWIND_LIMIT = 90;
 
+// Ramming (modifiers.ramming): a ship whose movement carries it within
+// RAM_CONTACT_RANGE of an enemy hull rams it — hull damage scales with the
+// rammer's effective speed and the rammer takes recoil damage on its own
+// bow. Contact is purely positional and consumes no rng roll, so the rng
+// stream is untouched whether or not a ram lands. One ram per ship pair per
+// turn (the first mover in resolution order strikes). Only meaningful with
+// modifiers.windMovement, since contact happens in the movement phase.
+// Values are design-tunable placeholders pending the balance pass
+// (docs/content/missions/mission-09-iron-bow.md). The contact range is
+// exported so mission scenarios can surface it as an objective.
+// Wide enough that a full-speed head-on pass cannot jump through the
+// contact window between turns (closing steps stay under twice the range).
+export const RAM_CONTACT_RANGE = 25;
+const RAM_BASE_HULL_DAMAGE = 10;
+const RAM_SPEED_HULL_DAMAGE = 4;
+const RAM_RECOIL_FRACTION = 0.5;
+
 // Raking fire (modifiers.rakingFire): a broadside whose shot line runs along
 // the target's keel — bearing within RAKE_ARC of the target heading (stern
 // rake) or its reverse (bow rake) — deals multiplied damage
@@ -344,6 +361,31 @@ function resolveBroadside(
   };
 }
 
+function resolveRam(rammer: ShipState, target: ShipState, effectiveSpeed: number): SimEvent {
+  const hullDamage = RAM_BASE_HULL_DAMAGE + effectiveSpeed * RAM_SPEED_HULL_DAMAGE;
+  const selfHullDamage = Math.floor(hullDamage * RAM_RECOIL_FRACTION);
+  target.hp = clamp(target.hp - hullDamage, 0, target.hp);
+  rammer.hp = clamp(rammer.hp - selfHullDamage, 0, rammer.hp);
+  return {
+    type: 'ram',
+    shipId: rammer.id,
+    targetShipId: target.id,
+    effectiveSpeed,
+    hullDamage,
+    selfHullDamage,
+    targetRemaining: {
+      hp: target.hp,
+      sail: target.sail,
+      crew: target.crew
+    },
+    rammerRemaining: {
+      hp: rammer.hp,
+      sail: rammer.sail,
+      crew: rammer.crew
+    }
+  };
+}
+
 function resolveBoarding(
   rng: () => number,
   attacker: ShipState,
@@ -480,21 +522,40 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
   }
 
   const windAware = input.modifiers?.windMovement === true;
+  const ramming = input.modifiers?.ramming === true;
+  const rammedPairs = new Set<string>();
   if (windAware) {
     const obstacles = input.state.obstacles ?? [];
     const slowZones = input.state.slowZones ?? [];
     for (const ship of resolutionOrder) {
       if (ship.hp <= 0) continue;
-      events.push(
-        applyMovement(
-          ship,
-          input.state.wind,
-          obstacles,
-          slowZones,
-          isSlowed(ship) ? SLOW_SPEED_PENALTY : 0,
-          sailSpeedBonus(playerTier(ship, 'sail'))
-        )
+      const moveEvent = applyMovement(
+        ship,
+        input.state.wind,
+        obstacles,
+        slowZones,
+        isSlowed(ship) ? SLOW_SPEED_PENALTY : 0,
+        sailSpeedBonus(playerTier(ship, 'sail'))
       );
+      events.push(moveEvent);
+      // A ship under way that ends its move in contact with an enemy hull
+      // rams it. Stationary ships (effective speed 0) never initiate a ram
+      // but can still be struck by a moving enemy. Gated on the flag so
+      // flag-off resolution stays byte-identical.
+      if (ramming && moveEvent.type === 'movement' && moveEvent.effectiveSpeed > 0) {
+        for (const target of resolutionOrder) {
+          // Recoil can sink the rammer mid-move; a sunk ship strikes no
+          // further blows.
+          if (ship.hp <= 0) break;
+          if (target.side === ship.side || target.hp <= 0) continue;
+          const pairKey = [ship.id, target.id].sort().join('|');
+          if (rammedPairs.has(pairKey) || distance(ship, target) > RAM_CONTACT_RANGE) {
+            continue;
+          }
+          rammedPairs.add(pairKey);
+          events.push(resolveRam(ship, target, moveEvent.effectiveSpeed));
+        }
+      }
     }
   }
 

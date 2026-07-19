@@ -6,6 +6,7 @@ import { MISSION_05_CODE } from '../sim/mission05.js';
 import { MISSION_06_CODE } from '../sim/mission06.js';
 import { MISSION_07_CODE } from '../sim/mission07.js';
 import { MISSION_08_CODE } from '../sim/mission08.js';
+import { MISSION_09_CODE } from '../sim/mission09.js';
 
 export type RewardItemKey = 'gold' | 'timber' | 'ore' | 'captain_shard' | 'cosmetic_token';
 
@@ -41,6 +42,9 @@ const MISSION_07_CAPTAIN_SHARDS = 3;
 const MISSION_08_GOLD = 500;
 const MISSION_08_ORE = 100;
 const MISSION_08_COSMETIC_TOKENS = 2;
+const MISSION_09_GOLD = 550;
+const MISSION_09_ORE = 110;
+const MISSION_09_CAPTAIN_SHARDS = 3;
 
 export const MISSION_REWARD_TABLE: Readonly<Record<string, readonly RewardGrant[]>> = {
   [MISSION_01_CODE]: [
@@ -82,6 +86,11 @@ export const MISSION_REWARD_TABLE: Readonly<Record<string, readonly RewardGrant[
     { itemKey: 'gold', quantity: MISSION_08_GOLD },
     { itemKey: 'ore', quantity: MISSION_08_ORE },
     { itemKey: 'cosmetic_token', quantity: MISSION_08_COSMETIC_TOKENS }
+  ],
+  [MISSION_09_CODE]: [
+    { itemKey: 'gold', quantity: MISSION_09_GOLD },
+    { itemKey: 'ore', quantity: MISSION_09_ORE },
+    { itemKey: 'captain_shard', quantity: MISSION_09_CAPTAIN_SHARDS }
   ]
 };
 

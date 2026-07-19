@@ -124,7 +124,12 @@ export const simModifiersSchema = z
     // Opt-in wind-aware turn rates: maneuvers are clamped by point of sail
     // (hardest beating upwind, barely when running free). Absent or false
     // keeps the legacy unclamped turning rules.
-    windTurnRate: z.boolean().optional()
+    windTurnRate: z.boolean().optional(),
+    // Opt-in ramming: movement-phase contact with an enemy hull deals
+    // speed-scaled ram damage to both ships. Only meaningful with
+    // modifiers.windMovement. Absent or false keeps the legacy contact-free
+    // movement rules.
+    ramming: z.boolean().optional()
   })
   .strict();
 
@@ -219,6 +224,24 @@ export type SimEvent =
       type: 'status';
       shipId: string;
       status: ShipStatus;
+    }
+  | {
+      type: 'ram';
+      shipId: string;
+      targetShipId: string;
+      effectiveSpeed: number;
+      hullDamage: number;
+      selfHullDamage: number;
+      targetRemaining: {
+        hp: number;
+        sail: number;
+        crew: number;
+      };
+      rammerRemaining: {
+        hp: number;
+        sail: number;
+        crew: number;
+      };
     };
 
 export interface SimSummary {
