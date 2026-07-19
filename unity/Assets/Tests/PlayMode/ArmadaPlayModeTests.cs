@@ -394,7 +394,8 @@ namespace Armada.Client.Tests.PlayMode
             // Seed 5 loses unupgraded but wins with cannon/sail/hull all at
             // tier 3 (tests/mission07.test.ts), so the attached tiers are
             // load-bearing for the server-side win proof.
-            var run = flow.RunAsync(5, new List<List<SimOrder>>());
+            var callerTurns = new List<List<SimOrder>>();
+            var run = flow.RunAsync(5, callerTurns);
             while (!run.IsCompleted)
             {
                 yield return null;
@@ -417,6 +418,9 @@ namespace Armada.Client.Tests.PlayMode
             Assert.That(complete.Result.Success, Is.True, complete.Result.ErrorReason);
             Assert.That(completionClient.LastCode, Is.EqualTo(Mission07Scenario.MissionCode));
             Assert.That(completionClient.LastRequest.Seed, Is.EqualTo(5));
+            // The flow snapshots the caller's turns so later mutations cannot
+            // desync the completion proof from the resolved run.
+            Assert.That(missionClient.LastResolveRequest.Turns, Is.Not.SameAs(callerTurns));
             Assert.That(completionClient.LastRequest.Turns, Is.SameAs(missionClient.LastResolveRequest.Turns));
             // The complete proof must carry the exact tiers the run resolved
             // with; mismatched tiers change the re-simulated outcome.

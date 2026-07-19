@@ -50,6 +50,28 @@ namespace Armada.Client.UI
                 Turns = turns
             });
 
+            ReportCompletion(code, progressResult);
+        }
+
+        // Mission 07 completions must go through the resolved flow so the win
+        // proof carries the exact seed, turns, and upgrade tiers the run was
+        // resolved with; completing via CompleteMission would drop the tiers
+        // and fail server-side re-simulation for upgraded wins.
+        public async void CompleteMission07(Mission07Flow flow, Dictionary<string, object> result, int? bestScore = null)
+        {
+            var player = authService.CurrentPlayer;
+            if (player == null)
+            {
+                SetStatus("Player not authed.");
+                return;
+            }
+
+            var progressResult = await flow.CompleteAsync(player.Id, result, bestScore);
+            ReportCompletion(Mission07Scenario.MissionCode, progressResult);
+        }
+
+        private void ReportCompletion(string code, ServiceResult<MissionCompleteResponse> progressResult)
+        {
             if (!progressResult.Success || progressResult.FeatureDisabled)
             {
                 SetStatus(FriendlyStatus(progressResult.Status, progressResult.ErrorReason, "Complete failed or feature off."));

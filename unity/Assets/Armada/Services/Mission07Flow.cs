@@ -69,7 +69,9 @@ namespace Armada.Client.Services
                 return Fail("scenario_mismatch");
             }
 
-            var runTurns = turns ?? new List<List<SimOrder>>();
+            // Snapshot the turns so later caller mutations cannot desync the
+            // completion proof from the turns the run was resolved with.
+            var runTurns = SnapshotTurns(turns);
             var upgrades = await FetchOwnedTiersAsync();
             var resolve = await _client.ResolveMission07Async(new Mission01ResolveRequest
             {
@@ -177,6 +179,42 @@ namespace Armada.Client.Services
             }
 
             return upgrades;
+        }
+
+        private static List<List<SimOrder>> SnapshotTurns(List<List<SimOrder>> turns)
+        {
+            var snapshot = new List<List<SimOrder>>();
+            if (turns == null)
+            {
+                return snapshot;
+            }
+
+            foreach (var turn in turns)
+            {
+                if (turn == null)
+                {
+                    snapshot.Add(null);
+                    continue;
+                }
+
+                var orders = new List<SimOrder>(turn.Count);
+                foreach (var order in turn)
+                {
+                    orders.Add(order == null ? null : new SimOrder
+                    {
+                        ShipId = order.ShipId,
+                        Action = order.Action,
+                        TargetShipId = order.TargetShipId,
+                        TurnDelta = order.TurnDelta,
+                        SpeedDelta = order.SpeedDelta,
+                        Side = order.Side
+                    });
+                }
+
+                snapshot.Add(orders);
+            }
+
+            return snapshot;
         }
 
         private static Mission07FlowResult Fail(string reason)
