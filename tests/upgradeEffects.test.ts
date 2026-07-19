@@ -243,6 +243,39 @@ describe('engine hull upgrade (modifiers.shipUpgrades)', () => {
     expect(shipIn(result, TARGET_ID).hp).toBe(200);
   });
 
+  it('does not reapply the hull bonus when chaining previews across turns', () => {
+    const upgradeRequest = {
+      modifiers: { shipUpgrades: true },
+      upgrades: tiers({ hull: 3 })
+    };
+    const first = resolveSimPreview(
+      duelPreview(7, attackerShip(), targetShip(), { orders: [], ...upgradeRequest })
+    );
+    expect(shipIn(first, ATTACKER_ID).hp).toBe(156);
+
+    // Feeding nextState back with the flag and tiers still set must carry the
+    // upgraded hp forward unchanged instead of compounding it (156, not 202).
+    const second = resolveSimPreview({
+      schemaVersion: 1,
+      seed: 7,
+      turn: 2,
+      state: first.nextState,
+      orders: [],
+      ...upgradeRequest
+    });
+    expect(shipIn(second, ATTACKER_ID).hp).toBe(156);
+
+    const third = resolveSimPreview({
+      schemaVersion: 1,
+      seed: 7,
+      turn: 3,
+      state: second.nextState,
+      orders: [],
+      ...upgradeRequest
+    });
+    expect(shipIn(third, ATTACKER_ID).hp).toBe(156);
+  });
+
   it('caps scaled hull hp at the schema maximum', () => {
     const result = resolveSimPreview(
       duelPreview(7, attackerShip({ hp: 1000 }), targetShip(), {

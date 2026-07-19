@@ -1,7 +1,8 @@
 // Ship upgrade effects (modifiers.shipUpgrades): request-level owned tiers
 // scale player-side ships only — cannon tiers raise broadside (and raked)
 // damage, sail tiers raise effective speed and ease the slowed turn clamp,
-// hull tiers raise hull hp at state build. All values are design-tunable
+// hull tiers raise hull hp at the battle-start (turn 1) state build only,
+// so chained turns never compound the bonus. All values are design-tunable
 // placeholders pending a balance pass (docs/content/balance-tables.md:
 // cannon tier → damage, sail tier → speed/turn, hull tier → hp).
 export const CANNON_DAMAGE_BONUS_PCT_PER_TIER = 10;

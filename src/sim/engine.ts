@@ -379,9 +379,10 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
       status: { ...ship.status },
       cooldowns: ship.cooldowns ?? {}
     };
-    // Hull tiers scale the request's input hp at state build; chained
-    // re-application semantics belong to mission adoption (next slice).
-    const hullTier = playerTier(next, 'hull');
+    // Hull tiers raise battle-start hp: applied only on the opening turn's
+    // state build so chained previews (nextState fed back with the flag
+    // still set) never rescale already-upgraded hp.
+    const hullTier = input.turn === 1 ? playerTier(next, 'hull') : 0;
     if (hullTier > 0) {
       next.hp = upgradedHullHp(next.hp, hullTier);
     }
