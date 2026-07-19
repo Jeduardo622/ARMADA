@@ -370,6 +370,51 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void Mission08Scenario_FingerprintMatchesBackendPinAndBootstrapMirrorsTackingOrders()
+        {
+            // Must equal EXPECTED_FINGERPRINT in tests/mission08.test.ts so the
+            // client and server pin the identical deterministic scenario.
+            const string expected =
+                "mission-08-eye-of-the-wind|turnLimit=10|upwindLimit=30|downwindLimit=90|swiftTarget=8|wind=180:4|" +
+                "enemy-corvette-a:enemy:240,35:h180:v3:hp150:sl85:cw55|" +
+                "enemy-corvette-b:enemy:240,-35:h180:v3:hp150:sl85:cw55|" +
+                "player-sloop-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
+                "player-sloop-b:player:0,-30:h0:v3:hp120:sl80:cw50";
+
+            Assert.That(Mission08Scenario.Fingerprint(), Is.EqualTo(expected));
+            Assert.That(
+                Mission08Scenario.FingerprintOf(Mission08Scenario.BuildExpectedStart(808)),
+                Is.EqualTo(expected));
+
+            // Seed 9 and the tacking orders are the deterministic win fixture
+            // pinned in tests/mission08.test.ts; the bootstrap must mirror
+            // them exactly or the runtime run stops winning.
+            Assert.That(Armada.Client.Bootstrap.Mission08Bootstrap.DefaultSeed, Is.EqualTo(9));
+
+            var turns = Armada.Client.Bootstrap.Mission08Bootstrap.BuildTackingOrders();
+            Assert.That(turns, Has.Count.EqualTo(Mission08Scenario.TurnLimit));
+
+            for (var i = 0; i < turns.Count; i++)
+            {
+                var expectedTarget = i < 5 ? Mission08Scenario.EnemyShipIds[0] : Mission08Scenario.EnemyShipIds[1];
+                var expectedTurnDelta = i == 1 ? 60 : i == 2 ? -60 : 0;
+                var expectedSpeedDelta = i >= 3 ? -2 : 0;
+
+                Assert.That(turns[i], Has.Count.EqualTo(2));
+                for (var ship = 0; ship < 2; ship++)
+                {
+                    var order = turns[i][ship];
+                    Assert.That(order.ShipId, Is.EqualTo(Mission08Scenario.PlayerShipIds[ship]));
+                    Assert.That(order.Action, Is.EqualTo("broadside"));
+                    Assert.That(order.TargetShipId, Is.EqualTo(expectedTarget));
+                    Assert.That(order.Side, Is.EqualTo("starboard"));
+                    Assert.That(order.TurnDelta, Is.EqualTo(expectedTurnDelta));
+                    Assert.That(order.SpeedDelta, Is.EqualTo(expectedSpeedDelta));
+                }
+            }
+        }
+
+        [Test]
         public void MissionCompleteResponse_DeserializesBackendPayload()
         {
             // Mirrors the /missions/{code}/complete response contract in

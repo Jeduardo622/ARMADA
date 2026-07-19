@@ -30,6 +30,16 @@ const WIND_TAILWIND_ARC = 45;
 const WIND_HEADWIND_ARC = 135;
 const MOVEMENT_SCALE = 5;
 
+// Wind turn rate (modifiers.windTurnRate): the rudder bites differently by
+// point of sail — turns are clamped hardest beating upwind, moderately on a
+// beam reach, and barely when running free. The limits reuse the wind impact
+// curve arcs and are exported so mission scenarios can surface them as
+// objectives. Placeholder values pending the balance pass
+// (docs/content/missions/mission-08-eye-of-the-wind.md).
+export const WIND_TURN_UPWIND_LIMIT = 30;
+export const WIND_TURN_BEAM_LIMIT = 60;
+export const WIND_TURN_DOWNWIND_LIMIT = 90;
+
 // Raking fire (modifiers.rakingFire): a broadside whose shot line runs along
 // the target's keel — bearing within RAKE_ARC of the target heading (stern
 // rake) or its reverse (bow rake) — deals multiplied damage
@@ -84,6 +94,33 @@ export function createDeterministicRng(seed: number) {
     r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+export type PointOfSail = 'downwind' | 'beam' | 'upwind';
+
+// Point of sail for a heading against the wind direction, using the same
+// arcs as the wind impact speed curve.
+export function pointOfSail(heading: number, wind: Wind): PointOfSail {
+  const rawDiff = Math.abs(normalizeHeading(heading - wind.direction));
+  const windAngle = Math.min(rawDiff, 360 - rawDiff);
+  if (windAngle <= WIND_TAILWIND_ARC) {
+    return 'downwind';
+  }
+  if (windAngle >= WIND_HEADWIND_ARC) {
+    return 'upwind';
+  }
+  return 'beam';
+}
+
+export function windTurnRateLimit(heading: number, wind: Wind): number {
+  switch (pointOfSail(heading, wind)) {
+    case 'downwind':
+      return WIND_TURN_DOWNWIND_LIMIT;
+    case 'upwind':
+      return WIND_TURN_UPWIND_LIMIT;
+    default:
+      return WIND_TURN_BEAM_LIMIT;
+  }
 }
 
 export function effectiveSpeed(ship: ShipState, wind: Wind): number {
@@ -413,13 +450,22 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
     }
   }
   const isSlowed = (ship: ShipState) => statusEffects && ship.status?.slowed === true;
-  // Slow clamps turns to SLOW_TURN_RATE_LIMIT; sail tiers ease the clamp.
+  const windTurnRate = input.modifiers?.windTurnRate === true;
+  // Slow clamps turns to SLOW_TURN_RATE_LIMIT (sail tiers ease that clamp);
+  // wind turn rate clamps by point of sail. When both apply the tighter
+  // limit wins. Pre-maneuver heading decides the point of sail.
   const turnRateLimitFor = (ship: ShipState) => {
-    if (!isSlowed(ship)) return undefined;
-    const sailTier = playerTier(ship, 'sail');
-    return sailTier > 0
-      ? slowedTurnRateLimit(SLOW_TURN_RATE_LIMIT, sailTier)
-      : SLOW_TURN_RATE_LIMIT;
+    const limits: number[] = [];
+    if (isSlowed(ship)) {
+      const sailTier = playerTier(ship, 'sail');
+      limits.push(
+        sailTier > 0 ? slowedTurnRateLimit(SLOW_TURN_RATE_LIMIT, sailTier) : SLOW_TURN_RATE_LIMIT
+      );
+    }
+    if (windTurnRate) {
+      limits.push(windTurnRateLimit(ship.heading, input.state.wind));
+    }
+    return limits.length > 0 ? Math.min(...limits) : undefined;
   };
 
   for (const ship of resolutionOrder) {

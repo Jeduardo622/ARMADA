@@ -811,6 +811,64 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class Mission08Objectives
+    {
+        public int TurnLimit { get; set; }
+        public int UpwindTurnLimit { get; set; }
+        public int DownwindTurnLimit { get; set; }
+        public int SwiftTurnTarget { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission08StartResponse
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission08Objectives Objectives { get; set; }
+        public SimState State { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission08BonusObjectives
+    {
+        public bool CleanTack { get; set; }
+        public bool SwiftVictory { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission08Telemetry
+    {
+        public int ClampedManeuvers { get; set; }
+        public int UpwindManeuvers { get; set; }
+        public int DownwindManeuvers { get; set; }
+    }
+
+    // Damage profile, turn records, and the resolve request shape are shared
+    // with mission 01 (Mission01DamageProfile / Mission01TurnRecord /
+    // Mission01ResolveRequest).
+    [Serializable]
+    public sealed class Mission08Outcome
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public string Result { get; set; }
+        public string FailReason { get; set; }
+        public int TurnCount { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission08BonusObjectives BonusObjectives { get; set; }
+        public Mission01DamageProfile DamageProfile { get; set; }
+        public Mission08Telemetry Telemetry { get; set; }
+        public List<Mission01TurnRecord> Turns { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission08ResolveEnvelope
+    {
+        public Mission08Outcome Outcome { get; set; }
+    }
+
+    [Serializable]
     public sealed class ConfigSnapshot
     {
         public string Namespace { get; set; }

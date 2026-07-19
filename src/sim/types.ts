@@ -120,7 +120,11 @@ export const simModifiersSchema = z
     // Opt-in ship upgrades: the request-level upgrades block scales
     // player-side ship stats (cannon → broadside damage, sail → speed/turn,
     // hull → hp). Absent or false ignores the upgrades block entirely.
-    shipUpgrades: z.boolean().optional()
+    shipUpgrades: z.boolean().optional(),
+    // Opt-in wind-aware turn rates: maneuvers are clamped by point of sail
+    // (hardest beating upwind, barely when running free). Absent or false
+    // keeps the legacy unclamped turning rules.
+    windTurnRate: z.boolean().optional()
   })
   .strict();
 
