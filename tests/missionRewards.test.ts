@@ -16,7 +16,12 @@ import { MISSION_03_CODE } from '../src/sim/mission03.js';
 import { MISSION_04_CODE } from '../src/sim/mission04.js';
 import { MISSION_05_CODE } from '../src/sim/mission05.js';
 import { MISSION_06_CODE } from '../src/sim/mission06.js';
-import { MISSION_07_CODE } from '../src/sim/mission07.js';
+import {
+  MISSION_07_CODE,
+  MISSION_07_ENEMY_SHIP_IDS,
+  MISSION_07_PLAYER_SHIP_IDS,
+  MISSION_07_TURN_LIMIT
+} from '../src/sim/mission07.js';
 
 const PLAYER_ID = '11111111-1111-1111-1111-111111111111';
 const ALL_MISSION_CODES = [
@@ -43,6 +48,22 @@ const winningTurns = Array.from({ length: MISSION_01_TURN_LIMIT }, () => [
   }
 ]);
 
+// Winning mission 07 fixture shared with tests/mission07.test.ts: seed 21,
+// pure gunnery focusing frigate A then B, heaving to from turn 4.
+const MISSION_07_WINNING_SEED = 21;
+const mission07WinningTurns = Array.from({ length: MISSION_07_TURN_LIMIT }, (_, i) => {
+  const target = i < 5 ? MISSION_07_ENEMY_SHIP_IDS[0] : MISSION_07_ENEMY_SHIP_IDS[1];
+  const speedDelta = i >= 3 ? -2 : 0;
+  return MISSION_07_PLAYER_SHIP_IDS.map((shipId) => ({
+    shipId,
+    action: 'broadside',
+    targetShipId: target,
+    side: 'starboard',
+    turnDelta: 0,
+    speedDelta
+  }));
+});
+
 const app = buildServer({ testing: true });
 
 // The testing preHandler in buildServer stamps a placeholder user id; this
@@ -68,6 +89,7 @@ let updateManyArgs: Array<Record<string, unknown>> = [];
 let simulateLostCreateRace = false;
 
 const missionIdFor = (code: string) => `mission-id:${code}`;
+let ownedUpgrades: Array<{ component: string; tier: number }> = [];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const prisma = app.prisma as any;
@@ -77,6 +99,10 @@ prisma.mission.findFirst = async (args: any) => {
 };
 prisma.player.findUnique = async (args: any) =>
   args?.where?.id === PLAYER_ID ? { id: PLAYER_ID } : null;
+prisma.playerShipUpgrade.findMany = async (args: any) =>
+  args?.where?.playerId === PLAYER_ID
+    ? ownedUpgrades.map((row) => ({ playerId: PLAYER_ID, ...row }))
+    : [];
 prisma.missionProgress.updateMany = async (args: any) => {
   updateManyArgs.push(args);
   const key = `${args.where.playerId}|${args.where.missionId}`;
@@ -168,6 +194,7 @@ beforeEach(() => {
   inventoryUpsertArgs = [];
   updateManyArgs = [];
   simulateLostCreateRace = false;
+  ownedUpgrades = [];
 });
 
 const complete = (code: string, overrides: Record<string, unknown> = {}) =>
@@ -247,6 +274,65 @@ describe('mission completion win proof', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe('boarding_disabled');
+  });
+});
+
+describe('mission completion upgrade tiers', () => {
+  const mission07Complete = (overrides: Record<string, unknown> = {}) =>
+    complete(MISSION_07_CODE, {
+      seed: MISSION_07_WINNING_SEED,
+      turns: mission07WinningTurns,
+      ...overrides
+    });
+
+  it('rejects upgrade tiers in proofs for missions without upgrade support', async () => {
+    const res = await complete(MISSION_01_CODE, { upgrades: { cannon: 1, sail: 0, hull: 0 } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('upgrades_not_supported');
+    expect(transactionCalls).toBe(0);
+    expect(inventoryStore.size).toBe(0);
+  });
+
+  it('rejects proofs claiming tiers the player does not own', async () => {
+    ownedUpgrades = [{ component: 'cannon', tier: 2 }];
+
+    const res = await mission07Complete({ upgrades: { cannon: 3, sail: 0, hull: 0 } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      error: 'upgrade_tiers_exceed_owned',
+      component: 'cannon',
+      claimed: 3,
+      owned: 2
+    });
+    expect(transactionCalls).toBe(0);
+    expect(progressStore.size).toBe(0);
+    expect(inventoryStore.size).toBe(0);
+  });
+
+  it('treats missing upgrade rows as tier zero', async () => {
+    const res = await mission07Complete({ upgrades: { cannon: 0, sail: 1, hull: 0 } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().component).toBe('sail');
+    expect(res.json().owned).toBe(0);
+  });
+
+  it('completes and grants when the proof tiers are owned and the run wins', async () => {
+    ownedUpgrades = [
+      { component: 'cannon', tier: 3 },
+      { component: 'sail', tier: 3 },
+      { component: 'hull', tier: 3 }
+    ];
+
+    const res = await mission07Complete({ upgrades: { cannon: 3, sail: 3, hull: 3 } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().progress.status).toBe('COMPLETED');
+    expect(res.json().rewardsGranted).toEqual(missionRewardsForCode(MISSION_07_CODE));
+  });
+
+  it('accepts all-zero tiers without owning any upgrades', async () => {
+    const res = await mission07Complete({ upgrades: { cannon: 0, sail: 0, hull: 0 } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().rewardsGranted).toEqual(missionRewardsForCode(MISSION_07_CODE));
   });
 });
 

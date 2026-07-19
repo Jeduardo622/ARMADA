@@ -141,6 +141,13 @@ components:
             maxItems: 6
             items:
               $ref: '#/components/schemas/SimOrder'
+        upgrades:
+          allOf:
+            - $ref: '#/components/schemas/ShipUpgradeTiers'
+          description: >-
+            Upgrade tiers the winning run was played with. Only accepted for
+            missions that support upgrades; the server rejects tiers above the
+            player's owned upgrades before re-simulating the proof.
     InventoryItem:
       type: object
       properties:
@@ -1210,6 +1217,8 @@ components:
             maxItems: 4
             items:
               $ref: '#/components/schemas/SimOrder'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
     Mission07BonusObjectives:
       type: object
       required: [enemyIgnited, unscorched]
@@ -1662,6 +1671,15 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Mission or player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            Proof upgrade tiers exceed the player's owned tiers
+            (upgrade_tiers_exceed_owned; the body names the offending
+            component with the claimed and owned tier).
           content:
             application/json:
               schema:

@@ -126,6 +126,46 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void MissionRequests_SerializeUpgradeTiersWithBackendKeysAndOmitWhenNull()
+        {
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver()
+            };
+            var resolve = new Mission01ResolveRequest
+            {
+                Seed = 21,
+                Turns = new List<List<SimOrder>>(),
+                Upgrades = new SimShipUpgrades { Cannon = 3, Sail = 3, Hull = 3 }
+            };
+            var completeRequest = new MissionCompleteRequest
+            {
+                PlayerId = "11111111-1111-1111-1111-111111111111",
+                Seed = 21,
+                Turns = new List<List<SimOrder>>(),
+                Upgrades = new SimShipUpgrades { Cannon = 2, Sail = 0, Hull = 1 }
+            };
+
+            StringAssert.Contains(
+                "\"upgrades\":{\"cannon\":3,\"sail\":3,\"hull\":3}",
+                JsonConvert.SerializeObject(resolve, settings));
+            StringAssert.Contains(
+                "\"upgrades\":{\"cannon\":2,\"sail\":0,\"hull\":1}",
+                JsonConvert.SerializeObject(completeRequest, settings));
+
+            // Requests without tiers must stay byte-identical to the legacy
+            // payloads accepted by the strict mission schemas.
+            var legacyResolve = new Mission01ResolveRequest
+            {
+                Seed = 21,
+                Turns = new List<List<SimOrder>>()
+            };
+            StringAssert.DoesNotContain(
+                "upgrades",
+                JsonConvert.SerializeObject(legacyResolve, settings));
+        }
+
+        [Test]
         public void Mission01Scenario_FingerprintMatchesBackendPin()
         {
             // Must equal EXPECTED_FINGERPRINT in tests/mission01.test.ts so the

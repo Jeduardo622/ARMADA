@@ -1,5 +1,13 @@
 import { resolveSimPreview } from './engine.js';
-import { SimEvent, SimModifiers, SimOrder, SimState, SimSummary, Wind } from './types.js';
+import {
+  SimEvent,
+  SimModifiers,
+  SimOrder,
+  SimState,
+  SimSummary,
+  ShipUpgradeTiers,
+  Wind
+} from './types.js';
 
 // Mission-generic turn loop shared by mission scenarios. Scenarios supply the
 // initial state, per-turn wind, enemy order generation, and modifiers;
@@ -22,6 +30,10 @@ export interface MissionRunConfig {
   // Optional pre-turn hook for scripted events such as reinforcement spawns;
   // returns the (possibly extended) state used for the turn.
   onTurnStart?: (state: SimState, turn: number) => SimState;
+  // Optional player upgrade tiers; when present the loop opts in to
+  // modifiers.shipUpgrades so the engine scales player-side ships (the hull
+  // bonus applies on turn 1 only and carries forward through the chain).
+  upgrades?: ShipUpgradeTiers;
 }
 
 export interface MissionRunResult {
@@ -63,7 +75,10 @@ export function runMissionLoop(
       turn,
       state: turnState,
       orders,
-      modifiers
+      // Without upgrades the request stays byte-identical to the legacy
+      // shape, preserving every pinned turn hash.
+      modifiers: config.upgrades ? { ...modifiers, shipUpgrades: true } : modifiers,
+      ...(config.upgrades ? { upgrades: config.upgrades } : {})
     });
 
     turns.push({ turn, hash: preview.hash, summary: preview.summary, events: preview.events });
