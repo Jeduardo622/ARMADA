@@ -297,6 +297,23 @@ namespace Armada.Client.Core
     }
 
     [Serializable]
+    public sealed class SimModifiers
+    {
+        // Opt-in flags mirror docs/api/openapi.yaml SimModifiers; other
+        // server-side modifier knobs are added as client features need them.
+        [JsonProperty("shipUpgrades", NullValueHandling = NullValueHandling.Ignore)]
+        public bool? ShipUpgrades { get; set; }
+    }
+
+    [Serializable]
+    public sealed class SimShipUpgrades
+    {
+        public int Cannon { get; set; }
+        public int Sail { get; set; }
+        public int Hull { get; set; }
+    }
+
+    [Serializable]
     public sealed class SimPreviewRequest
     {
         [JsonProperty("schemaVersion")] public int SchemaVersion { get; set; } = 1;
@@ -304,6 +321,11 @@ namespace Armada.Client.Core
         public int Turn { get; set; } = 1;
         public SimState State { get; set; }
         public List<SimOrder> Orders { get; set; }
+        [JsonProperty("modifiers", NullValueHandling = NullValueHandling.Ignore)]
+        public SimModifiers Modifiers { get; set; }
+        // Only read by the server when Modifiers.ShipUpgrades is true.
+        [JsonProperty("upgrades", NullValueHandling = NullValueHandling.Ignore)]
+        public SimShipUpgrades Upgrades { get; set; }
     }
 
     [Serializable]

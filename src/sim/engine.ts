@@ -7,11 +7,18 @@ import {
   SimState,
   SimSummary,
   ShipState,
+  ShipUpgradeTiers,
   Obstacle,
   SlowZone,
   Vector2,
   Wind
 } from './types.js';
+import {
+  cannonDamageBonusPct,
+  sailSpeedBonus,
+  slowedTurnRateLimit,
+  upgradedHullHp
+} from './upgradeEffects.js';
 
 const MAX_SPEED = 10;
 
@@ -169,9 +176,14 @@ function applyMovement(
   wind: Wind,
   obstacles: Obstacle[],
   slowZones: SlowZone[],
-  statusSpeedPenalty: number
+  statusSpeedPenalty: number,
+  upgradeSpeedBonus: number
 ): SimEvent {
   let speed = effectiveSpeed(ship, wind);
+  if (upgradeSpeedBonus > 0 && speed > 0) {
+    // Upgraded rigging: the bonus applies before hazard and status penalties.
+    speed = Math.min(MAX_SPEED, speed + upgradeSpeedBonus);
+  }
   const hazard = speed > 0 ? insideSlowZone(ship.position, slowZones) : undefined;
   if (hazard) {
     // Ships under way keep steerage even inside debris.
@@ -199,11 +211,12 @@ function applyMovement(
   };
 }
 
-function applyManeuver(ship: ShipState, order: SimOrder, slowed: boolean): SimEvent {
+function applyManeuver(ship: ShipState, order: SimOrder, turnRateLimit?: number): SimEvent {
   const requestedTurn = order.turnDelta ?? 0;
-  const turnDelta = slowed
-    ? clamp(requestedTurn, -SLOW_TURN_RATE_LIMIT, SLOW_TURN_RATE_LIMIT)
-    : requestedTurn;
+  const turnDelta =
+    turnRateLimit === undefined
+      ? requestedTurn
+      : clamp(requestedTurn, -turnRateLimit, turnRateLimit);
   const nextHeading = normalizeHeading(ship.heading + turnDelta);
   const nextSpeed = clamp(ship.speed + (order.speedDelta ?? 0), 0, MAX_SPEED);
   ship.heading = nextHeading;
@@ -226,7 +239,8 @@ function resolveBroadside(
   damageScale: number,
   attackerSpeed: number,
   rakingEnabled: boolean,
-  accuracyBonus: number
+  accuracyBonus: number,
+  cannonBonusPct: number
 ): SimEvent {
   const range = distance(attacker, target);
   const bearingToTarget = angleBetween(attacker, target);
@@ -258,6 +272,10 @@ function resolveBroadside(
   let scaledDamage = Math.floor((baseDamage + variance) * damageScale);
   if (rake) {
     scaledDamage = Math.floor(scaledDamage * RAKE_MULTIPLIER);
+  }
+  if (cannonBonusPct > 0) {
+    // Integer scale-then-floor; applies to raked damage too.
+    scaledDamage = Math.floor((scaledDamage * (100 + cannonBonusPct)) / 100);
   }
   const hullDamage = hit ? scaledDamage : 0;
   const sailDamage = hit ? Math.floor(scaledDamage * 0.6) : 0;
@@ -344,13 +362,31 @@ function buildSummary(ships: ShipState[]): SimSummary {
 
 export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
   const rng = createDeterministicRng(input.seed + input.turn);
-  const ships: ShipState[] = input.state.ships.map((ship) => ({
-    ...ship,
-    // Copy rather than alias: status effects mutate this object and must
-    // never write back into the caller's input state.
-    status: { ...ship.status },
-    cooldowns: ship.cooldowns ?? {}
-  }));
+
+  // Ship upgrades (modifiers.shipUpgrades): request-level tiers scale
+  // player-side ships only. Tier authenticity against owned upgrades is
+  // enforced at mission win-proof time, not here.
+  const upgrades =
+    input.modifiers?.shipUpgrades === true ? input.upgrades : undefined;
+  const playerTier = (ship: ShipState, component: keyof ShipUpgradeTiers) =>
+    upgrades && ship.side === 'player' ? upgrades[component] : 0;
+
+  const ships: ShipState[] = input.state.ships.map((ship) => {
+    const next: ShipState = {
+      ...ship,
+      // Copy rather than alias: status effects mutate this object and must
+      // never write back into the caller's input state.
+      status: { ...ship.status },
+      cooldowns: ship.cooldowns ?? {}
+    };
+    // Hull tiers scale the request's input hp at state build; chained
+    // re-application semantics belong to mission adoption (next slice).
+    const hullTier = playerTier(next, 'hull');
+    if (hullTier > 0) {
+      next.hp = upgradedHullHp(next.hp, hullTier);
+    }
+    return next;
+  });
 
   const shipById = new Map<string, ShipState>();
   for (const ship of ships) {
@@ -376,6 +412,14 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
     }
   }
   const isSlowed = (ship: ShipState) => statusEffects && ship.status?.slowed === true;
+  // Slow clamps turns to SLOW_TURN_RATE_LIMIT; sail tiers ease the clamp.
+  const turnRateLimitFor = (ship: ShipState) => {
+    if (!isSlowed(ship)) return undefined;
+    const sailTier = playerTier(ship, 'sail');
+    return sailTier > 0
+      ? slowedTurnRateLimit(SLOW_TURN_RATE_LIMIT, sailTier)
+      : SLOW_TURN_RATE_LIMIT;
+  };
 
   for (const ship of resolutionOrder) {
     // A ship the fire tick just sank takes no further actions. Gated on the
@@ -384,7 +428,7 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
     if (statusEffects && ship.hp <= 0) continue;
     const order = orderByShip.get(ship.id);
     if (order) {
-      events.push(applyManeuver(ship, order, isSlowed(ship)));
+      events.push(applyManeuver(ship, order, turnRateLimitFor(ship)));
     }
   }
 
@@ -400,7 +444,8 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
           input.state.wind,
           obstacles,
           slowZones,
-          isSlowed(ship) ? SLOW_SPEED_PENALTY : 0
+          isSlowed(ship) ? SLOW_SPEED_PENALTY : 0,
+          sailSpeedBonus(playerTier(ship, 'sail'))
         )
       );
     }
@@ -418,6 +463,10 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
       if (target && target.hp > 0) {
         const damageScale = input.modifiers?.damageScale?.[ship.id] ?? 1;
         let attackerSpeed = windAware ? effectiveSpeed(ship, input.state.wind) : ship.speed;
+        const sailBonus = sailSpeedBonus(playerTier(ship, 'sail'));
+        if (sailBonus > 0 && attackerSpeed > 0) {
+          attackerSpeed = Math.min(MAX_SPEED, attackerSpeed + sailBonus);
+        }
         if (isSlowed(ship)) {
           attackerSpeed = Math.max(0, attackerSpeed - SLOW_SPEED_PENALTY);
         }
@@ -433,7 +482,8 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
           damageScale,
           attackerSpeed,
           rakingEnabled,
-          accuracyBonus
+          accuracyBonus,
+          cannonDamageBonusPct(playerTier(ship, 'cannon'))
         );
         events.push(event);
         if (statusEffects && event.type === 'broadside' && event.hit) {

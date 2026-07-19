@@ -91,6 +91,41 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void SimPreviewRequest_SerializesUpgradesWithBackendKeysAndOmitsWhenNull()
+        {
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver()
+            };
+            var withUpgrades = new SimPreviewRequest
+            {
+                Seed = 7,
+                State = new SimState { Ships = new List<SimShip>() },
+                Orders = new List<SimOrder>(),
+                Modifiers = new SimModifiers { ShipUpgrades = true },
+                Upgrades = new SimShipUpgrades { Cannon = 3, Sail = 1, Hull = 2 }
+            };
+
+            var json = JsonConvert.SerializeObject(withUpgrades, settings);
+
+            StringAssert.Contains("\"modifiers\":{\"shipUpgrades\":true}", json);
+            StringAssert.Contains("\"upgrades\":{\"cannon\":3,\"sail\":1,\"hull\":2}", json);
+
+            // Flag-off requests must stay byte-identical to the legacy payload.
+            var withoutUpgrades = new SimPreviewRequest
+            {
+                Seed = 7,
+                State = new SimState { Ships = new List<SimShip>() },
+                Orders = new List<SimOrder>()
+            };
+
+            var legacyJson = JsonConvert.SerializeObject(withoutUpgrades, settings);
+
+            StringAssert.DoesNotContain("modifiers", legacyJson);
+            StringAssert.DoesNotContain("upgrades", legacyJson);
+        }
+
+        [Test]
         public void Mission01Scenario_FingerprintMatchesBackendPin()
         {
             // Must equal EXPECTED_FINGERPRINT in tests/mission01.test.ts so the
