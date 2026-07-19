@@ -211,6 +211,36 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void Mission07Bootstrap_BuildsPinnedGunneryOrdersForDefaultSeed()
+        {
+            // Seed 21 and the pure-gunnery orders are the deterministic win
+            // fixture pinned in tests/mission07.test.ts; the bootstrap must
+            // mirror them exactly or the runtime run stops winning.
+            Assert.That(Armada.Client.Bootstrap.Mission07Bootstrap.DefaultSeed, Is.EqualTo(21));
+
+            var turns = Armada.Client.Bootstrap.Mission07Bootstrap.BuildGunneryOrders();
+            Assert.That(turns, Has.Count.EqualTo(Mission07Scenario.TurnLimit));
+
+            for (var i = 0; i < turns.Count; i++)
+            {
+                var expectedTarget = i < 5 ? Mission07Scenario.EnemyShipIds[0] : Mission07Scenario.EnemyShipIds[1];
+                var expectedSpeedDelta = i >= 3 ? -2 : 0;
+
+                Assert.That(turns[i], Has.Count.EqualTo(2));
+                for (var ship = 0; ship < 2; ship++)
+                {
+                    var order = turns[i][ship];
+                    Assert.That(order.ShipId, Is.EqualTo(Mission07Scenario.PlayerShipIds[ship]));
+                    Assert.That(order.Action, Is.EqualTo("broadside"));
+                    Assert.That(order.TargetShipId, Is.EqualTo(expectedTarget));
+                    Assert.That(order.Side, Is.EqualTo("starboard"));
+                    Assert.That(order.TurnDelta, Is.Zero);
+                    Assert.That(order.SpeedDelta, Is.EqualTo(expectedSpeedDelta));
+                }
+            }
+        }
+
+        [Test]
         public void Mission01Scenario_FingerprintMatchesBackendPin()
         {
             // Must equal EXPECTED_FINGERPRINT in tests/mission01.test.ts so the

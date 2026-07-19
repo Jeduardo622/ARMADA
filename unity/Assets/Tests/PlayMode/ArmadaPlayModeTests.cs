@@ -2,8 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Armada.Client.Bootstrap;
 using Armada.Client.Core;
 using Armada.Client.Services;
+using Armada.Client.UI;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -474,6 +476,72 @@ namespace Armada.Client.Tests.PlayMode
                     Success = true,
                     Status = HttpStatusCode.OK
                 });
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Mission07Bootstrap_DrivesRunAndCompletesWinThroughMissionUI()
+        {
+            var missionClient = new FakeMission07Client();
+            var upgradesClient = new FakeFullTierUpgradesClient();
+            var completionClient = new FakeMissionCompletionClient();
+            var flow = new Mission07Flow(missionClient, null, upgradesClient, completionClient);
+
+            // Inactive so MissionUIController.Start never fires a network
+            // refresh; CompleteMission07 is a plain method call and does not
+            // need the component to be active.
+            var gameObject = new GameObject("mission07-bootstrap-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var missionUI = gameObject.AddComponent<MissionUIController>();
+
+                // Wire the plain-class [SerializeField] auth dependency the
+                // same way the bootstrap composition roots do (reflection),
+                // with a pre-authed state so CurrentPlayer resolves offline.
+                var authService = new AuthService(null, null);
+                typeof(AuthService)
+                    .GetField("_state", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(authService, new AuthState
+                    {
+                        Token = "test-token",
+                        Player = new Player { Id = "11111111-1111-1111-1111-111111111111" }
+                    });
+                typeof(MissionUIController)
+                    .GetField("authService", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(missionUI, authService);
+
+                var drive = Mission07Bootstrap.DriveAsync(
+                    flow,
+                    missionUI,
+                    Mission07Bootstrap.DefaultSeed,
+                    Mission07Bootstrap.BuildGunneryOrders());
+                while (!drive.IsCompleted)
+                {
+                    yield return null;
+                }
+
+                Assert.That(drive.Result.Success, Is.True, drive.Result.FailureReason);
+                Assert.That(drive.Result.Outcome.Result, Is.EqualTo("win"));
+
+                // CompleteMission07 is async void; with fake clients it
+                // finishes within a few frames.
+                for (var frame = 0; completionClient.LastRequest == null && frame < 120; frame++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(completionClient.LastCode, Is.EqualTo(Mission07Scenario.MissionCode));
+                Assert.That(completionClient.LastRequest.PlayerId, Is.EqualTo("11111111-1111-1111-1111-111111111111"));
+                Assert.That(completionClient.LastRequest.Seed, Is.EqualTo(Mission07Bootstrap.DefaultSeed));
+                // The completion proof must re-send the exact snapshotted
+                // turns and tiers the run was resolved with.
+                Assert.That(completionClient.LastRequest.Turns, Is.SameAs(missionClient.LastResolveRequest.Turns));
+                Assert.That(completionClient.LastRequest.Upgrades, Is.SameAs(missionClient.LastResolveRequest.Upgrades));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
             }
         }
 
