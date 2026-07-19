@@ -290,6 +290,13 @@ namespace Armada.Client.Core
         public int? CrewLoss { get; set; }
         public int? TargetCrewLoss { get; set; }
         public SimShipStatus Status { get; set; }
+        // Ram event fields (docs/api/openapi.yaml SimEvent "ram" variant):
+        // hull damage dealt to the target, recoil taken on the rammer's own
+        // bow, and both remaining blocks for damage readability.
+        public int? EffectiveSpeed { get; set; }
+        public int? HullDamage { get; set; }
+        public int? SelfHullDamage { get; set; }
+        public SimRemaining RammerRemaining { get; set; }
     }
 
     [Serializable]

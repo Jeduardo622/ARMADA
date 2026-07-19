@@ -456,6 +456,27 @@ namespace Armada.Client.Tests.EditMode
                     Assert.That(order.SpeedDelta, Is.EqualTo(expectedSpeedDelta));
                 }
             }
+
+            // Mirrors the SimEvent "ram" variant in docs/api/openapi.yaml so
+            // per-ram damage stays readable client-side (hullDamage vs
+            // selfHullDamage plus both remaining blocks).
+            const string ramJson =
+                "{\"type\":\"ram\",\"shipId\":\"player-sloop-a\",\"targetShipId\":\"enemy-brig-a\"," +
+                "\"effectiveSpeed\":9,\"hullDamage\":46,\"selfHullDamage\":23," +
+                "\"targetRemaining\":{\"hp\":114,\"sail\":85,\"crew\":55}," +
+                "\"rammerRemaining\":{\"hp\":97,\"sail\":80,\"crew\":50}}";
+
+            var ramEvent = JsonConvert.DeserializeObject<SimEvent>(ramJson);
+            Assert.That(ramEvent.Type, Is.EqualTo("ram"));
+            Assert.That(ramEvent.ShipId, Is.EqualTo("player-sloop-a"));
+            Assert.That(ramEvent.TargetShipId, Is.EqualTo("enemy-brig-a"));
+            Assert.That(ramEvent.EffectiveSpeed, Is.EqualTo(9));
+            Assert.That(ramEvent.HullDamage, Is.EqualTo(46));
+            Assert.That(ramEvent.SelfHullDamage, Is.EqualTo(23));
+            Assert.That(ramEvent.TargetRemaining.Hp, Is.EqualTo(114));
+            Assert.That(ramEvent.RammerRemaining.Hp, Is.EqualTo(97));
+            Assert.That(ramEvent.RammerRemaining.Sail, Is.EqualTo(80));
+            Assert.That(ramEvent.RammerRemaining.Crew, Is.EqualTo(50));
         }
 
         [Test]
