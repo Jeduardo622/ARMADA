@@ -11,18 +11,17 @@ using UnityEngine;
 namespace Armada.Client.Bootstrap
 {
     /// <summary>
-    /// Runtime composition root for the Mission 07 "Burning Seas" slice.
-    /// Constructs the client service graph, runs Mission07Flow with a
-    /// deterministic seed and the pinned gunnery orders, then reports a win
-    /// through MissionUIController.CompleteMission07 so the completion proof
-    /// re-sends the resolved run's snapshotted seed, turns, and owned upgrade
-    /// tiers.
+    /// Runtime composition root for the Mission 10 "Sail-Cutter" slice.
+    /// Constructs the client service graph, runs Mission10Flow with a
+    /// deterministic seed and the pinned mixed-battery orders, then reports a
+    /// win through MissionUIController.CompleteMission10 so the completion
+    /// proof re-sends the resolved run's snapshotted seed and turns.
     /// </summary>
-    public sealed class Mission07Bootstrap : MonoBehaviour
+    public sealed class Mission10Bootstrap : MonoBehaviour
     {
-        // Seed 21 wins the pinned gunnery orders both with and without owned
-        // upgrade tiers (tests/mission07.test.ts).
-        public const int DefaultSeed = 21;
+        // Seed 2 wins the pinned mixed-battery orders at turn 8 with both
+        // bonuses (tests/mission10.test.ts).
+        public const int DefaultSeed = 2;
 
         [Header("Config")]
         [SerializeField] private ArmadaClientConfig clientConfig;
@@ -35,7 +34,7 @@ namespace Armada.Client.Bootstrap
         [SerializeField] private int seed = DefaultSeed;
 
         private AuthService _authService;
-        private Mission07Flow _flow;
+        private Mission10Flow _flow;
 
         // Composition happens in Awake so the wired [SerializeField] services
         // are in place before any MissionUIController.Start can run its first
@@ -44,17 +43,17 @@ namespace Armada.Client.Bootstrap
         {
             if (clientConfig == null)
             {
-                Debug.LogError("[Mission07Bootstrap] Missing client config asset.");
+                Debug.LogError("[Mission10Bootstrap] Missing client config asset.");
                 return;
             }
 
-            // ArmadaBootstrap and Mission08Bootstrap also compose an
-            // authenticated service graph. A second graph would open a second
-            // guest session with a different player and race it for the same
-            // UI wiring, so composition roots must not run together.
-            if (FindFirstObjectByType<ArmadaBootstrap>() != null || FindFirstObjectByType<Mission08Bootstrap>() != null || FindFirstObjectByType<Mission09Bootstrap>() != null || FindFirstObjectByType<Mission10Bootstrap>() != null)
+            // Each bootstrap composes an authenticated service graph. A
+            // second graph would open a second guest session with a different
+            // player and race it for the same UI wiring, so composition
+            // roots must not run together in one scene.
+            if (FindFirstObjectByType<ArmadaBootstrap>() != null || FindFirstObjectByType<Mission07Bootstrap>() != null || FindFirstObjectByType<Mission08Bootstrap>() != null || FindFirstObjectByType<Mission09Bootstrap>() != null)
             {
-                Debug.LogError("[Mission07Bootstrap] Another composition root is active in the scene; refusing to compose a second authenticated service graph.");
+                Debug.LogError("[Mission10Bootstrap] Another composition root is active in the scene; refusing to compose a second authenticated service graph.");
                 return;
             }
 
@@ -68,10 +67,9 @@ namespace Armada.Client.Bootstrap
             authServiceRef = authService;
 
             var missionService = new MissionService(apiClient, flags);
-            var upgradesService = new UpgradesService(apiClient, flags);
 
             _authService = authService;
-            _flow = new Mission07Flow(missionService, determinism, upgradesService, missionService);
+            _flow = new Mission10Flow(missionService, determinism, missionService);
 
             WireUI(missionService, authService);
         }
@@ -84,49 +82,52 @@ namespace Armada.Client.Bootstrap
             }
 
             await _authService.GetTokenAsync();
-            await DriveAsync(_flow, missionUI, seed, BuildGunneryOrders());
+            await DriveAsync(_flow, missionUI, seed, BuildMixedBatteryOrders());
         }
 
         /// <summary>
         /// Runs the mission and, on a win, completes it through the UI
         /// controller. Completion must go through the flow-aware
-        /// CompleteMission07 path so the request carries the exact seed,
-        /// turns, and tiers the run was resolved with.
+        /// CompleteMission10 path so the request carries the exact seed and
+        /// turns the run was resolved with.
         /// </summary>
-        public static async Task<Mission07FlowResult> DriveAsync(Mission07Flow flow, MissionUIController missionUI, int seed, List<List<SimOrder>> turns)
+        public static async Task<Mission10FlowResult> DriveAsync(Mission10Flow flow, MissionUIController missionUI, int seed, List<List<SimOrder>> turns)
         {
             var run = await flow.RunAsync(seed, turns);
             if (run.Success && run.Outcome?.Result == "win" && missionUI != null)
             {
-                missionUI.CompleteMission07(flow, new Dictionary<string, object> { ["outcome"] = "win" });
+                missionUI.CompleteMission10(flow, new Dictionary<string, object> { ["outcome"] = "win" });
             }
 
             return run;
         }
 
         /// <summary>
-        /// Client-side mirror of the pure-gunnery order fixture pinned in
-        /// tests/mission07.test.ts: both sloops focus frigate A for the first
-        /// five turns then frigate B, heaving to (-2 speed) from turn 4.
+        /// Client-side mirror of the mixed-battery order fixture pinned in
+        /// tests/mission10.test.ts: both sloops fire chain shot into the
+        /// rigging for the first three turns while the lines close, then ball
+        /// to sink, on clipper A for the first five turns then clipper B.
+        /// Round-shot turns omit the ammo key so those orders stay
+        /// byte-identical to the legacy payload shape.
         /// </summary>
-        public static List<List<SimOrder>> BuildGunneryOrders()
+        public static List<List<SimOrder>> BuildMixedBatteryOrders()
         {
-            var turns = new List<List<SimOrder>>(Mission07Scenario.TurnLimit);
-            for (var i = 0; i < Mission07Scenario.TurnLimit; i++)
+            var turns = new List<List<SimOrder>>(Mission10Scenario.TurnLimit);
+            for (var i = 0; i < Mission10Scenario.TurnLimit; i++)
             {
-                var target = i < 5 ? Mission07Scenario.EnemyShipIds[0] : Mission07Scenario.EnemyShipIds[1];
-                var speedDelta = i >= 3 ? -2 : 0;
+                var target = i < 5 ? Mission10Scenario.EnemyShipIds[0] : Mission10Scenario.EnemyShipIds[1];
+                var ammo = i < 3 ? "chain" : null;
                 turns.Add(new List<SimOrder>
                 {
-                    Fire(Mission07Scenario.PlayerShipIds[0], target, speedDelta),
-                    Fire(Mission07Scenario.PlayerShipIds[1], target, speedDelta)
+                    Fire(Mission10Scenario.PlayerShipIds[0], target, ammo),
+                    Fire(Mission10Scenario.PlayerShipIds[1], target, ammo)
                 });
             }
 
             return turns;
         }
 
-        private static SimOrder Fire(string shipId, string targetShipId, int speedDelta)
+        private static SimOrder Fire(string shipId, string targetShipId, string ammo)
         {
             return new SimOrder
             {
@@ -135,7 +136,8 @@ namespace Armada.Client.Bootstrap
                 TargetShipId = targetShipId,
                 Side = "starboard",
                 TurnDelta = 0,
-                SpeedDelta = speedDelta
+                SpeedDelta = 0,
+                Ammo = ammo
             };
         }
 

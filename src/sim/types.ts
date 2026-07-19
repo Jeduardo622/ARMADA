@@ -82,7 +82,11 @@ export const simOrderSchema = z
     targetShipId: z.string().min(1).optional(),
     turnDelta: z.number().int().min(-90).max(90).default(0),
     speedDelta: z.number().int().min(-2).max(2).default(0),
-    side: z.enum(['port', 'starboard']).optional()
+    side: z.enum(['port', 'starboard']).optional(),
+    // Optional per-order ammo selection, only read for broadsides when
+    // modifiers.chainShot is true and otherwise inert. Absent-by-default (no
+    // default value) so legacy order payloads parse byte-identically.
+    ammo: z.enum(['round', 'chain']).optional()
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -129,7 +133,11 @@ export const simModifiersSchema = z
     // speed-scaled ram damage to both ships. Only meaningful with
     // modifiers.windMovement. Absent or false keeps the legacy contact-free
     // movement rules.
-    ramming: z.boolean().optional()
+    ramming: z.boolean().optional(),
+    // Opt-in chain shot: broadside orders may select ammo 'chain' to trade
+    // hull damage for heavy sail/rigging damage. Absent or false keeps the
+    // legacy round-shot damage split and ignores the ammo key entirely.
+    chainShot: z.boolean().optional()
   })
   .strict();
 
@@ -197,6 +205,9 @@ export type SimEvent =
         crew: number;
       };
       rake?: 'bow' | 'stern';
+      // Present only when chain shot actually fired (modifiers.chainShot and
+      // ammo 'chain'); round-shot events keep the legacy shape.
+      ammo?: 'chain';
     }
   | {
       type: 'boarding';

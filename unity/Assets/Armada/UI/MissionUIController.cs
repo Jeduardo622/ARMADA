@@ -100,6 +100,21 @@ namespace Armada.Client.UI
             ReportCompletion(Mission09Scenario.MissionCode, progressResult);
         }
 
+        // Mission 10 completions must go through the resolved flow so the win
+        // proof carries the exact seed and turns the run was resolved with.
+        public async void CompleteMission10(Mission10Flow flow, Dictionary<string, object> result, int? bestScore = null)
+        {
+            var player = authService.CurrentPlayer;
+            if (player == null)
+            {
+                SetStatus("Player not authed.");
+                return;
+            }
+
+            var progressResult = await flow.CompleteAsync(player.Id, result, bestScore);
+            ReportCompletion(Mission10Scenario.MissionCode, progressResult);
+        }
+
         private void ReportCompletion(string code, ServiceResult<MissionCompleteResponse> progressResult)
         {
             if (!progressResult.Success || progressResult.FeatureDisabled)

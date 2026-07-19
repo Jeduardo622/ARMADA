@@ -57,6 +57,19 @@ const RAM_BASE_HULL_DAMAGE = 10;
 const RAM_SPEED_HULL_DAMAGE = 4;
 const RAM_RECOIL_FRACTION = 0.5;
 
+// Chain shot (modifiers.chainShot): a broadside order may select ammo
+// 'chain' to fire chain shot — the same shot weight redistributed at the
+// rigging: heavy sail damage, reduced hull and crew damage. The selection is
+// per order and rng-free (the hit and variance rolls are consumed exactly as
+// for round shot), so the roll stream never depends on the ammo choice.
+// Absent ammo or an absent/false flag keeps the legacy round-shot split.
+// Percent values are design-tunable placeholders pending the balance pass
+// (docs/content/missions/mission-10-sail-cutter.md). Exported so mission
+// scenarios can surface the split as objectives.
+export const CHAIN_SHOT_HULL_PERCENT = 40;
+export const CHAIN_SHOT_SAIL_PERCENT = 120;
+export const CHAIN_SHOT_CREW_PERCENT = 20;
+
 // Raking fire (modifiers.rakingFire): a broadside whose shot line runs along
 // the target's keel — bearing within RAKE_ARC of the target heading (stern
 // rake) or its reverse (bow rake) — deals multiplied damage
@@ -294,7 +307,8 @@ function resolveBroadside(
   attackerSpeed: number,
   rakingEnabled: boolean,
   accuracyBonus: number,
-  cannonBonusPct: number
+  cannonBonusPct: number,
+  chainShot: boolean
 ): SimEvent {
   const range = distance(attacker, target);
   const bearingToTarget = angleBetween(attacker, target);
@@ -331,9 +345,24 @@ function resolveBroadside(
     // Integer scale-then-floor; applies to raked damage too.
     scaledDamage = Math.floor((scaledDamage * (100 + cannonBonusPct)) / 100);
   }
-  const hullDamage = hit ? scaledDamage : 0;
-  const sailDamage = hit ? Math.floor(scaledDamage * 0.6) : 0;
-  const crewDamage = hit ? Math.floor(scaledDamage * 0.35) : 0;
+  // Chain shot redistributes the same scaled shot weight toward the rigging
+  // (integer scale-then-floor, applied after rake and cannon-tier scaling);
+  // the round-shot split below is byte-identical to the legacy rules.
+  const hullDamage = hit
+    ? chainShot
+      ? Math.floor((scaledDamage * CHAIN_SHOT_HULL_PERCENT) / 100)
+      : scaledDamage
+    : 0;
+  const sailDamage = hit
+    ? chainShot
+      ? Math.floor((scaledDamage * CHAIN_SHOT_SAIL_PERCENT) / 100)
+      : Math.floor(scaledDamage * 0.6)
+    : 0;
+  const crewDamage = hit
+    ? chainShot
+      ? Math.floor((scaledDamage * CHAIN_SHOT_CREW_PERCENT) / 100)
+      : Math.floor(scaledDamage * 0.35)
+    : 0;
 
   target.hp = clamp(target.hp - hullDamage, 0, target.hp);
   target.sail = clamp(target.sail - sailDamage, 0, target.sail);
@@ -357,7 +386,10 @@ function resolveBroadside(
       sail: target.sail,
       crew: target.crew
     },
-    ...(rake ? { rake } : {})
+    ...(rake ? { rake } : {}),
+    // Marked only when chain shot actually fired, so flag-off (and round
+    // shot) events stay byte-identical to the legacy shape.
+    ...(chainShot ? { ammo: 'chain' as const } : {})
   };
 }
 
@@ -523,6 +555,7 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
 
   const windAware = input.modifiers?.windMovement === true;
   const ramming = input.modifiers?.ramming === true;
+  const chainShotEnabled = input.modifiers?.chainShot === true;
   const rammedPairs = new Set<string>();
   if (windAware) {
     const obstacles = input.state.obstacles ?? [];
@@ -591,7 +624,8 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
           attackerSpeed,
           rakingEnabled,
           accuracyBonus,
-          cannonDamageBonusPct(playerTier(ship, 'cannon'))
+          cannonDamageBonusPct(playerTier(ship, 'cannon')),
+          chainShotEnabled && order.ammo === 'chain'
         );
         events.push(event);
         if (statusEffects && event.type === 'broadside' && event.hit) {

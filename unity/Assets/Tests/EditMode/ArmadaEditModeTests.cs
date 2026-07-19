@@ -480,6 +480,95 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void Mission10Scenario_FingerprintMatchesBackendPinAndBootstrapMirrorsMixedBatteryOrders()
+        {
+            // Must equal EXPECTED_FINGERPRINT in tests/mission10.test.ts so the
+            // client and server pin the identical deterministic scenario.
+            const string expected =
+                "mission-10-sail-cutter|turnLimit=10|chainHull=40|chainSail=120|chainCrew=20|sailTarget=60|wind=0:4|" +
+                "enemy-clipper-a:enemy:220,35:h180:v3:hp140:sl110:cw50|" +
+                "enemy-clipper-b:enemy:220,-35:h180:v3:hp140:sl110:cw50|" +
+                "player-sloop-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
+                "player-sloop-b:player:0,-30:h0:v3:hp120:sl80:cw50";
+
+            Assert.That(Mission10Scenario.Fingerprint(), Is.EqualTo(expected));
+            Assert.That(
+                Mission10Scenario.FingerprintOf(Mission10Scenario.BuildExpectedStart(1010)),
+                Is.EqualTo(expected));
+
+            // Seed 2 and the mixed-battery orders are the deterministic win
+            // fixture pinned in tests/mission10.test.ts; the bootstrap must
+            // mirror them exactly or the runtime run stops winning.
+            Assert.That(Armada.Client.Bootstrap.Mission10Bootstrap.DefaultSeed, Is.EqualTo(2));
+
+            var turns = Armada.Client.Bootstrap.Mission10Bootstrap.BuildMixedBatteryOrders();
+            Assert.That(turns, Has.Count.EqualTo(Mission10Scenario.TurnLimit));
+
+            for (var i = 0; i < turns.Count; i++)
+            {
+                var expectedTarget = i < 5 ? Mission10Scenario.EnemyShipIds[0] : Mission10Scenario.EnemyShipIds[1];
+                var expectedAmmo = i < 3 ? "chain" : null;
+
+                Assert.That(turns[i], Has.Count.EqualTo(2));
+                for (var ship = 0; ship < 2; ship++)
+                {
+                    var order = turns[i][ship];
+                    Assert.That(order.ShipId, Is.EqualTo(Mission10Scenario.PlayerShipIds[ship]));
+                    Assert.That(order.Action, Is.EqualTo("broadside"));
+                    Assert.That(order.TargetShipId, Is.EqualTo(expectedTarget));
+                    Assert.That(order.Side, Is.EqualTo("starboard"));
+                    Assert.That(order.TurnDelta, Is.EqualTo(0));
+                    Assert.That(order.SpeedDelta, Is.EqualTo(0));
+                    Assert.That(order.Ammo, Is.EqualTo(expectedAmmo));
+                }
+            }
+
+            // Mirrors the SimEvent "broadside" variant with the chain-shot
+            // marker in docs/api/openapi.yaml so ammo readability survives
+            // Json.NET deserialization (unmapped fields drop silently).
+            const string chainJson =
+                "{\"type\":\"broadside\",\"shipId\":\"player-sloop-a\",\"targetShipId\":\"enemy-clipper-a\"," +
+                "\"side\":\"starboard\",\"hit\":true,\"roll\":68,\"hitChance\":72," +
+                "\"damage\":{\"hull\":11,\"sail\":33,\"crew\":5}," +
+                "\"targetRemaining\":{\"hp\":89,\"sail\":47,\"crew\":35},\"ammo\":\"chain\"}";
+
+            var chainEvent = JsonConvert.DeserializeObject<SimEvent>(chainJson);
+            Assert.That(chainEvent.Type, Is.EqualTo("broadside"));
+            Assert.That(chainEvent.Ammo, Is.EqualTo("chain"));
+            Assert.That(chainEvent.Hit, Is.True);
+            Assert.That(chainEvent.Damage.Hull, Is.EqualTo(11));
+            Assert.That(chainEvent.Damage.Sail, Is.EqualTo(33));
+            Assert.That(chainEvent.Damage.Crew, Is.EqualTo(5));
+            Assert.That(chainEvent.TargetRemaining.Hp, Is.EqualTo(89));
+
+            // A null ammo must be omitted on the wire so round-shot and
+            // legacy-mission order payloads stay byte-identical to the
+            // pre-chain-shot shape (SimModifiers precedent).
+            var settings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+            var roundOrder = new SimOrder
+            {
+                ShipId = "player-sloop-a",
+                Action = "broadside",
+                TargetShipId = "enemy-clipper-a",
+                Side = "starboard",
+                TurnDelta = 0,
+                SpeedDelta = 0
+            };
+            Assert.That(JsonConvert.SerializeObject(roundOrder, settings), Does.Not.Contain("ammo"));
+            var chainOrder = new SimOrder
+            {
+                ShipId = "player-sloop-a",
+                Action = "broadside",
+                TargetShipId = "enemy-clipper-a",
+                Side = "starboard",
+                TurnDelta = 0,
+                SpeedDelta = 0,
+                Ammo = "chain"
+            };
+            Assert.That(JsonConvert.SerializeObject(chainOrder, settings), Does.Contain("\"ammo\":\"chain\""));
+        }
+
+        [Test]
         public void MissionCompleteResponse_DeserializesBackendPayload()
         {
             // Mirrors the /missions/{code}/complete response contract in

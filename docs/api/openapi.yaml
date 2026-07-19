@@ -435,6 +435,9 @@ components:
         side:
           type: string
           enum: [port, starboard]
+        ammo:
+          type: string
+          enum: [round, chain]
     SimModifiers:
       type: object
       properties:
@@ -467,6 +470,8 @@ components:
         windTurnRate:
           type: boolean
         ramming:
+          type: boolean
+        chainShot:
           type: boolean
     ShipUpgradeTiers:
       type: object
@@ -545,6 +550,9 @@ components:
             rake:
               type: string
               enum: [bow, stern]
+            ammo:
+              type: string
+              enum: [chain]
         - type: object
           required:
             [type, shipId, targetShipId, success, roll, crewLoss, targetCrewLoss, targetRemaining]
@@ -1556,6 +1564,127 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MissionTurnRecord'
+    Mission10StartRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+          minimum: 0
+          default: 1010
+    Mission10Objectives:
+      type: object
+      required: [turnLimit, chainHullPercent, chainSailPercent, chainCrewPercent, chainSailTarget]
+      properties:
+        turnLimit:
+          type: integer
+        chainHullPercent:
+          type: integer
+        chainSailPercent:
+          type: integer
+        chainCrewPercent:
+          type: integer
+        chainSailTarget:
+          type: integer
+    Mission10StartResponse:
+      type: object
+      required: [missionCode, seed, turnLimit, objectives, state]
+      properties:
+        missionCode:
+          type: string
+          example: mission-10-sail-cutter
+        seed:
+          type: integer
+        turnLimit:
+          type: integer
+        objectives:
+          $ref: '#/components/schemas/Mission10Objectives'
+        state:
+          $ref: '#/components/schemas/SimState'
+    Mission10ResolveRequest:
+      type: object
+      required: [seed, turns]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turns:
+          type: array
+          maxItems: 10
+          items:
+            type: array
+            maxItems: 4
+            items:
+              $ref: '#/components/schemas/SimOrder'
+    Mission10BonusObjectives:
+      type: object
+      required: [sailShredder, mixedBattery]
+      properties:
+        sailShredder:
+          type: boolean
+        mixedBattery:
+          type: boolean
+    Mission10DamageProfile:
+      type: object
+      required:
+        [playerHullDamage, playerHullDamageFraction, playerRemainingHp, enemyHullDamage, enemyRemainingHp]
+      properties:
+        playerHullDamage:
+          type: integer
+        playerHullDamageFraction:
+          type: number
+        playerRemainingHp:
+          type: integer
+        enemyHullDamage:
+          type: integer
+        enemyRemainingHp:
+          type: integer
+    Mission10Telemetry:
+      type: object
+      required: [chainShotOrders, chainShotHits, roundShotHits, chainSailDamageDealt]
+      properties:
+        chainShotOrders:
+          type: integer
+        chainShotHits:
+          type: integer
+        roundShotHits:
+          type: integer
+        chainSailDamageDealt:
+          type: integer
+    Mission10Outcome:
+      type: object
+      required:
+        [missionCode, seed, result, failReason, turnCount, turnLimit, bonusObjectives, damageProfile, telemetry, turns]
+      properties:
+        missionCode:
+          type: string
+          example: mission-10-sail-cutter
+        seed:
+          type: integer
+        result:
+          type: string
+          enum: [win, loss]
+        failReason:
+          type: string
+          enum: [timeout, sunk, flanked]
+          nullable: true
+        turnCount:
+          type: integer
+        turnLimit:
+          type: integer
+        bonusObjectives:
+          $ref: '#/components/schemas/Mission10BonusObjectives'
+        damageProfile:
+          $ref: '#/components/schemas/Mission10DamageProfile'
+        telemetry:
+          $ref: '#/components/schemas/Mission10Telemetry'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
     ConfigSnapshot:
       type: object
       properties:
@@ -2471,6 +2600,82 @@ paths:
                 properties:
                   outcome:
                     $ref: '#/components/schemas/Mission09Outcome'
+        '400':
+          description: Bad request (validation, non-player ship, or invalid target)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-10-sail-cutter/start:
+    post:
+      summary: Start the deterministic Mission 10 "Sail-Cutter" scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission10StartRequest'
+      responses:
+        '200':
+          description: Scenario payload for the given seed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission10StartResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-10-sail-cutter/resolve:
+    post:
+      summary: Resolve a Mission 10 run from per-turn player orders (chain shot active)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission10ResolveRequest'
+      responses:
+        '200':
+          description: Deterministic mission outcome with ammo telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome:
+                    $ref: '#/components/schemas/Mission10Outcome'
         '400':
           description: Bad request (validation, non-player ship, or invalid target)
           content:
