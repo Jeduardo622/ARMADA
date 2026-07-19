@@ -34,11 +34,27 @@ namespace Armada.Client.Bootstrap
         [Header("Run")]
         [SerializeField] private int seed = DefaultSeed;
 
-        private async void Start()
+        private AuthService _authService;
+        private Mission07Flow _flow;
+
+        // Composition happens in Awake so the wired [SerializeField] services
+        // are in place before any MissionUIController.Start can run its first
+        // refresh; Unity does not guarantee sibling Start ordering.
+        private void Awake()
         {
             if (clientConfig == null)
             {
                 Debug.LogError("[Mission07Bootstrap] Missing client config asset.");
+                return;
+            }
+
+            // ArmadaBootstrap already composes an authenticated service
+            // graph. A second graph would open a second guest session with a
+            // different player and race it for the same UI wiring, so the
+            // two bootstraps must not run together.
+            if (FindFirstObjectByType<ArmadaBootstrap>() != null)
+            {
+                Debug.LogError("[Mission07Bootstrap] ArmadaBootstrap is active in the scene; refusing to compose a second authenticated service graph.");
                 return;
             }
 
@@ -53,12 +69,22 @@ namespace Armada.Client.Bootstrap
 
             var missionService = new MissionService(apiClient, flags);
             var upgradesService = new UpgradesService(apiClient, flags);
-            var flow = new Mission07Flow(missionService, determinism, upgradesService, missionService);
+
+            _authService = authService;
+            _flow = new Mission07Flow(missionService, determinism, upgradesService, missionService);
 
             WireUI(missionService, authService);
+        }
 
-            await authService.GetTokenAsync();
-            await DriveAsync(flow, missionUI, seed, BuildGunneryOrders());
+        private async void Start()
+        {
+            if (_flow == null)
+            {
+                return;
+            }
+
+            await _authService.GetTokenAsync();
+            await DriveAsync(_flow, missionUI, seed, BuildGunneryOrders());
         }
 
         /// <summary>
