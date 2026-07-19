@@ -464,6 +464,8 @@ components:
           type: boolean
         shipUpgrades:
           type: boolean
+        windTurnRate:
+          type: boolean
     ShipUpgradeTiers:
       type: object
       properties:
@@ -1283,6 +1285,123 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MissionTurnRecord'
+    Mission08StartRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+          minimum: 0
+          default: 808
+    Mission08Objectives:
+      type: object
+      required: [turnLimit, upwindTurnLimit, downwindTurnLimit, swiftTurnTarget]
+      properties:
+        turnLimit:
+          type: integer
+        upwindTurnLimit:
+          type: integer
+        downwindTurnLimit:
+          type: integer
+        swiftTurnTarget:
+          type: integer
+    Mission08StartResponse:
+      type: object
+      required: [missionCode, seed, turnLimit, objectives, state]
+      properties:
+        missionCode:
+          type: string
+          example: mission-08-eye-of-the-wind
+        seed:
+          type: integer
+        turnLimit:
+          type: integer
+        objectives:
+          $ref: '#/components/schemas/Mission08Objectives'
+        state:
+          $ref: '#/components/schemas/SimState'
+    Mission08ResolveRequest:
+      type: object
+      required: [seed, turns]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+          default: 1
+        seed:
+          type: integer
+          minimum: 0
+        turns:
+          type: array
+          maxItems: 10
+          items:
+            type: array
+            maxItems: 4
+            items:
+              $ref: '#/components/schemas/SimOrder'
+    Mission08BonusObjectives:
+      type: object
+      required: [cleanTack, swiftVictory]
+      properties:
+        cleanTack:
+          type: boolean
+        swiftVictory:
+          type: boolean
+    Mission08DamageProfile:
+      type: object
+      required:
+        [playerHullDamage, playerHullDamageFraction, playerRemainingHp, enemyHullDamage, enemyRemainingHp]
+      properties:
+        playerHullDamage:
+          type: integer
+        playerHullDamageFraction:
+          type: number
+        playerRemainingHp:
+          type: integer
+        enemyHullDamage:
+          type: integer
+        enemyRemainingHp:
+          type: integer
+    Mission08Telemetry:
+      type: object
+      required: [clampedManeuvers, upwindManeuvers, downwindManeuvers]
+      properties:
+        clampedManeuvers:
+          type: integer
+        upwindManeuvers:
+          type: integer
+        downwindManeuvers:
+          type: integer
+    Mission08Outcome:
+      type: object
+      required:
+        [missionCode, seed, result, failReason, turnCount, turnLimit, bonusObjectives, damageProfile, telemetry, turns]
+      properties:
+        missionCode:
+          type: string
+          example: mission-08-eye-of-the-wind
+        seed:
+          type: integer
+        result:
+          type: string
+          enum: [win, loss]
+        failReason:
+          type: string
+          enum: [timeout, sunk, flanked]
+          nullable: true
+        turnCount:
+          type: integer
+        turnLimit:
+          type: integer
+        bonusObjectives:
+          $ref: '#/components/schemas/Mission08BonusObjectives'
+        damageProfile:
+          $ref: '#/components/schemas/Mission08DamageProfile'
+        telemetry:
+          $ref: '#/components/schemas/Mission08Telemetry'
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
     ConfigSnapshot:
       type: object
       properties:
@@ -2046,6 +2165,82 @@ paths:
                 properties:
                   outcome:
                     $ref: '#/components/schemas/Mission07Outcome'
+        '400':
+          description: Bad request (validation, non-player ship, or invalid target)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-08-eye-of-the-wind/start:
+    post:
+      summary: Start the deterministic Mission 08 "Eye of the Wind" scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission08StartRequest'
+      responses:
+        '200':
+          description: Scenario payload for the given seed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission08StartResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-08-eye-of-the-wind/resolve:
+    post:
+      summary: Resolve a Mission 08 run from per-turn player orders (wind turn-rate active)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mission08ResolveRequest'
+      responses:
+        '200':
+          description: Deterministic mission outcome with clamped-maneuver telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome:
+                    $ref: '#/components/schemas/Mission08Outcome'
         '400':
           description: Bad request (validation, non-player ship, or invalid target)
           content:

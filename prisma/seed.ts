@@ -24,6 +24,11 @@ const missionSeeds = [
     code: 'mission-07-burning-seas',
     name: 'Burning Seas',
     description: 'Status effects: fire and slow'
+  },
+  {
+    code: 'mission-08-eye-of-the-wind',
+    name: 'Eye of the Wind',
+    description: 'Wind turn-rate tactics'
   }
 ];
 

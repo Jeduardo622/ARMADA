@@ -1,6 +1,6 @@
-import { FIRE_DURATION_TURNS, SLOW_DURATION_TURNS } from './engine.js';
+import { FIRE_DURATION_TURNS, SLOW_DURATION_TURNS, pointOfSail } from './engine.js';
 import { MissionTurnRecord } from './missionRunner.js';
-import { SimEvent, SimState, Vector2, Wind } from './types.js';
+import { SimEvent, SimOrder, SimState, Vector2, Wind } from './types.js';
 
 // Mission-generic outcome metrics shared by mission scenarios: positional
 // geometry, weather-gage detection, flanked classification, and rake counts.
@@ -142,6 +142,55 @@ export function countStatusApplications(
     }
   }
   return { ignitions: ignitions.size, slows: slows.size };
+}
+
+export interface ManeuverWindCounts {
+  clampedManeuvers: number;
+  upwindManeuvers: number;
+  downwindManeuvers: number;
+}
+
+// Wind profile of the given ships' maneuvers: how many were clamped below
+// the ordered turn (a turn-rate limit bit) and how many executed on an
+// upwind versus downwind point of sail. The pre-maneuver heading is
+// reconstructed from the event (heading minus applied turnDelta) and judged
+// against the wind the loop supplied for that turn.
+export function countManeuverWindProfile(
+  turns: MissionTurnRecord[],
+  playerTurnOrders: SimOrder[][],
+  shipIds: readonly string[],
+  windForTurn: (turn: number) => Wind
+): ManeuverWindCounts {
+  let clampedManeuvers = 0;
+  let upwindManeuvers = 0;
+  let downwindManeuvers = 0;
+  for (const turn of turns) {
+    // Last order per ship wins, mirroring how resolveSimPreview builds its
+    // orderByShip map, so duplicate-order turns compare against the order
+    // that actually executed.
+    const requestedByShip = new Map<string, number>();
+    for (const order of playerTurnOrders[turn.turn - 1] ?? []) {
+      requestedByShip.set(order.shipId, order.turnDelta ?? 0);
+    }
+    const wind = windForTurn(turn.turn);
+    for (const event of turn.events) {
+      if (event.type !== 'maneuver' || !shipIds.includes(event.shipId)) {
+        continue;
+      }
+      const requested = requestedByShip.get(event.shipId) ?? 0;
+      if (event.turnDelta !== requested) {
+        clampedManeuvers += 1;
+      }
+      const headingBefore = (((event.heading - event.turnDelta) % 360) + 360) % 360;
+      const sail = pointOfSail(headingBefore, wind);
+      if (sail === 'upwind') {
+        upwindManeuvers += 1;
+      } else if (sail === 'downwind') {
+        downwindManeuvers += 1;
+      }
+    }
+  }
+  return { clampedManeuvers, upwindManeuvers, downwindManeuvers };
 }
 
 export function countRakes(turns: MissionTurnRecord[], shipIds: readonly string[]): RakeCounts {
