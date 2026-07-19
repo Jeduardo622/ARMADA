@@ -193,6 +193,43 @@ export function countManeuverWindProfile(
   return { clampedManeuvers, upwindManeuvers, downwindManeuvers };
 }
 
+export interface RamProfileCounts {
+  ramsInflicted: number;
+  ramsSuffered: number;
+  ramHullDamageDealt: number;
+  ramHullDamageTaken: number;
+}
+
+// Ram profile of the given ships: rams they initiated (hull damage dealt to
+// the enemy plus the recoil their own bows absorbed) versus rams an enemy
+// drove into them. Enemy recoil is self-inflicted and never counts as
+// damage dealt.
+export function countRamProfile(
+  turns: MissionTurnRecord[],
+  shipIds: readonly string[]
+): RamProfileCounts {
+  let ramsInflicted = 0;
+  let ramsSuffered = 0;
+  let ramHullDamageDealt = 0;
+  let ramHullDamageTaken = 0;
+  for (const turn of turns) {
+    for (const event of turn.events) {
+      if (event.type !== 'ram') {
+        continue;
+      }
+      if (shipIds.includes(event.shipId)) {
+        ramsInflicted += 1;
+        ramHullDamageDealt += event.hullDamage;
+        ramHullDamageTaken += event.selfHullDamage;
+      } else if (shipIds.includes(event.targetShipId)) {
+        ramsSuffered += 1;
+        ramHullDamageTaken += event.hullDamage;
+      }
+    }
+  }
+  return { ramsInflicted, ramsSuffered, ramHullDamageDealt, ramHullDamageTaken };
+}
+
 export function countRakes(turns: MissionTurnRecord[], shipIds: readonly string[]): RakeCounts {
   let rakeAttempts = 0;
   let rakeHits = 0;

@@ -659,6 +659,121 @@ namespace Armada.Client.Tests.PlayMode
             }
         }
 
+        private sealed class FakeMission09Client : IMission09Client
+        {
+            public Mission01ResolveRequest LastResolveRequest;
+
+            public Task<ServiceResult<Mission09StartResponse>> StartMission09Async(int seed)
+            {
+                return Task.FromResult(new ServiceResult<Mission09StartResponse>
+                {
+                    Data = Mission09Scenario.BuildExpectedStart(seed),
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<Mission09Outcome>> ResolveMission09Async(Mission01ResolveRequest request)
+            {
+                LastResolveRequest = request;
+                // Mirrors the seed-87 double-ram outcome pinned in
+                // tests/mission09.test.ts.
+                return Task.FromResult(new ServiceResult<Mission09Outcome>
+                {
+                    Data = new Mission09Outcome
+                    {
+                        MissionCode = Mission09Scenario.MissionCode,
+                        Seed = request.Seed,
+                        Result = "win",
+                        FailReason = null,
+                        TurnCount = 7,
+                        TurnLimit = Mission09Scenario.TurnLimit,
+                        BonusObjectives = new Mission09BonusObjectives
+                        {
+                            HullBreaker = true,
+                            Unrammed = true
+                        },
+                        Telemetry = new Mission09Telemetry
+                        {
+                            RamsInflicted = 2,
+                            RamsSuffered = 0,
+                            RamHullDamageDealt = 92,
+                            RamHullDamageTaken = 46
+                        }
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Mission09Bootstrap_DrivesRunAndCompletesWinThroughMissionUI()
+        {
+            var missionClient = new FakeMission09Client();
+            var completionClient = new FakeMissionCompletionClient();
+            var flow = new Mission09Flow(missionClient, null, completionClient);
+
+            // Inactive so MissionUIController.Start never fires a network
+            // refresh; CompleteMission09 is a plain method call and does not
+            // need the component to be active.
+            var gameObject = new GameObject("mission09-bootstrap-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var missionUI = gameObject.AddComponent<MissionUIController>();
+
+                // Wire the plain-class [SerializeField] auth dependency the
+                // same way the bootstrap composition roots do (reflection),
+                // with a pre-authed state so CurrentPlayer resolves offline.
+                var authService = new AuthService(null, null);
+                typeof(AuthService)
+                    .GetField("_state", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(authService, new AuthState
+                    {
+                        Token = "test-token",
+                        Player = new Player { Id = "11111111-1111-1111-1111-111111111111" }
+                    });
+                typeof(MissionUIController)
+                    .GetField("authService", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(missionUI, authService);
+
+                var drive = Mission09Bootstrap.DriveAsync(
+                    flow,
+                    missionUI,
+                    Mission09Bootstrap.DefaultSeed,
+                    Mission09Bootstrap.BuildRammingOrders());
+                while (!drive.IsCompleted)
+                {
+                    yield return null;
+                }
+
+                Assert.That(drive.Result.Success, Is.True, drive.Result.FailureReason);
+                Assert.That(drive.Result.Outcome.Result, Is.EqualTo("win"));
+
+                // CompleteMission09 is async void; with fake clients it
+                // finishes within a few frames.
+                for (var frame = 0; completionClient.LastRequest == null && frame < 120; frame++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(completionClient.LastCode, Is.EqualTo(Mission09Scenario.MissionCode));
+                Assert.That(completionClient.LastRequest.PlayerId, Is.EqualTo("11111111-1111-1111-1111-111111111111"));
+                Assert.That(completionClient.LastRequest.Seed, Is.EqualTo(Mission09Bootstrap.DefaultSeed));
+                // The completion proof must re-send the exact snapshotted
+                // turns the run was resolved with; the mission carries no
+                // upgrade tiers, so the request must omit them entirely.
+                Assert.That(completionClient.LastRequest.Turns, Is.SameAs(missionClient.LastResolveRequest.Turns));
+                Assert.That(missionClient.LastResolveRequest.Upgrades, Is.Null);
+                Assert.That(completionClient.LastRequest.Upgrades, Is.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+
         [UnityTest]
         public IEnumerator UpgradesFlow_PurchasesNextSequentialTier()
         {

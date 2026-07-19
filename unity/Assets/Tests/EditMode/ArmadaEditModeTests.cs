@@ -415,6 +415,71 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void Mission09Scenario_FingerprintMatchesBackendPinAndBootstrapMirrorsRammingOrders()
+        {
+            // Must equal EXPECTED_FINGERPRINT in tests/mission09.test.ts so the
+            // client and server pin the identical deterministic scenario.
+            const string expected =
+                "mission-09-iron-bow|turnLimit=10|ramRange=25|ramTarget=2|wind=0:4|" +
+                "enemy-brig-a:enemy:220,35:h180:v3:hp160:sl85:cw55|" +
+                "enemy-brig-b:enemy:220,-35:h180:v3:hp160:sl85:cw55|" +
+                "player-sloop-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
+                "player-sloop-b:player:0,-30:h0:v3:hp120:sl80:cw50";
+
+            Assert.That(Mission09Scenario.Fingerprint(), Is.EqualTo(expected));
+            Assert.That(
+                Mission09Scenario.FingerprintOf(Mission09Scenario.BuildExpectedStart(909)),
+                Is.EqualTo(expected));
+
+            // Seed 87 and the ramming orders are the deterministic win fixture
+            // pinned in tests/mission09.test.ts; the bootstrap must mirror
+            // them exactly or the runtime run stops winning.
+            Assert.That(Armada.Client.Bootstrap.Mission09Bootstrap.DefaultSeed, Is.EqualTo(87));
+
+            var turns = Armada.Client.Bootstrap.Mission09Bootstrap.BuildRammingOrders();
+            Assert.That(turns, Has.Count.EqualTo(Mission09Scenario.TurnLimit));
+
+            for (var i = 0; i < turns.Count; i++)
+            {
+                var expectedTarget = i < 5 ? Mission09Scenario.EnemyShipIds[0] : Mission09Scenario.EnemyShipIds[1];
+                var expectedSpeedDelta = i < 2 ? 2 : 0;
+
+                Assert.That(turns[i], Has.Count.EqualTo(2));
+                for (var ship = 0; ship < 2; ship++)
+                {
+                    var order = turns[i][ship];
+                    Assert.That(order.ShipId, Is.EqualTo(Mission09Scenario.PlayerShipIds[ship]));
+                    Assert.That(order.Action, Is.EqualTo("broadside"));
+                    Assert.That(order.TargetShipId, Is.EqualTo(expectedTarget));
+                    Assert.That(order.Side, Is.EqualTo("starboard"));
+                    Assert.That(order.TurnDelta, Is.EqualTo(0));
+                    Assert.That(order.SpeedDelta, Is.EqualTo(expectedSpeedDelta));
+                }
+            }
+
+            // Mirrors the SimEvent "ram" variant in docs/api/openapi.yaml so
+            // per-ram damage stays readable client-side (hullDamage vs
+            // selfHullDamage plus both remaining blocks).
+            const string ramJson =
+                "{\"type\":\"ram\",\"shipId\":\"player-sloop-a\",\"targetShipId\":\"enemy-brig-a\"," +
+                "\"effectiveSpeed\":9,\"hullDamage\":46,\"selfHullDamage\":23," +
+                "\"targetRemaining\":{\"hp\":114,\"sail\":85,\"crew\":55}," +
+                "\"rammerRemaining\":{\"hp\":97,\"sail\":80,\"crew\":50}}";
+
+            var ramEvent = JsonConvert.DeserializeObject<SimEvent>(ramJson);
+            Assert.That(ramEvent.Type, Is.EqualTo("ram"));
+            Assert.That(ramEvent.ShipId, Is.EqualTo("player-sloop-a"));
+            Assert.That(ramEvent.TargetShipId, Is.EqualTo("enemy-brig-a"));
+            Assert.That(ramEvent.EffectiveSpeed, Is.EqualTo(9));
+            Assert.That(ramEvent.HullDamage, Is.EqualTo(46));
+            Assert.That(ramEvent.SelfHullDamage, Is.EqualTo(23));
+            Assert.That(ramEvent.TargetRemaining.Hp, Is.EqualTo(114));
+            Assert.That(ramEvent.RammerRemaining.Hp, Is.EqualTo(97));
+            Assert.That(ramEvent.RammerRemaining.Sail, Is.EqualTo(80));
+            Assert.That(ramEvent.RammerRemaining.Crew, Is.EqualTo(50));
+        }
+
+        [Test]
         public void MissionCompleteResponse_DeserializesBackendPayload()
         {
             // Mirrors the /missions/{code}/complete response contract in

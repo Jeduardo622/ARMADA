@@ -74,6 +74,15 @@ import {
   runMission08
 } from '../sim/mission08.js';
 import {
+  MISSION_09_CODE,
+  MISSION_09_DEFAULT_SEED,
+  MISSION_09_ENEMY_SHIP_IDS,
+  MISSION_09_PLAYER_SHIP_IDS,
+  MISSION_09_TURN_LIMIT,
+  mission09StartResponse,
+  runMission09
+} from '../sim/mission09.js';
+import {
   shipUpgradeTiersSchema,
   simOrderSchema,
   type ShipUpgradeTiers,
@@ -226,6 +235,20 @@ const mission08ResolveSchema = z
   })
   .strict();
 
+const mission09StartSchema = z
+  .object({
+    seed: z.number().int().nonnegative().default(MISSION_09_DEFAULT_SEED)
+  })
+  .strict();
+
+const mission09ResolveSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+    seed: z.number().int().nonnegative(),
+    turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_09_TURN_LIMIT)
+  })
+  .strict();
+
 const missionWinProofConfigs: Record<string, MissionWinProofConfig> = {
   [MISSION_01_CODE]: {
     run: runMission01,
@@ -282,6 +305,15 @@ const missionWinProofConfigs: Record<string, MissionWinProofConfig> = {
     enemyShipIds: new Set(MISSION_08_ENEMY_SHIP_IDS),
     allowBoarding: true,
     // runMission08 never passes modifiers.shipUpgrades, so proofs must not
+    // carry upgrade tiers.
+    supportsUpgrades: false
+  },
+  [MISSION_09_CODE]: {
+    run: runMission09,
+    playerShipIds: new Set(MISSION_09_PLAYER_SHIP_IDS),
+    enemyShipIds: new Set(MISSION_09_ENEMY_SHIP_IDS),
+    allowBoarding: true,
+    // runMission09 never passes modifiers.shipUpgrades, so proofs must not
     // carry upgrade tiers.
     supportsUpgrades: false
   }
@@ -815,6 +847,71 @@ export function registerMissionRoutes(app: FastifyInstance) {
         requestId: request.id
       },
       'mission08_resolved'
+    );
+
+    return { outcome };
+  });
+
+  app.post('/missions/mission-09-iron-bow/start', async (request, reply) => {
+    if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_09_CODE }))) {
+      return;
+    }
+
+    const parsed = mission09StartSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.format() });
+    }
+
+    return mission09StartResponse(parsed.data.seed);
+  });
+
+  app.post('/missions/mission-09-iron-bow/resolve', async (request, reply) => {
+    if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_09_CODE }))) {
+      return;
+    }
+
+    const parsed = mission09ResolveSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.format() });
+    }
+
+    if (!validateJsonLimit(reply, parsed.data.turns)) {
+      return;
+    }
+
+    const playerShipIds = new Set<string>(MISSION_09_PLAYER_SHIP_IDS);
+    const enemyShipIds = new Set<string>(MISSION_09_ENEMY_SHIP_IDS);
+    for (const turnOrders of parsed.data.turns) {
+      for (const order of turnOrders) {
+        if (!playerShipIds.has(order.shipId)) {
+          return reply.status(400).send({ error: 'invalid_order_ship', shipId: order.shipId });
+        }
+        if (order.targetShipId && !enemyShipIds.has(order.targetShipId)) {
+          return reply
+            .status(400)
+            .send({ error: 'unknown_target_in_order', shipId: order.targetShipId });
+        }
+      }
+    }
+
+    const outcome = runMission09(parsed.data.seed, parsed.data.turns);
+
+    request.log.info(
+      {
+        actor: request.user?.id,
+        missionCode: MISSION_09_CODE,
+        result: outcome.result,
+        failReason: outcome.failReason,
+        turnCount: outcome.turnCount,
+        damageProfile: outcome.damageProfile,
+        bonusObjectives: outcome.bonusObjectives,
+        ramsInflicted: outcome.telemetry.ramsInflicted,
+        ramsSuffered: outcome.telemetry.ramsSuffered,
+        ramHullDamageDealt: outcome.telemetry.ramHullDamageDealt,
+        ramHullDamageTaken: outcome.telemetry.ramHullDamageTaken,
+        requestId: request.id
+      },
+      'mission09_resolved'
     );
 
     return { outcome };

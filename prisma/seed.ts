@@ -29,7 +29,8 @@ const missionSeeds = [
     code: 'mission-08-eye-of-the-wind',
     name: 'Eye of the Wind',
     description: 'Wind turn-rate tactics'
-  }
+  },
+  { code: 'mission-09-iron-bow', name: 'Iron Bow', description: 'Ramming tactics' }
 ];
 
 // Short codes seeded before the runtime slugs were finalized. Renamed in
