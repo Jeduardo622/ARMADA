@@ -161,6 +161,27 @@ describe('ramming modifier', () => {
     });
   });
 
+  it('mirrors fire-tick burns so an overkill ram after a tick is not overcounted', () => {
+    // ship-a starts burning at 20 hp: the start-of-turn fire tick burns it
+    // to 15 without any remaining block, then enemy-b's nominal 18-point
+    // ram sinks it. The tracker must charge the ram only the 15 hull the
+    // tick left behind — not the stale-tracked 18.
+    const state = closingState(15, 0, 2);
+    state.ships[0].hp = 20;
+    state.ships[0].status = { onFire: true, fireTurnsRemaining: 2 };
+    const result = preview(state, { ramming: true, statusEffects: true });
+    const ram = result.events.find((event) => event.type === 'ram');
+    expect(ram).toMatchObject({ hullDamage: 18, targetRemaining: { hp: 0 } });
+
+    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events }];
+    expect(countRamProfile(turns, ['ship-a'], state)).toEqual({
+      ramsInflicted: 0,
+      ramsSuffered: 1,
+      ramHullDamageDealt: 0,
+      ramHullDamageTaken: 15
+    });
+  });
+
   it('never rams from a standstill but a moving enemy can strike a stationary hull', () => {
     // Both becalmed inside contact range: proximity alone is not a ram.
     const becalmed = preview(closingState(10, 0, 0), { ramming: true });
