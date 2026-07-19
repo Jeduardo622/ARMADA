@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_UPGRADE_TIER } from '../economy/upgrades.js';
 
 export const vectorSchema = z
   .object({
@@ -115,7 +116,22 @@ export const simModifiersSchema = z
     // Opt-in status effects: fire deals per-turn hull damage plus an accuracy
     // penalty; slow reduces speed and turn rate. Absent or false keeps the
     // legacy rules and never mutates ship status.
-    statusEffects: z.boolean().optional()
+    statusEffects: z.boolean().optional(),
+    // Opt-in ship upgrades: the request-level upgrades block scales
+    // player-side ship stats (cannon → broadside damage, sail → speed/turn,
+    // hull → hp). Absent or false ignores the upgrades block entirely.
+    shipUpgrades: z.boolean().optional()
+  })
+  .strict();
+
+// Owned upgrade tiers supplied by the client for preview purposes. Tier
+// authenticity against actually-owned upgrades is enforced at mission
+// win-proof time, not here.
+export const shipUpgradeTiersSchema = z
+  .object({
+    cannon: z.number().int().min(0).max(MAX_UPGRADE_TIER).default(0),
+    sail: z.number().int().min(0).max(MAX_UPGRADE_TIER).default(0),
+    hull: z.number().int().min(0).max(MAX_UPGRADE_TIER).default(0)
   })
   .strict();
 
@@ -126,11 +142,14 @@ export const simPreviewSchema = z
     turn: z.number().int().min(1).default(1),
     state: simStateSchema,
     orders: z.array(simOrderSchema).max(32),
-    modifiers: simModifiersSchema.optional()
+    modifiers: simModifiersSchema.optional(),
+    // Only read when modifiers.shipUpgrades is true.
+    upgrades: shipUpgradeTiersSchema.optional()
   })
   .strict();
 
 export type SimModifiers = z.infer<typeof simModifiersSchema>;
+export type ShipUpgradeTiers = z.infer<typeof shipUpgradeTiersSchema>;
 export type Obstacle = z.infer<typeof obstacleSchema>;
 export type SlowZone = z.infer<typeof slowZoneSchema>;
 export type Vector2 = z.infer<typeof vectorSchema>;

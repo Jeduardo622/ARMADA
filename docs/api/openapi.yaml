@@ -455,6 +455,26 @@ components:
             maximum: 50
         statusEffects:
           type: boolean
+        shipUpgrades:
+          type: boolean
+    ShipUpgradeTiers:
+      type: object
+      properties:
+        cannon:
+          type: integer
+          minimum: 0
+          maximum: 3
+          default: 0
+        sail:
+          type: integer
+          minimum: 0
+          maximum: 3
+          default: 0
+        hull:
+          type: integer
+          minimum: 0
+          maximum: 3
+          default: 0
     SimEvent:
       oneOf:
         - type: object
@@ -604,6 +624,8 @@ components:
             $ref: '#/components/schemas/SimOrder'
         modifiers:
           $ref: '#/components/schemas/SimModifiers'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
     SimPreviewResult:
       type: object
       required: [turn, nextState, events, summary, hash]
