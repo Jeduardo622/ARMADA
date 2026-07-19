@@ -230,6 +230,71 @@ export function countRamProfile(
   return { ramsInflicted, ramsSuffered, ramHullDamageDealt, ramHullDamageTaken };
 }
 
+export interface AmmoProfileCounts {
+  chainShotOrders: number;
+  chainShotHits: number;
+  roundShotHits: number;
+  chainSailDamageDealt: number;
+}
+
+// Ammo profile of the given ships' broadsides: chain-shot orders issued,
+// hits landed by ammo type, and sail damage dealt by chain shot. Orders are
+// deduplicated last-order-wins per ship, mirroring how resolveSimPreview
+// builds its orderByShip map, so duplicate-order turns count the order that
+// actually executed. Broadside events carry ammo only when chain shot
+// actually fired, so absence means round shot. Sail damage counts what was
+// actually applied — event.damage.sail is the nominal roll and overstates
+// the loss when the engine clamps a shredded target at zero — derived from
+// per-target targetRemaining.sail deltas seeded from the initial state
+// (sail only ever changes through broadsides; ships absent from the initial
+// state fall back to the nominal value).
+export function countAmmoProfile(
+  turns: MissionTurnRecord[],
+  playerTurnOrders: SimOrder[][],
+  shipIds: readonly string[],
+  initialState: SimState
+): AmmoProfileCounts {
+  let chainShotOrders = 0;
+  let chainShotHits = 0;
+  let roundShotHits = 0;
+  let chainSailDamageDealt = 0;
+  const sailByShip = new Map(initialState.ships.map((ship) => [ship.id, ship.sail]));
+  for (const turn of turns) {
+    const lastOrderByShip = new Map<string, SimOrder>();
+    for (const order of playerTurnOrders[turn.turn - 1] ?? []) {
+      if (shipIds.includes(order.shipId)) {
+        lastOrderByShip.set(order.shipId, order);
+      }
+    }
+    for (const order of lastOrderByShip.values()) {
+      if (order.action === 'broadside' && order.ammo === 'chain') {
+        chainShotOrders += 1;
+      }
+    }
+    for (const event of turn.events) {
+      if (event.type !== 'broadside') {
+        continue;
+      }
+      const sailBefore = sailByShip.get(event.targetShipId);
+      const appliedSailDamage =
+        sailBefore === undefined ? event.damage.sail : sailBefore - event.targetRemaining.sail;
+      sailByShip.set(event.targetShipId, event.targetRemaining.sail);
+      if (!shipIds.includes(event.shipId)) {
+        continue;
+      }
+      if (event.ammo === 'chain') {
+        if (event.hit) {
+          chainShotHits += 1;
+        }
+        chainSailDamageDealt += appliedSailDamage;
+      } else if (event.hit) {
+        roundShotHits += 1;
+      }
+    }
+  }
+  return { chainShotOrders, chainShotHits, roundShotHits, chainSailDamageDealt };
+}
+
 export function countRakes(turns: MissionTurnRecord[], shipIds: readonly string[]): RakeCounts {
   let rakeAttempts = 0;
   let rakeHits = 0;

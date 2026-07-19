@@ -1,0 +1,10 @@
+# Mission 10: Sail-Cutter
+- Narrative beat: Introduce the ammunition choice — ball sinks ships, chain cuts the wings they fly on; a gunner who cannot pick the right load loses the race before the fight.
+- Objectives: Win; bonus—sail shredder (win with at least 60 sail damage dealt by chain shot); bonus—mixed battery (win landing at least one chain-shot hit and one round-shot hit).
+- Enemy setup: 2x tall-rigged clippers (AI: aggressive) in line abreast beating upwind at the player; their broadside weight rides on that sail area, so chain shot into the rigging blunts their guns while round shot sinks them.
+- Player constraints: Boarding enabled; turn limit 10; no upgrade tiers on this mission; ammo is selected per broadside order (`ammo: 'chain'` — absent or `'round'` keeps the legacy load).
+- Environment: Dead-astern tailwind for the player's opening heading (wind 0, speed 4, medium variance); no terrain — the duel is gunnery and load selection at bow-rake geometry.
+- Rewards: Gold, timber, cosmetic token.
+- Tuning knobs: Chain shot redistributes the same scaled shot weight — hull 40%, sail 120%, crew 20% (engine placeholders pending balance pass); the split applies after rake and cannon-tier scaling; the ammo choice is rng-free so the roll stream is untouched; chain sail target 60 (placeholder); AI clippers carry only ball; enemies-win-by-timeout stays the loss condition (knob open).
+- Telemetry: Chain-shot orders issued (last order per ship wins); chain/round hits landed; chain sail damage dealt as applied loss (nominal rolls clamped at a shredded target's zero sail do not inflate the count); fail reasons; turn count.
+- QA notes: Ammo readability from broadside events (`ammo: 'chain'` present only when chain actually fired); verify bonuses are win-gated; the `ammo` order key must stay optional-absent-by-default and inert without `modifiers.chainShot`; flag-off runs must keep mission 01-09 hashes byte-identical; draft spec authored with the slice, pending design review.

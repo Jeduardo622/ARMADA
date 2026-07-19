@@ -254,6 +254,11 @@ namespace Armada.Client.Core
         public int TurnDelta { get; set; }
         public int SpeedDelta { get; set; }
         public string Side { get; set; }
+        // Optional per-order ammo selection ("round"/"chain"), only read by
+        // the server when modifiers.chainShot is on. Null is omitted so
+        // legacy order payloads stay byte-identical.
+        [JsonProperty("ammo", NullValueHandling = NullValueHandling.Ignore)]
+        public string Ammo { get; set; }
     }
 
     [Serializable]
@@ -297,6 +302,9 @@ namespace Armada.Client.Core
         public int? HullDamage { get; set; }
         public int? SelfHullDamage { get; set; }
         public SimRemaining RammerRemaining { get; set; }
+        // Broadside chain-shot marker (docs/api/openapi.yaml SimEvent
+        // "broadside" variant): present only when chain shot actually fired.
+        public string Ammo { get; set; }
     }
 
     [Serializable]
@@ -931,6 +939,66 @@ namespace Armada.Client.Core
     public sealed class Mission09ResolveEnvelope
     {
         public Mission09Outcome Outcome { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission10Objectives
+    {
+        public int TurnLimit { get; set; }
+        public int ChainHullPercent { get; set; }
+        public int ChainSailPercent { get; set; }
+        public int ChainCrewPercent { get; set; }
+        public int ChainSailTarget { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission10StartResponse
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission10Objectives Objectives { get; set; }
+        public SimState State { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission10BonusObjectives
+    {
+        public bool SailShredder { get; set; }
+        public bool MixedBattery { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission10Telemetry
+    {
+        public int ChainShotOrders { get; set; }
+        public int ChainShotHits { get; set; }
+        public int RoundShotHits { get; set; }
+        public int ChainSailDamageDealt { get; set; }
+    }
+
+    // Damage profile, turn records, and the resolve request shape are shared
+    // with mission 01 (Mission01DamageProfile / Mission01TurnRecord /
+    // Mission01ResolveRequest).
+    [Serializable]
+    public sealed class Mission10Outcome
+    {
+        public string MissionCode { get; set; }
+        public int Seed { get; set; }
+        public string Result { get; set; }
+        public string FailReason { get; set; }
+        public int TurnCount { get; set; }
+        public int TurnLimit { get; set; }
+        public Mission10BonusObjectives BonusObjectives { get; set; }
+        public Mission01DamageProfile DamageProfile { get; set; }
+        public Mission10Telemetry Telemetry { get; set; }
+        public List<Mission01TurnRecord> Turns { get; set; }
+    }
+
+    [Serializable]
+    public sealed class Mission10ResolveEnvelope
+    {
+        public Mission10Outcome Outcome { get; set; }
     }
 
     [Serializable]

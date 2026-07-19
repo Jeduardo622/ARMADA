@@ -61,12 +61,18 @@ namespace Armada.Client.Services
         Task<ServiceResult<Mission09Outcome>> ResolveMission09Async(Mission01ResolveRequest request);
     }
 
+    public interface IMission10Client
+    {
+        Task<ServiceResult<Mission10StartResponse>> StartMission10Async(int seed);
+        Task<ServiceResult<Mission10Outcome>> ResolveMission10Async(Mission01ResolveRequest request);
+    }
+
     public interface IMissionCompletionClient
     {
         Task<ServiceResult<MissionCompleteResponse>> CompleteAsync(string code, MissionCompleteRequest request);
     }
 
-    public sealed class MissionService : IMission01Client, IMission02Client, IMission03Client, IMission04Client, IMission05Client, IMission06Client, IMission07Client, IMission08Client, IMission09Client, IMissionCompletionClient
+    public sealed class MissionService : IMission01Client, IMission02Client, IMission03Client, IMission04Client, IMission05Client, IMission06Client, IMission07Client, IMission08Client, IMission09Client, IMission10Client, IMissionCompletionClient
     {
         private readonly ApiClient _client;
         private readonly FeatureFlags _flags;
@@ -386,6 +392,39 @@ namespace Armada.Client.Services
             }
 
             return new ServiceResult<Mission09Outcome>
+            {
+                Data = resp.Data?.Outcome,
+                Success = resp.Success,
+                Status = resp.StatusCode,
+                ErrorReason = resp.ErrorReason,
+                FeatureDisabled = featureDisabled
+            };
+        }
+
+        public async Task<ServiceResult<Mission10StartResponse>> StartMission10Async(int seed)
+        {
+            var resp = await _client.SendAsync<Mission10StartResponse>($"/missions/{Mission10Scenario.MissionCode}/start", UnityWebRequest.kHttpVerbPOST, new Mission01StartRequest { Seed = seed });
+            var featureDisabled = false;
+            if (resp.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _flags.DisableFromForbidden(FeatureKey);
+                featureDisabled = true;
+            }
+
+            return ServiceResult<Mission10StartResponse>.FromResponse(resp, featureDisabled);
+        }
+
+        public async Task<ServiceResult<Mission10Outcome>> ResolveMission10Async(Mission01ResolveRequest request)
+        {
+            var resp = await _client.SendAsync<Mission10ResolveEnvelope>($"/missions/{Mission10Scenario.MissionCode}/resolve", UnityWebRequest.kHttpVerbPOST, request);
+            var featureDisabled = false;
+            if (resp.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _flags.DisableFromForbidden(FeatureKey);
+                featureDisabled = true;
+            }
+
+            return new ServiceResult<Mission10Outcome>
             {
                 Data = resp.Data?.Outcome,
                 Success = resp.Success,
