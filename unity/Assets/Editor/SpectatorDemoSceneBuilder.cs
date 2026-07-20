@@ -24,6 +24,14 @@ public static class SpectatorDemoSceneBuilder
     [MenuItem("Assets/Armada/Build Spectator Demo Scene")]
     public static void Build()
     {
+        // Opening a new scene in Single mode discards the current one; give
+        // the user the standard save/discard/cancel prompt first. Returns
+        // true without prompting in batch mode.
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+        {
+            return;
+        }
+
         if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
         {
             AssetDatabase.CreateFolder("Assets", "Scenes");
@@ -73,6 +81,13 @@ public static class SpectatorDemoSceneBuilder
         var missionUIObject = new GameObject("MissionUI", typeof(MissionUIController));
         var missionUI = missionUIObject.GetComponent<MissionUIController>();
         SetReference(missionUI, "statusLabel", statusLabel);
+        // Inactive so MissionUIController.Start never fires its automatic
+        // missions refresh: that refresh would race Mission10Bootstrap's
+        // startup authentication (AuthService.GetTokenAsync returns null to
+        // concurrent callers while a request is in flight), which could leave
+        // the run at start_failed. CompleteMission10 is a plain method call
+        // and still reports through the status label on the inactive object.
+        missionUIObject.SetActive(false);
 
         var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap));
         var bootstrap = bootstrapObject.GetComponent<Mission10Bootstrap>();
