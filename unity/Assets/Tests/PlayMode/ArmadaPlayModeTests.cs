@@ -1317,5 +1317,111 @@ namespace Armada.Client.Tests.PlayMode
 
             yield return null;
         }
+
+        [UnityTest]
+        public IEnumerator SpectatorRenderer_ControlsPauseStepScaleSpeedAndDriveReadoutBars()
+        {
+            // Inactive so Update (and its input polling) never runs; the test
+            // drives Tick and the public control methods directly and asserts
+            // state, never rendered output (gates run -batchmode -nographics).
+            var gameObject = new GameObject("spectator-controls-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<SpectatorRenderer>();
+                var outcome = new Mission10Outcome
+                {
+                    MissionCode = Mission10Scenario.MissionCode,
+                    Seed = Mission10Bootstrap.DefaultSeed,
+                    Result = "win",
+                    TurnCount = 1,
+                    TurnLimit = Mission10Scenario.TurnLimit,
+                    BonusObjectives = new Mission10BonusObjectives(),
+                    Turns = new List<Mission01TurnRecord>
+                    {
+                        new Mission01TurnRecord
+                        {
+                            Turn = 1,
+                            Events = new List<SimEvent>
+                            {
+                                new SimEvent { Type = "movement", ShipId = "player-sloop-a", Position = new SimVector2 { X = 40, Y = 30 } },
+                                new SimEvent
+                                {
+                                    Type = "broadside",
+                                    ShipId = "player-sloop-a",
+                                    TargetShipId = "enemy-clipper-a",
+                                    Hit = true,
+                                    Ammo = "chain",
+                                    TargetRemaining = new SimRemaining { Hp = 140, Sail = 76, Crew = 50 }
+                                }
+                            }
+                        }
+                    }
+                };
+
+                spectator.BeginOutcome(outcome);
+
+                // Bars spawn full before any event lands.
+                Assert.That(spectator.TryGetReadoutFractions("enemy-clipper-a", out var hullStart, out var sailStart), Is.True);
+                Assert.That(hullStart, Is.EqualTo(1f).Within(0.001f));
+                Assert.That(sailStart, Is.EqualTo(1f).Within(0.001f));
+
+                // Paused playback ignores ticks entirely.
+                spectator.Pause();
+                Assert.That(spectator.IsPaused, Is.True);
+                Assert.That(spectator.HudText, Does.Contain("PAUSED"));
+                for (var tick = 0; tick < 5; tick++)
+                {
+                    spectator.Tick(1f);
+                }
+                Assert.That(spectator.CurrentStep, Is.Null);
+                Assert.That(spectator.IsFinished, Is.False);
+
+                // StepOnce arms exactly one step: the turn banner begins,
+                // completes, and playback freezes again.
+                spectator.StepOnce();
+                spectator.Tick(0.05f);
+                Assert.That(spectator.CurrentStep?.Kind, Is.EqualTo(PlaybackStepKind.TurnStart));
+                spectator.Tick(10f);
+                Assert.That(spectator.CurrentStep, Is.Null);
+                spectator.Tick(10f);
+                Assert.That(spectator.CurrentStep, Is.Null);
+                Assert.That(spectator.IsFinished, Is.False);
+
+                // The multiplier scales elapsed time: at x4, one 0.1s tick
+                // covers the whole 0.35s move step (x1 would need four).
+                spectator.StepOnce();
+                spectator.Tick(0.05f);
+                Assert.That(spectator.CurrentStep?.Kind, Is.EqualTo(PlaybackStepKind.Move));
+                spectator.SetSpeed(4f);
+                Assert.That(spectator.HudText, Does.Contain("speed x4"));
+                spectator.Tick(0.1f);
+                Assert.That(spectator.CurrentStep, Is.Null, "x4 speed should finish the 0.35s move step in one 0.1s tick");
+
+                // Resume at normal speed and run out the stream; the HUD
+                // drops the control status once both are back to defaults.
+                spectator.Resume();
+                spectator.SetSpeed(1f);
+                Assert.That(spectator.HudText, Does.Not.Contain("PAUSED"));
+                Assert.That(spectator.HudText, Does.Not.Contain("speed x"));
+                for (var tick = 0; tick < 100 && !spectator.IsFinished; tick++)
+                {
+                    spectator.Tick(0.5f);
+                }
+                Assert.That(spectator.IsFinished, Is.True);
+
+                // The chain broadside's remaining block (sail 110 -> 76)
+                // drives the sail bar; hull is untouched.
+                Assert.That(spectator.TryGetReadoutFractions("enemy-clipper-a", out var hullEnd, out var sailEnd), Is.True);
+                Assert.That(hullEnd, Is.EqualTo(1f).Within(0.001f));
+                Assert.That(sailEnd, Is.EqualTo(76f / 110f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+
+            yield return null;
+        }
     }
 }

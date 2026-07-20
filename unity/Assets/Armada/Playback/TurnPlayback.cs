@@ -93,6 +93,17 @@ namespace Armada.Client.Playback
         }
 
         /// <summary>
+        /// Latest tracked remaining block for a ship: the initial scenario
+        /// stats until an event's remaining block snaps them. Powers the
+        /// renderer's per-ship HP/sail readouts.
+        /// </summary>
+        public bool TryGetRemaining(string shipId, out SimRemaining remaining)
+        {
+            remaining = null;
+            return shipId != null && _remaining.TryGetValue(shipId, out remaining);
+        }
+
+        /// <summary>
         /// Emits the next renderer command, or false once the stream (plus a
         /// single trailing RunComplete) is exhausted. Unknown or malformed
         /// events are skipped so a newer server event vocabulary cannot stall

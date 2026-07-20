@@ -70,7 +70,7 @@ public static class SpectatorDemoSceneBuilder
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
         var hudLabel = CreateLabel(canvasObject.transform, "SpectatorHud", anchorTop: true);
-        hudLabel.text = "Waiting for run...";
+        hudLabel.text = "Waiting for run... (Space pause, Right Arrow step, 1-4 speed)";
         var statusLabel = CreateLabel(canvasObject.transform, "MissionStatus", anchorTop: false);
         statusLabel.text = string.Empty;
 
