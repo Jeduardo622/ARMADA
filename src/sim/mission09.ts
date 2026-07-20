@@ -191,7 +191,7 @@ export function runMission09(seed: number, playerTurnOrders: SimOrder[][]): Miss
   const failReason =
     result === 'win' ? null : classifyLoss(run.finalState, run.playerSunk, FLANKED_SPREAD);
 
-  const rams = countRamProfile(turns, MISSION_09_PLAYER_SHIP_IDS);
+  const rams = countRamProfile(turns, MISSION_09_PLAYER_SHIP_IDS, createMission09State());
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');

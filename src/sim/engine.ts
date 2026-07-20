@@ -84,9 +84,11 @@ const RAKE_MULTIPLIER = 1.5;
 // (docs/content/balance-tables.md, status effects). Values are design-tunable.
 const FIRE_IGNITION_CHANCE = 25;
 // The duration constants are exported so mission telemetry can tell an
-// ignition/application event (counter at full duration) from a tick.
+// ignition/application event (counter at full duration) from a tick; the
+// burn amount is exported so applied-loss tracking can mirror the tick's
+// hull loss, which emits no remaining block.
 export const FIRE_DURATION_TURNS = 3;
-const FIRE_HULL_DAMAGE_PER_TURN = 5;
+export const FIRE_HULL_DAMAGE_PER_TURN = 5;
 const FIRE_ACCURACY_PENALTY = 15;
 const SLOW_SAIL_FRACTION = 0.5;
 export const SLOW_DURATION_TURNS = 2;

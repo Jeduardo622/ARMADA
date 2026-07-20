@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildServer } from '../src/app.js';
 import { RAM_CONTACT_RANGE, resolveSimPreview } from '../src/sim/engine.js';
+import { countRamProfile } from '../src/sim/missionMetrics.js';
 import {
   MISSION_09_CODE,
   MISSION_09_ENEMY_SHIP_IDS,
@@ -134,6 +135,53 @@ describe('ramming modifier', () => {
     expect(explicitOff).toEqual(absent);
   });
 
+  it('counts only the hull actually removed when a ram finishes a battered hull', () => {
+    // ship-a is down to 10 hp, so enemy-b's nominal 18-point ram clamps at
+    // zero: the event still reports the nominal roll, but the telemetry
+    // must count the 10 hull actually removed (and the full 9 recoil
+    // against enemy-b's healthy bow).
+    const state = closingState(30, 2, 2);
+    state.ships[0].hp = 10;
+    const result = preview(state, { ramming: true });
+    const rams = result.events.filter((event) => event.type === 'ram');
+    expect(rams[0]).toMatchObject({ hullDamage: 18, targetRemaining: { hp: 0 } });
+
+    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events }];
+    expect(countRamProfile(turns, ['ship-a'], state)).toEqual({
+      ramsInflicted: 0,
+      ramsSuffered: 1,
+      ramHullDamageDealt: 0,
+      ramHullDamageTaken: 10
+    });
+    expect(countRamProfile(turns, ['enemy-b'], state)).toEqual({
+      ramsInflicted: 1,
+      ramsSuffered: 0,
+      ramHullDamageDealt: 10,
+      ramHullDamageTaken: 9
+    });
+  });
+
+  it('mirrors fire-tick burns so an overkill ram after a tick is not overcounted', () => {
+    // ship-a starts burning at 20 hp: the start-of-turn fire tick burns it
+    // to 15 without any remaining block, then enemy-b's nominal 18-point
+    // ram sinks it. The tracker must charge the ram only the 15 hull the
+    // tick left behind — not the stale-tracked 18.
+    const state = closingState(15, 0, 2);
+    state.ships[0].hp = 20;
+    state.ships[0].status = { onFire: true, fireTurnsRemaining: 2 };
+    const result = preview(state, { ramming: true, statusEffects: true });
+    const ram = result.events.find((event) => event.type === 'ram');
+    expect(ram).toMatchObject({ hullDamage: 18, targetRemaining: { hp: 0 } });
+
+    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events }];
+    expect(countRamProfile(turns, ['ship-a'], state)).toEqual({
+      ramsInflicted: 0,
+      ramsSuffered: 1,
+      ramHullDamageDealt: 0,
+      ramHullDamageTaken: 15
+    });
+  });
+
   it('never rams from a standstill but a moving enemy can strike a stationary hull', () => {
     // Both becalmed inside contact range: proximity alone is not a ram.
     const becalmed = preview(closingState(10, 0, 0), { ramming: true });
@@ -173,11 +221,13 @@ describe('mission 09 scenario', () => {
     expect(outcome.failReason).toBeNull();
     expect(outcome.turnCount).toBe(7);
     // The turn-4 contact rams both lanes at effective speed 9 (speed 7 plus
-    // the tailwind bonus): 46 hull each to the brigs, 23 recoil each.
+    // the tailwind bonus): nominal 46 hull each, but brig B is down to 23 hp
+    // at contact, so the applied telemetry counts 46 + 23; recoil is 23 each
+    // against full sloop hulls.
     expect(outcome.telemetry).toEqual({
       ramsInflicted: 2,
       ramsSuffered: 0,
-      ramHullDamageDealt: 92,
+      ramHullDamageDealt: 69,
       ramHullDamageTaken: 46
     });
     const rams = outcome.turns.flatMap((turn) =>
@@ -259,7 +309,7 @@ describe('mission 09 routes', () => {
     const outcome = res.json().outcome;
     expect(outcome.result).toBe('win');
     expect(outcome.telemetry.ramsInflicted).toBe(2);
-    expect(outcome.telemetry.ramHullDamageDealt).toBe(92);
+    expect(outcome.telemetry.ramHullDamageDealt).toBe(69);
   });
 
   it('rejects orders for ships the player does not control', async () => {

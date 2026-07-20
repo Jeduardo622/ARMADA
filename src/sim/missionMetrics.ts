@@ -1,4 +1,9 @@
-import { FIRE_DURATION_TURNS, SLOW_DURATION_TURNS, pointOfSail } from './engine.js';
+import {
+  FIRE_DURATION_TURNS,
+  FIRE_HULL_DAMAGE_PER_TURN,
+  SLOW_DURATION_TURNS,
+  pointOfSail
+} from './engine.js';
 import { MissionTurnRecord } from './missionRunner.js';
 import { SimEvent, SimOrder, SimState, Vector2, Wind } from './types.js';
 
@@ -193,6 +198,92 @@ export function countManeuverWindProfile(
   return { clampedManeuvers, upwindManeuvers, downwindManeuvers };
 }
 
+export interface RemainingStats {
+  hp: number;
+  sail: number;
+  crew: number;
+}
+
+export interface AppliedDamage {
+  hull: number;
+  sail: number;
+  crew: number;
+}
+
+// Event damage fields carry the nominal roll, which overstates the loss
+// whenever the engine clamps a stat at zero — a ship cannot lose more hull
+// or sail than it has left. Damage telemetry must count the applied loss
+// instead, derived by following each ship's last known stats through the
+// events that carry remaining blocks. Fire ticks reduce hull without a
+// remaining block, so observe() mirrors the engine's per-turn burn from the
+// tick's status event (burning with the counter below full duration; at
+// most one burn per ship per turn, so a later status snapshot repeating the
+// stale counter never double-burns). The result stays clamped to the
+// nominal roll as a final guard.
+export function createAppliedLossTracker(initialState: SimState) {
+  const stats = new Map<string, RemainingStats>(
+    initialState.ships.map((ship) => [ship.id, { hp: ship.hp, sail: ship.sail, crew: ship.crew }])
+  );
+  let burnedThisTurn = new Set<string>();
+  // Called once per turn before its events so the fire-burn dedupe resets.
+  const beginTurn = () => {
+    burnedThisTurn = new Set<string>();
+  };
+  // Sync a ship's tracked stats from an event's remaining block without
+  // attributing damage (e.g. boarding losses between attributed events).
+  const sync = (shipId: string, remaining: RemainingStats) => {
+    stats.set(shipId, { hp: remaining.hp, sail: remaining.sail, crew: remaining.crew });
+  };
+  // Keep the tracker current through an event the caller does not
+  // attribute damage for.
+  const observe = (event: SimEvent) => {
+    if (event.type === 'broadside' || event.type === 'boarding') {
+      sync(event.targetShipId, event.targetRemaining);
+      return;
+    }
+    if (event.type === 'ram') {
+      sync(event.targetShipId, event.targetRemaining);
+      sync(event.shipId, event.rammerRemaining);
+      return;
+    }
+    if (event.type === 'status') {
+      // A burn tick is the only stat change without a remaining block: the
+      // ship is burning with the counter already below full duration
+      // (applications and refreshes carry the full counter and burn
+      // nothing).
+      const burning =
+        event.status.onFire === true &&
+        (event.status.fireTurnsRemaining ?? 0) < FIRE_DURATION_TURNS;
+      if (burning && !burnedThisTurn.has(event.shipId)) {
+        burnedThisTurn.add(event.shipId);
+        const entry = stats.get(event.shipId);
+        if (entry) {
+          entry.hp = Math.max(0, entry.hp - FIRE_HULL_DAMAGE_PER_TURN);
+        }
+      }
+    }
+  };
+  // Applied loss for one attributed event; ships absent from the initial
+  // state (e.g. mid-run reinforcements) fall back to the nominal roll.
+  const applied = (
+    shipId: string,
+    remaining: RemainingStats,
+    nominal: AppliedDamage
+  ): AppliedDamage => {
+    const before = stats.get(shipId);
+    sync(shipId, remaining);
+    if (!before) {
+      return { ...nominal };
+    }
+    return {
+      hull: Math.max(0, Math.min(nominal.hull, before.hp - remaining.hp)),
+      sail: Math.max(0, Math.min(nominal.sail, before.sail - remaining.sail)),
+      crew: Math.max(0, Math.min(nominal.crew, before.crew - remaining.crew))
+    };
+  };
+  return { applied, sync, observe, beginTurn };
+}
+
 export interface RamProfileCounts {
   ramsInflicted: number;
   ramsSuffered: number;
@@ -203,27 +294,44 @@ export interface RamProfileCounts {
 // Ram profile of the given ships: rams they initiated (hull damage dealt to
 // the enemy plus the recoil their own bows absorbed) versus rams an enemy
 // drove into them. Enemy recoil is self-inflicted and never counts as
-// damage dealt.
+// damage dealt. Hull damage counts the applied loss, not the nominal roll,
+// so a ram that finishes an already-battered hull cannot overstate the
+// blow; broadside and boarding events between rams keep the tracker
+// current.
 export function countRamProfile(
   turns: MissionTurnRecord[],
-  shipIds: readonly string[]
+  shipIds: readonly string[],
+  initialState: SimState
 ): RamProfileCounts {
   let ramsInflicted = 0;
   let ramsSuffered = 0;
   let ramHullDamageDealt = 0;
   let ramHullDamageTaken = 0;
+  const tracker = createAppliedLossTracker(initialState);
   for (const turn of turns) {
+    tracker.beginTurn();
     for (const event of turn.events) {
       if (event.type !== 'ram') {
+        tracker.observe(event);
         continue;
       }
+      const targetHullLoss = tracker.applied(event.targetShipId, event.targetRemaining, {
+        hull: event.hullDamage,
+        sail: 0,
+        crew: 0
+      }).hull;
+      const recoilHullLoss = tracker.applied(event.shipId, event.rammerRemaining, {
+        hull: event.selfHullDamage,
+        sail: 0,
+        crew: 0
+      }).hull;
       if (shipIds.includes(event.shipId)) {
         ramsInflicted += 1;
-        ramHullDamageDealt += event.hullDamage;
-        ramHullDamageTaken += event.selfHullDamage;
+        ramHullDamageDealt += targetHullLoss;
+        ramHullDamageTaken += recoilHullLoss;
       } else if (shipIds.includes(event.targetShipId)) {
         ramsSuffered += 1;
-        ramHullDamageTaken += event.hullDamage;
+        ramHullDamageTaken += targetHullLoss;
       }
     }
   }
@@ -242,12 +350,9 @@ export interface AmmoProfileCounts {
 // deduplicated last-order-wins per ship, mirroring how resolveSimPreview
 // builds its orderByShip map, so duplicate-order turns count the order that
 // actually executed. Broadside events carry ammo only when chain shot
-// actually fired, so absence means round shot. Sail damage counts what was
-// actually applied — event.damage.sail is the nominal roll and overstates
-// the loss when the engine clamps a shredded target at zero — derived from
-// per-target targetRemaining.sail deltas seeded from the initial state
-// (sail only ever changes through broadsides; ships absent from the initial
-// state fall back to the nominal value).
+// actually fired, so absence means round shot. Sail damage counts the
+// applied loss via the shared tracker, so a shredded target clamped at
+// zero cannot inflate the count.
 export function countAmmoProfile(
   turns: MissionTurnRecord[],
   playerTurnOrders: SimOrder[][],
@@ -258,8 +363,9 @@ export function countAmmoProfile(
   let chainShotHits = 0;
   let roundShotHits = 0;
   let chainSailDamageDealt = 0;
-  const sailByShip = new Map(initialState.ships.map((ship) => [ship.id, ship.sail]));
+  const tracker = createAppliedLossTracker(initialState);
   for (const turn of turns) {
+    tracker.beginTurn();
     const lastOrderByShip = new Map<string, SimOrder>();
     for (const order of playerTurnOrders[turn.turn - 1] ?? []) {
       if (shipIds.includes(order.shipId)) {
@@ -273,12 +379,14 @@ export function countAmmoProfile(
     }
     for (const event of turn.events) {
       if (event.type !== 'broadside') {
+        tracker.observe(event);
         continue;
       }
-      const sailBefore = sailByShip.get(event.targetShipId);
-      const appliedSailDamage =
-        sailBefore === undefined ? event.damage.sail : sailBefore - event.targetRemaining.sail;
-      sailByShip.set(event.targetShipId, event.targetRemaining.sail);
+      const appliedSailDamage = tracker.applied(
+        event.targetShipId,
+        event.targetRemaining,
+        event.damage
+      ).sail;
       if (!shipIds.includes(event.shipId)) {
         continue;
       }
