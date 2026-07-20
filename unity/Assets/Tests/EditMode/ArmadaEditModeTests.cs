@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Armada.Client.Core;
 using Armada.Client.Playback;
 using Armada.Client.Services;
@@ -746,6 +747,41 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(PlaybackEase.Progress(-1f, 1f), Is.Zero);
             Assert.That(PlaybackEase.Progress(2f, 1f), Is.EqualTo(1f));
             Assert.That(PlaybackEase.Progress(0.5f, 1f), Is.EqualTo(0.5f).Within(0.0001f));
+        }
+
+        [Test]
+        public void AuthService_ConcurrentCallersShareTheInFlightTokenRequest()
+        {
+            var authService = new AuthService(null, null);
+            var inFlightField = typeof(AuthService).GetField(
+                "_inFlightRequest",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+            // Simulate a request another caller already owns; a caller
+            // arriving while it is in flight must await that same task
+            // instead of yielding once and returning null (the old behavior
+            // sent its follow-up requests unauthenticated).
+            var inFlight = new TaskCompletionSource<string>();
+            inFlightField.SetValue(authService, inFlight.Task);
+
+            var concurrent = authService.GetTokenAsync();
+            Assert.That(concurrent, Is.SameAs(inFlight.Task));
+            Assert.That(concurrent.IsCompleted, Is.False);
+
+            inFlight.SetResult("shared-token");
+            Assert.That(concurrent.Result, Is.EqualTo("shared-token"));
+
+            // Once a token is held, callers short-circuit without touching
+            // the in-flight slot.
+            inFlightField.SetValue(authService, null);
+            typeof(AuthService)
+                .GetField("_state", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .SetValue(authService, new AuthState { Token = "held-token", Player = new Player { Id = "p1" } });
+
+            var cached = authService.GetTokenAsync();
+            Assert.That(cached.IsCompleted, Is.True);
+            Assert.That(cached.Result, Is.EqualTo("held-token"));
+            Assert.That(inFlightField.GetValue(authService), Is.Null);
         }
 
         private static TelemetryEvent Event(string type, string value)

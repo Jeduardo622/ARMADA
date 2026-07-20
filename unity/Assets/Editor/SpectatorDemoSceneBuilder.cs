@@ -81,12 +81,12 @@ public static class SpectatorDemoSceneBuilder
         var missionUIObject = new GameObject("MissionUI", typeof(MissionUIController));
         var missionUI = missionUIObject.GetComponent<MissionUIController>();
         SetReference(missionUI, "statusLabel", statusLabel);
-        // Inactive so MissionUIController.Start never fires its automatic
-        // missions refresh: that refresh would race Mission10Bootstrap's
-        // startup authentication (AuthService.GetTokenAsync returns null to
-        // concurrent callers while a request is in flight), which could leave
-        // the run at start_failed. CompleteMission10 is a plain method call
-        // and still reports through the status label on the inactive object.
+        // Inactive because the spectator demo has no use for the automatic
+        // missions-list refresh in MissionUIController.Start. (Historically
+        // this also avoided a startup auth race, before AuthService shared
+        // its in-flight token request among concurrent callers.)
+        // CompleteMission10 is a plain method call and still reports through
+        // the status label on the inactive object.
         missionUIObject.SetActive(false);
 
         var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap));

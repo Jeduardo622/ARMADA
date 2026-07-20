@@ -17,7 +17,7 @@ namespace Armada.Client.Core
         private readonly ApiClient _apiClient;
         private readonly JsonSerializerSettings _options;
         private AuthState _state;
-        private bool _isRequestInFlight;
+        private Task<string> _inFlightRequest;
 
         public AuthService(ApiClient apiClient, JsonSerializerSettings options)
         {
@@ -27,20 +27,35 @@ namespace Armada.Client.Core
 
         public bool HasToken => _state != null && !string.IsNullOrWhiteSpace(_state.Token);
 
-        public async Task<string> GetTokenAsync()
+        // Single-threaded Unity main-thread access is assumed, matching the
+        // rest of the client service graph; no locking.
+        public Task<string> GetTokenAsync()
         {
             if (HasToken)
             {
-                return _state.Token;
+                return Task.FromResult(_state.Token);
             }
 
-            if (_isRequestInFlight)
+            // Concurrent callers share the one in-flight request. The old
+            // bool guard made late callers yield once and return null, so a
+            // startup race (e.g. a UI refresh beside a bootstrap) sent their
+            // follow-up requests unauthenticated.
+            if (_inFlightRequest != null)
             {
-                await Task.Yield();
-                return _state?.Token;
+                return _inFlightRequest;
             }
 
-            _isRequestInFlight = true;
+            var request = RequestTokenAsync();
+            if (!request.IsCompleted)
+            {
+                _inFlightRequest = request;
+            }
+
+            return request;
+        }
+
+        private async Task<string> RequestTokenAsync()
+        {
             try
             {
                 var response = await _apiClient.SendAsync<GuestAuthResponse>("/auth/guest", UnityWebRequest.kHttpVerbPOST, new GuestAuthRequest(), null, false);
@@ -60,7 +75,10 @@ namespace Armada.Client.Core
             }
             finally
             {
-                _isRequestInFlight = false;
+                // Cleared on completion (success or failure) so a failed
+                // request is retried by the next caller instead of pinning a
+                // stale completed task.
+                _inFlightRequest = null;
             }
         }
 
