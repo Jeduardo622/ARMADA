@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Armada.Client.Bootstrap;
 using Armada.Client.Core;
+using Armada.Client.Playback;
 using Armada.Client.Services;
 using Armada.Client.UI;
 using NUnit.Framework;
@@ -1228,6 +1229,93 @@ namespace Armada.Client.Tests.PlayMode
                     Status = HttpStatusCode.OK
                 });
             }
+        }
+
+        [UnityTest]
+        public IEnumerator SpectatorRenderer_PlaysResolvedTurnsAndReportsOutcomeState()
+        {
+            // Inactive so Update never runs; the test drives Tick with fixed
+            // deltas and asserts playback/component state, never rendered
+            // output (gates run -batchmode -nographics).
+            var gameObject = new GameObject("spectator-renderer-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<SpectatorRenderer>();
+                var outcome = new Mission10Outcome
+                {
+                    MissionCode = Mission10Scenario.MissionCode,
+                    Seed = Mission10Bootstrap.DefaultSeed,
+                    Result = "win",
+                    TurnCount = 1,
+                    TurnLimit = Mission10Scenario.TurnLimit,
+                    BonusObjectives = new Mission10BonusObjectives { SailShredder = true, MixedBattery = true },
+                    Turns = new List<Mission01TurnRecord>
+                    {
+                        new Mission01TurnRecord
+                        {
+                            Turn = 1,
+                            Events = new List<SimEvent>
+                            {
+                                new SimEvent { Type = "movement", ShipId = "player-sloop-a", Position = new SimVector2 { X = 40, Y = 30 } },
+                                new SimEvent
+                                {
+                                    Type = "broadside",
+                                    ShipId = "player-sloop-a",
+                                    TargetShipId = "enemy-clipper-a",
+                                    Hit = true,
+                                    Ammo = "chain",
+                                    TargetRemaining = new SimRemaining { Hp = 140, Sail = 76, Crew = 50 }
+                                }
+                            }
+                        }
+                    }
+                };
+
+                spectator.BeginOutcome(outcome);
+
+                // Markers spawn at the pinned scenario start positions scaled
+                // by the placeholder 0.1 world-units-per-sim-unit.
+                Assert.That(spectator.TryGetMarkerPosition("player-sloop-a", out var start), Is.True);
+                Assert.That(start.x, Is.EqualTo(0f).Within(0.001f));
+                Assert.That(start.z, Is.EqualTo(3f).Within(0.001f));
+                Assert.That(spectator.TryGetMarkerPosition("enemy-clipper-b", out var enemyStart), Is.True);
+                Assert.That(enemyStart.x, Is.EqualTo(22f).Within(0.001f));
+
+                var sawChainBroadside = false;
+                for (var tick = 0; tick < 100 && !spectator.IsFinished; tick++)
+                {
+                    spectator.Tick(0.5f);
+                    if (spectator.CurrentStep?.Kind == PlaybackStepKind.Broadside)
+                    {
+                        Assert.That(spectator.CurrentStep.ChainShot, Is.True);
+                        Assert.That(spectator.CurrentStep.AppliedSail, Is.EqualTo(34));
+                        sawChainBroadside = true;
+                    }
+                }
+
+                Assert.That(spectator.IsFinished, Is.True);
+                Assert.That(sawChainBroadside, Is.True);
+
+                // The movement event animated the marker to its resolved
+                // position.
+                Assert.That(spectator.TryGetMarkerPosition("player-sloop-a", out var moved), Is.True);
+                Assert.That(moved.x, Is.EqualTo(4f).Within(0.001f));
+                Assert.That(moved.z, Is.EqualTo(3f).Within(0.001f));
+
+                // End-of-run HUD reports the outcome, bonuses, and applied
+                // (remaining-delta) damage totals.
+                Assert.That(spectator.HudText, Does.Contain("win"));
+                Assert.That(spectator.HudText, Does.Contain("sailShredder=yes"));
+                Assert.That(spectator.HudText, Does.Contain("mixedBattery=yes"));
+                Assert.That(spectator.HudText, Does.Contain("sail 34"));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+
+            yield return null;
         }
     }
 }
