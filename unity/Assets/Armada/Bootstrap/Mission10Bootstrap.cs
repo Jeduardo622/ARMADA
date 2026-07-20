@@ -30,6 +30,12 @@ namespace Armada.Client.Bootstrap
         [Header("UI Wiring")]
         [SerializeField] private MissionUIController missionUI;
 
+        // Optional spectate-only renderer (SpectatorDemo scene). When wired,
+        // the resolved run's turn event stream plays back visually after the
+        // flow completes; when null the bootstrap behaves exactly as before.
+        [Header("Spectator (optional)")]
+        [SerializeField] private Playback.SpectatorRenderer spectator;
+
         [Header("Run")]
         [SerializeField] private int seed = DefaultSeed;
 
@@ -82,7 +88,11 @@ namespace Armada.Client.Bootstrap
             }
 
             await _authService.GetTokenAsync();
-            await DriveAsync(_flow, missionUI, seed, BuildMixedBatteryOrders());
+            var run = await DriveAsync(_flow, missionUI, seed, BuildMixedBatteryOrders());
+            if (spectator != null)
+            {
+                spectator.Begin(run);
+            }
         }
 
         /// <summary>

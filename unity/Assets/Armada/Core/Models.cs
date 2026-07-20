@@ -295,6 +295,11 @@ namespace Armada.Client.Core
         public int? CrewLoss { get; set; }
         public int? TargetCrewLoss { get; set; }
         public SimShipStatus Status { get; set; }
+        // Maneuver/movement variant fields (docs/api/openapi.yaml SimEvent):
+        // the post-maneuver heading and the post-move position the spectator
+        // renderer animates markers toward.
+        public int? Heading { get; set; }
+        public SimVector2 Position { get; set; }
         // Ram event fields (docs/api/openapi.yaml SimEvent "ram" variant):
         // hull damage dealt to the target, recoil taken on the rammer's own
         // bow, and both remaining blocks for damage readability.

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Armada.Client.Core;
+using Armada.Client.Playback;
 using Armada.Client.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -645,6 +646,106 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(cleared.OnFire, Is.Null);
             Assert.That(cleared.FireTurnsRemaining, Is.Null);
             Assert.That(cleared.SlowTurnsRemaining, Is.Null);
+        }
+
+        [Test]
+        public void TurnPlayback_StepsResolvedEventsAndCountsAppliedLossFromRemainingDeltas()
+        {
+            var ships = Mission10Scenario.BuildExpectedStart(Armada.Client.Bootstrap.Mission10Bootstrap.DefaultSeed).State.Ships;
+            var turns = new List<Mission01TurnRecord>
+            {
+                new Mission01TurnRecord
+                {
+                    Turn = 1,
+                    Events = new List<SimEvent>
+                    {
+                        new SimEvent { Type = "maneuver", ShipId = "player-sloop-a", Heading = 45 },
+                        new SimEvent { Type = "movement", ShipId = "player-sloop-a", Position = new SimVector2 { X = 12, Y = 30 } },
+                        new SimEvent
+                        {
+                            Type = "broadside",
+                            ShipId = "player-sloop-a",
+                            TargetShipId = "enemy-clipper-a",
+                            Hit = true,
+                            Ammo = "chain",
+                            // Nominal roll is deliberately absurd: applied loss
+                            // must come from the remaining delta, not damage.
+                            Damage = new SimDamage { Hull = 999, Sail = 999, Crew = 999 },
+                            TargetRemaining = new SimRemaining { Hp = 138, Sail = 80, Crew = 50 }
+                        }
+                    }
+                },
+                new Mission01TurnRecord
+                {
+                    Turn = 2,
+                    Events = new List<SimEvent>
+                    {
+                        new SimEvent
+                        {
+                            Type = "ram",
+                            ShipId = "player-sloop-b",
+                            TargetShipId = "enemy-clipper-a",
+                            HullDamage = 999,
+                            SelfHullDamage = 999,
+                            TargetRemaining = new SimRemaining { Hp = 120, Sail = 80, Crew = 50 },
+                            RammerRemaining = new SimRemaining { Hp = 112, Sail = 80, Crew = 50 }
+                        },
+                        new SimEvent { Type = "unknown-future-event", ShipId = "player-sloop-a" }
+                    }
+                }
+            };
+
+            var playback = new TurnPlayback(ships, turns);
+            var steps = new List<PlaybackStep>();
+            while (playback.TryStep(out var step))
+            {
+                steps.Add(step);
+            }
+
+            Assert.That(steps, Has.Count.EqualTo(7));
+            Assert.That(
+                steps.ConvertAll(s => s.Kind),
+                Is.EqualTo(new[]
+                {
+                    PlaybackStepKind.TurnStart,
+                    PlaybackStepKind.Maneuver,
+                    PlaybackStepKind.Move,
+                    PlaybackStepKind.Broadside,
+                    PlaybackStepKind.TurnStart,
+                    PlaybackStepKind.Ram,
+                    PlaybackStepKind.RunComplete
+                }));
+            Assert.That(playback.TryStep(out _), Is.False);
+
+            Assert.That(steps[1].Heading, Is.EqualTo(45));
+            Assert.That(steps[2].X, Is.EqualTo(12));
+            Assert.That(steps[2].Y, Is.EqualTo(30));
+
+            // Chain broadside: enemy-clipper-a starts at hp 140 / sail 110, so
+            // the applied loss is 2 hull and 30 sail regardless of the roll.
+            var broadside = steps[3];
+            Assert.That(broadside.ChainShot, Is.True);
+            Assert.That(broadside.Hit, Is.True);
+            Assert.That(broadside.AppliedHull, Is.EqualTo(2));
+            Assert.That(broadside.AppliedSail, Is.EqualTo(30));
+            Assert.That(broadside.AppliedCrew, Is.Zero);
+
+            // Ram: 138 -> 120 target hull, 120 -> 112 self recoil.
+            var ram = steps[5];
+            Assert.That(ram.Turn, Is.EqualTo(2));
+            Assert.That(ram.AppliedHull, Is.EqualTo(18));
+            Assert.That(ram.SelfAppliedHull, Is.EqualTo(8));
+
+            // Totals aggregate applied loss only; ram recoil is self-inflicted
+            // and never counts toward either side.
+            Assert.That(playback.PlayerInflicted.Hull, Is.EqualTo(20));
+            Assert.That(playback.PlayerInflicted.Sail, Is.EqualTo(30));
+            Assert.That(playback.PlayerInflicted.Crew, Is.Zero);
+            Assert.That(playback.EnemyInflicted.Hull, Is.Zero);
+
+            Assert.That(PlaybackEase.Progress(-1f, 1f), Is.Zero);
+            Assert.That(PlaybackEase.Progress(2f, 1f), Is.EqualTo(1f));
+            Assert.That(PlaybackEase.Progress(0.5f, 1f), Is.EqualTo(0.5f).Within(0.0001f));
         }
 
         private static TelemetryEvent Event(string type, string value)
