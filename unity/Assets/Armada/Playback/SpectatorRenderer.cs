@@ -47,7 +47,8 @@ namespace Armada.Client.Playback
 
         [Header("Readout bars (design-tunable placeholders)")]
         [SerializeField] private float barWidth = 1.2f;
-        [SerializeField] private float barLift = 0.6f;
+        [Tooltip("Must clear the tallest marker: enemy capsules top out at y=1.5 under the top-down camera.")]
+        [SerializeField] private float barLift = 1.2f;
         [SerializeField] private Color hullBarColor = new Color(0.40f, 0.95f, 0.40f);
         [SerializeField] private Color sailBarColor = new Color(0.95f, 0.90f, 0.55f);
 
