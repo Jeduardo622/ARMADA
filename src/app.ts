@@ -63,7 +63,8 @@ export function buildServer(options?: BuildOptions) {
       match: {
         create: async (data: unknown) => data,
         findUnique: async () => null,
-        updateMany: async () => ({ count: 0 })
+        updateMany: async () => ({ count: 0 }),
+        count: async () => 0
       },
       matchParticipant: {
         create: async (data: unknown) => data,

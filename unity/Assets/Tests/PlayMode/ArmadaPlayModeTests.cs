@@ -1637,8 +1637,18 @@ namespace Armada.Client.Tests.PlayMode
                 });
             }
 
+            // When set, the next poll reports the match as expired (the
+            // server's abandonment TTL fired).
+            public bool ExpireOnNextPoll;
+
             public Task<ServiceResult<PvpMatchResponse>> GetMatchAsync(string matchId)
             {
+                if (ExpireOnNextPoll)
+                {
+                    ExpireOnNextPoll = false;
+                    return Ok(View("EXPIRED", 1, StartState(), new List<Mission01TurnRecord>(), opponentJoined: false));
+                }
+
                 if (_reconcilePending)
                 {
                     // The failed submission never landed: live match, no
@@ -1817,6 +1827,48 @@ namespace Armada.Client.Tests.PlayMode
             finally
             {
                 UnityEngine.Object.Destroy(spectatorObject);
+                UnityEngine.Object.Destroy(controllerObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PvpNetplay_ExpiredMatchEndsTheSessionInsteadOfPollingForever()
+        {
+            var controllerObject = new GameObject("pvp-netplay-expiry-test");
+            controllerObject.SetActive(false);
+            try
+            {
+                var controller = controllerObject.AddComponent<PvpNetplayUIController>();
+                var fakeClient = new FakeNetplayMatchClient();
+                var flow = new PvpNetplayFlow(fakeClient);
+                controller.Compose(flow, null);
+                controller.ShowMenu();
+
+                controller.OnCreateMatch();
+                var deadline = System.Diagnostics.Stopwatch.StartNew();
+                while (controller.Phase != PvpNetplayUIController.NetplayPhase.WaitingForOpponentJoin
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.WaitingForOpponentJoin));
+
+                // The server-side abandonment TTL fires; the next poll must
+                // finish the session rather than keep waiting on the match.
+                fakeClient.ExpireOnNextPoll = true;
+                controller.Advance(2.5f);
+                deadline.Restart();
+                while (controller.Phase != PvpNetplayUIController.NetplayPhase.Finished
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.Finished));
+            }
+            finally
+            {
                 UnityEngine.Object.Destroy(controllerObject);
             }
 
