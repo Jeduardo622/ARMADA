@@ -164,14 +164,18 @@ namespace Armada.Client.Playback
         /// consumers): markers spawn at the supplied ship snapshot, then the
         /// turn records animate them. The completion line replaces the
         /// mission outcome summary on finish; applied per-side loss totals
-        /// are appended either way.
+        /// are appended either way. Callers replaying mid-battle snapshots
+        /// (per-turn hot-seat playback) pass the battle-start ships as
+        /// baselineShips so the HP/sail readout bars keep the true maxima
+        /// instead of re-baselining to the snapshot values.
         /// </summary>
         public void BeginTurns(
             IReadOnlyList<SimShip> shipsAtStart,
             IReadOnlyList<Mission01TurnRecord> turns,
             int turnLimit,
             string introLine,
-            string completionLine)
+            string completionLine,
+            IReadOnlyList<SimShip> baselineShips = null)
         {
             ClearMarkers();
             _outcome = null;
@@ -181,9 +185,21 @@ namespace Armada.Client.Playback
             _stepArmed = false;
             IsFinished = false;
 
+            var baselineById = new Dictionary<string, SimShip>();
+            if (baselineShips != null)
+            {
+                foreach (var ship in baselineShips)
+                {
+                    if (ship?.Id != null)
+                    {
+                        baselineById[ship.Id] = ship;
+                    }
+                }
+            }
+
             foreach (var ship in shipsAtStart)
             {
-                SpawnMarker(ship);
+                SpawnMarker(ship, baselineById.TryGetValue(ship.Id ?? string.Empty, out var baseline) ? baseline : ship);
             }
 
             _playback = new TurnPlayback(shipsAtStart, turns);
@@ -443,6 +459,13 @@ namespace Armada.Client.Playback
 
         private void SpawnMarker(SimShip ship)
         {
+            SpawnMarker(ship, ship);
+        }
+
+        // baselineShip supplies the readout-bar maxima; it differs from the
+        // spawned snapshot only for mid-battle playback (hot-seat turns).
+        private void SpawnMarker(SimShip ship, SimShip baselineShip)
+        {
             // Placeholder art: player ships are cubes, enemy ships capsules,
             // flat-tinted with the side color.
             var primitive = GameObject.CreatePrimitive(ship.Side == "player" ? PrimitiveType.Cube : PrimitiveType.Capsule);
@@ -463,13 +486,16 @@ namespace Armada.Client.Playback
                 Transform = primitive.transform,
                 Renderer = markerRenderer,
                 BaseColor = baseColor,
-                MaxHull = Mathf.Max(1, ship.Hp),
-                MaxSail = Mathf.Max(1, ship.Sail),
+                MaxHull = Mathf.Max(1, baselineShip.Hp),
+                MaxSail = Mathf.Max(1, baselineShip.Sail),
                 HullBar = SpawnBar($"hull-bar-{ship.Id}", hullBarColor),
                 SailBar = SpawnBar($"sail-bar-{ship.Id}", sailBarColor)
             };
             _markers[ship.Id] = marker;
-            PositionBars(marker, 1f, 1f);
+            PositionBars(
+                marker,
+                Mathf.Clamp01(ship.Hp / (float)marker.MaxHull),
+                Mathf.Clamp01(ship.Sail / (float)marker.MaxSail));
         }
 
         // Bars parent to the renderer, not the marker, so heading rotations

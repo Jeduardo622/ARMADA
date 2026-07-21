@@ -23,6 +23,10 @@ namespace Armada.Client.UI
         {
             Idle,
             SideAEntry,
+            // Hand-the-seat interstitial: side A's confirm never rolls
+            // straight into a live side-B session, so a double-press cannot
+            // submit default side-B orders.
+            SideBHandoff,
             SideBEntry,
             Resolving,
             Playback,
@@ -83,6 +87,12 @@ namespace Armada.Client.UI
 
         public void OnConfirmSide()
         {
+            if (Phase == HotseatPhase.SideBHandoff)
+            {
+                BeginSideEntry(HotseatPhase.SideBEntry);
+                return;
+            }
+
             if (_session == null)
             {
                 return;
@@ -91,7 +101,10 @@ namespace Armada.Client.UI
             if (Phase == HotseatPhase.SideAEntry)
             {
                 _sideAOrders = _session.BuildOrders();
-                BeginSideEntry(HotseatPhase.SideBEntry);
+                _session = null;
+                Phase = HotseatPhase.SideBHandoff;
+                SetStatus($"Side A locked in. Hand the seat to Side B, then press Confirm Side to enter orders.");
+                SetOrderText(string.Empty);
             }
             else if (Phase == HotseatPhase.SideBEntry)
             {
@@ -145,7 +158,10 @@ namespace Armada.Client.UI
                     new List<Mission01TurnRecord> { resolution.Record },
                     PvpScenario.TurnLimit,
                     $"Turn {resolution.Turn}: broadsides fly...",
-                    CompletionLineFor(resolution));
+                    CompletionLineFor(resolution),
+                    // Battle-start stats keep the HP/sail bars on the true
+                    // maxima when replaying a mid-battle turn snapshot.
+                    PvpScenario.BuildInitialState().Ships);
                 Phase = HotseatPhase.Playback;
                 SetStatus($"Turn {resolution.Turn} resolved — spectating playback.");
             }

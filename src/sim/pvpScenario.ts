@@ -1,4 +1,4 @@
-import { SimModifiers, SimState, SimSummary } from './types.js';
+import { SimModifiers, SimOrder, SimState, SimSummary } from './types.js';
 
 // PvP skirmish "2v2" — the pinned symmetric player-versus-player scenario.
 // Side A ships ride the engine's 'player' side and side B the 'enemy' side;
@@ -105,6 +105,33 @@ export function pvpFingerprint(state: SimState = createPvpSkirmishState()): stri
 }
 
 export type PvpMatchResult = 'ongoing' | 'side_a' | 'side_b' | 'draw';
+
+export type PvpEngineSide = 'player' | 'enemy';
+
+// Hot-seat/server fairness guard, defined once here so the slice-2 server
+// routes lift a tested helper instead of re-deriving the C# client mirror
+// (PvpHotseatFlow.ValidateSideOrders): a side may only order its own living
+// ships, and attacks may only target living ships on the opposing side.
+export function validateSideOrders(
+  orders: SimOrder[],
+  state: SimState,
+  engineSide: PvpEngineSide
+): 'order_side_mismatch' | 'target_side_mismatch' | null {
+  const shipById = new Map(state.ships.map((ship) => [ship.id, ship]));
+  for (const order of orders) {
+    const ship = shipById.get(order.shipId);
+    if (!ship || ship.side !== engineSide || ship.hp <= 0) {
+      return 'order_side_mismatch';
+    }
+    if (order.targetShipId !== undefined) {
+      const target = shipById.get(order.targetShipId);
+      if (!target || target.side === engineSide || target.hp <= 0) {
+        return 'target_side_mismatch';
+      }
+    }
+  }
+  return null;
+}
 
 // Match result after a resolved turn. summary counts the engine sides:
 // playerRemaining is side A, enemyRemaining is side B. Mutual annihilation

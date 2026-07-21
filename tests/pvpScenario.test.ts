@@ -10,7 +10,8 @@ import {
   createPvpModifiers,
   createPvpSkirmishState,
   pvpFingerprint,
-  pvpResultForTurn
+  pvpResultForTurn,
+  validateSideOrders
 } from '../src/sim/pvpScenario.js';
 import type { SimOrder, SimPreviewResult, SimState, SimSummary } from '../src/sim/types.js';
 
@@ -214,5 +215,68 @@ describe('pvp match loop (client-style state chaining)', () => {
 
   it('mirrored orders leave the scenario code stable (sanity)', () => {
     expect(PVP_SCENARIO_CODE).toBe('pvp-skirmish-2v2');
+  });
+});
+
+describe('side-order fairness guard (lifted by the slice-2 server routes)', () => {
+  const state = () => createPvpSkirmishState();
+
+  it('accepts a side ordering its own living ships at opposing targets', () => {
+    expect(
+      validateSideOrders(
+        [
+          fire(PVP_SIDE_A_SHIP_IDS[0], PVP_SIDE_B_SHIP_IDS[0]),
+          { shipId: PVP_SIDE_A_SHIP_IDS[1], action: 'maneuver', turnDelta: 15, speedDelta: 0 }
+        ],
+        state(),
+        'player'
+      )
+    ).toBeNull();
+  });
+
+  it('rejects ordering the opposing side, unknown, or sunk ships', () => {
+    expect(
+      validateSideOrders([fire(PVP_SIDE_B_SHIP_IDS[0], PVP_SIDE_A_SHIP_IDS[0])], state(), 'player')
+    ).toBe('order_side_mismatch');
+    expect(
+      validateSideOrders(
+        [{ shipId: 'ghost-ship', action: 'pass', turnDelta: 0, speedDelta: 0 }],
+        state(),
+        'player'
+      )
+    ).toBe('order_side_mismatch');
+
+    const sunkOwn = state();
+    sunkOwn.ships[0].hp = 0;
+    expect(
+      validateSideOrders([fire(PVP_SIDE_A_SHIP_IDS[0], PVP_SIDE_B_SHIP_IDS[0])], sunkOwn, 'player')
+    ).toBe('order_side_mismatch');
+  });
+
+  it('rejects friendly-fire, unknown, and sunk targets', () => {
+    expect(
+      validateSideOrders([fire(PVP_SIDE_A_SHIP_IDS[0], PVP_SIDE_A_SHIP_IDS[1])], state(), 'player')
+    ).toBe('target_side_mismatch');
+    expect(
+      validateSideOrders([fire(PVP_SIDE_A_SHIP_IDS[0], 'ghost-ship')], state(), 'player')
+    ).toBe('target_side_mismatch');
+
+    const sunkTarget = state();
+    sunkTarget.ships[2].hp = 0;
+    expect(
+      validateSideOrders(
+        [fire(PVP_SIDE_A_SHIP_IDS[0], PVP_SIDE_B_SHIP_IDS[0])],
+        sunkTarget,
+        'player'
+      )
+    ).toBe('target_side_mismatch');
+
+    // The same rules hold from side B's perspective.
+    expect(
+      validateSideOrders([fire(PVP_SIDE_B_SHIP_IDS[0], PVP_SIDE_A_SHIP_IDS[0])], state(), 'enemy')
+    ).toBeNull();
+    expect(
+      validateSideOrders([fire(PVP_SIDE_B_SHIP_IDS[0], PVP_SIDE_B_SHIP_IDS[1])], state(), 'enemy')
+    ).toBe('target_side_mismatch');
   });
 });

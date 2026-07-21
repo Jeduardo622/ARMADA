@@ -645,6 +645,68 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(session.CurrentDraft.SpeedDelta, Is.EqualTo(-2));
         }
 
+        private sealed class RejectingPvpPreviewClient : ISimPreviewClient
+        {
+            public int Calls { get; private set; }
+
+            public Task<SimPreviewResult> PreviewAsync(SimPreviewRequest request)
+            {
+                Calls++;
+                return Task.FromResult<SimPreviewResult>(null);
+            }
+        }
+
+        [Test]
+        public void PvpHotseatFlow_RejectsUnfairOrdersAndClassifiesResultsLikeTheBackend()
+        {
+            // Mirrors validateSideOrders/pvpResultForTurn rejection rows in
+            // tests/pvpScenario.test.ts; the fake never resolves, so any
+            // client call means a guard failed. Synchronously-completed
+            // tasks make blocking on the result safe here.
+            var client = new RejectingPvpPreviewClient();
+            var flow = new PvpHotseatFlow(client);
+            var maneuver = new SimOrder { ShipId = "alpha-frigate-a", Action = "maneuver" };
+            var sideBManeuver = new SimOrder { ShipId = "bravo-frigate-a", Action = "maneuver" };
+
+            // Side A ordering a bravo ship (and vice versa) is rejected.
+            var swapped = flow.SubmitTurnAsync(
+                new List<SimOrder> { sideBManeuver },
+                new List<SimOrder> { maneuver }).GetAwaiter().GetResult();
+            Assert.That(swapped.Success, Is.False);
+            Assert.That(swapped.FailureReason, Is.EqualTo("order_side_mismatch"));
+
+            // Friendly fire is rejected.
+            var friendly = flow.SubmitTurnAsync(
+                new List<SimOrder>
+                {
+                    new SimOrder { ShipId = "alpha-frigate-a", Action = "broadside", TargetShipId = "alpha-frigate-b", Side = "starboard" }
+                },
+                new List<SimOrder> { sideBManeuver }).GetAwaiter().GetResult();
+            Assert.That(friendly.Success, Is.False);
+            Assert.That(friendly.FailureReason, Is.EqualTo("target_side_mismatch"));
+
+            // Unknown ships and null order lists are rejected.
+            var unknown = flow.SubmitTurnAsync(
+                new List<SimOrder> { new SimOrder { ShipId = "ghost-ship", Action = "pass" } },
+                new List<SimOrder> { sideBManeuver }).GetAwaiter().GetResult();
+            Assert.That(unknown.FailureReason, Is.EqualTo("order_side_mismatch"));
+            var missing = flow.SubmitTurnAsync(null, new List<SimOrder>()).GetAwaiter().GetResult();
+            Assert.That(missing.FailureReason, Is.EqualTo("orders_missing"));
+
+            // No rejected submit ever reached the preview client, and the
+            // match state never advanced.
+            Assert.That(client.Calls, Is.Zero);
+            Assert.That(flow.TurnNumber, Is.EqualTo(1));
+            Assert.That(flow.MatchResult, Is.EqualTo(PvpHotseatFlow.ResultOngoing));
+
+            // Result classification mirrors pvpResultForTurn row for row.
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 0, EnemyRemaining = 0 }, 3), Is.EqualTo(PvpHotseatFlow.ResultDraw));
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 2, EnemyRemaining = 0 }, 3), Is.EqualTo(PvpHotseatFlow.ResultSideA));
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 0, EnemyRemaining = 1 }, 3), Is.EqualTo(PvpHotseatFlow.ResultSideB));
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 1, EnemyRemaining = 1 }, 3), Is.EqualTo(PvpHotseatFlow.ResultOngoing));
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 1, EnemyRemaining = 1 }, PvpScenario.TurnLimit), Is.EqualTo(PvpHotseatFlow.ResultDraw));
+        }
+
         [Test]
         public void MissionCompleteResponse_DeserializesBackendPayload()
         {
