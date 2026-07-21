@@ -24,7 +24,7 @@ namespace Armada.Client.Playback
         [SerializeField] private float markerHeight = 0.5f;
 
         [Header("Step timing seconds (design-tunable placeholders)")]
-        [SerializeField] private float turnBannerSeconds = 0.4f;
+        [SerializeField] private float turnBannerSeconds = 0.5f;
         [SerializeField] private float maneuverSeconds = 0.2f;
         [SerializeField] private float moveSeconds = 0.35f;
         [SerializeField] private float flashSeconds = 0.45f;
@@ -32,7 +32,7 @@ namespace Armada.Client.Playback
         [Header("Colors (design-tunable placeholders)")]
         [SerializeField] private Color playerColor = new Color(0.20f, 0.75f, 0.35f);
         [SerializeField] private Color enemyColor = new Color(0.85f, 0.25f, 0.20f);
-        [SerializeField] private Color roundShotFlashColor = new Color(1.00f, 0.60f, 0.10f);
+        [SerializeField] private Color roundShotFlashColor = new Color(1.00f, 0.72f, 0.05f);
         [Tooltip("Chain shot is the Mission 10 showcase; its flash must read distinct from round shot.")]
         [SerializeField] private Color chainShotFlashColor = new Color(0.20f, 0.90f, 1.00f);
         [SerializeField] private Color ramFlashColor = Color.white;
@@ -48,7 +48,7 @@ namespace Armada.Client.Playback
         [Header("Readout bars (design-tunable placeholders)")]
         [SerializeField] private float barWidth = 1.2f;
         [Tooltip("Must clear the tallest marker: enemy capsules top out at y=1.5 under the top-down camera.")]
-        [SerializeField] private float barLift = 1.2f;
+        [SerializeField] private float barLift = 1.4f;
         [SerializeField] private Color hullBarColor = new Color(0.40f, 0.95f, 0.40f);
         [SerializeField] private Color sailBarColor = new Color(0.95f, 0.90f, 0.55f);
 
