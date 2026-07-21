@@ -109,4 +109,6 @@ Both clients default to `http://localhost:4500`
   bookkeeping is the pre-turn fleet snapshot used to animate playback.
 - The scenario, fleet, and modifier set are fingerprint-pinned in
   `tests/pvpScenario.test.ts` and the Unity EditMode suite; deviations are
-  design changes, not tuning.
+  design changes, not tuning. The full knob inventory, current values,
+  and tuning constraints live in the draft spec at
+  `docs/design/pvp-tuning.md`.

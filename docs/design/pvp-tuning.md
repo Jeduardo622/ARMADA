@@ -1,0 +1,114 @@
+# PvP Demo Design Tuning
+
+> **Status: DRAFT — pending design review.** Authored after the PvP demo
+> merged (PRs #53–#56), following the Mission 07 / spectator-tuning
+> precedent of writing the missing design spec against the shipped
+> implementation. No values are proposed changed yet: every **Proposed**
+> cell is `keep` until a design pass fills it in. Value changes land with
+> a status update in the same PR.
+
+Consolidates every design-tunable knob and placeholder constant in the
+PvP demo — scenario stats, match lifecycle policy, order-entry surface,
+netplay polling, and the two generated scenes. Spectator playback knobs
+(shared renderer) are owned by `docs/design/spectator-tuning.md` and are
+deliberately not duplicated here.
+
+## Scenario (`src/sim/pvpScenario.ts`, mirrored in `unity/.../Core/PvpScenario.cs`)
+
+> ⚠ Everything in this section is **fingerprint-pinned** in
+> `tests/pvpScenario.test.ts` AND the Unity EditMode suite. Changing any
+> value is a design change: update both fingerprint constants, the C#
+> mirror, and re-derive the empirical fixtures (see Constraints).
+
+| Knob | Current | Proposed | Rationale / derived effect |
+| --- | --- | --- | --- |
+| `PVP_TURN_LIMIT` | 20 | keep | Focus-fire wins land around turn 6–8; 20 gives maneuver-heavy play headroom while keeping stalemates bounded. Timeout = draw. |
+| `FRIGATE_HP` | 120 | keep | ~3 broadside hits to sink (base damage 25 + 0–5 variance at opening stats); sets match length together with the hit chance below. |
+| `FRIGATE_SAIL` | 80 | keep | Feeds base damage (`18 + floor(sail/25)` = +3) and is the chain-shot target pool. |
+| `FRIGATE_CREW` | 50 | keep | Only cosmetic in v1 (boarding deferred); becomes live if boarding joins the modifier set. |
+| `FRIGATE_SPEED` | 3 | keep | +1 hit chance (`floor(v/2)`), +4 base damage (`floor(v·1.5)`); speedDelta orders swing damage ±3 without a movement phase. |
+| `LINE_SEPARATION` | 220 | keep | Opening range 220 → range penalty 4 → ~69% hit chance at start. The single biggest lethality lever: −50 range ≈ +1% hit per 50 units. |
+| `LINE_SPREAD` | 30 | keep | ±30 y keeps the four markers visually separated at the shared 0.1 world-scale framing. |
+| `WIND_DIRECTION` / `WIND_SPEED` | 90 / 0 | keep | Cosmetic in v1 (no `windMovement`); speed 0 keeps it inert even if flags flip accidentally. |
+| `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). Pinned fixture: seed-11 focus-fire-vs-split is a side A win inside the limit. |
+| Modifier set | `{ chainShot: true }` | keep | **Product pin, not a tuning knob.** No movement phase by consequence; flipping `windMovement`/`ramming` in is scenario v2 and needs explicit sign-off. |
+
+## Match lifecycle policy (`src/routes/pvp.ts`)
+
+| Knob | Current | Proposed | Rationale |
+| --- | --- | --- | --- |
+| `MATCH_WAITING_TTL_MS` | 30 min | keep | How long a join code stays live. Generous for share-a-code-over-chat; not so long that dead lobbies pile up. |
+| `MATCH_IN_PROGRESS_TTL_MS` | 60 min | keep | Idle time (no submission) before an in-progress match expires. Must comfortably exceed real order-authoring time; polling never refreshes it by design. |
+| `MAX_OPEN_MATCHES_PER_PLAYER` | 3 | keep | Soft cap, enforced on create AND join. Bounds storage abuse; 3 lets a playtest juggle a stuck match plus a fresh one. |
+| Join-code length / alphabet | 8 chars, `A–Z2–9` minus `0/O/1/I/L` (31 glyphs) | keep | Read-aloud safe; 31⁸ ≈ 8.5e11 codes keeps collisions negligible for the 3-attempt create loop. |
+| `CODE_CREATE_ATTEMPTS` | 3 | keep | Collision retries before giving up; at the code space above this should never be observed. |
+| Orders per submission (zod cap, hard-coded) | 8 | keep | Must stay ≥ ships per side (2); headroom for larger scenario variants without a contract change. |
+| Server seed range (hard-coded) | `randomInt(0, 2^31−1)` | keep | Full non-negative int32 space; no gameplay effect beyond variety. |
+
+## Order-entry surface (`unity/.../Services/PvpOrderSession.cs`)
+
+| Knob | Current | Proposed | Rationale |
+| --- | --- | --- | --- |
+| `TurnDeltaStep` | 15° per press | keep | Matches the engine's 15°-per-point angle penalty granularity, so every press has a legible effect. |
+| `TurnDeltaLimit` | ±90° | keep | **Schema-pinned** (`simOrderSchema`); the UI clamp must mirror the server bound. |
+| `SpeedDeltaLimit` | ±2 | keep | **Schema-pinned**; same mirroring requirement. |
+
+## Netplay client (`unity/.../UI/PvpNetplayUIController.cs`)
+
+| Knob | Current | Proposed | Rationale |
+| --- | --- | --- | --- |
+| `pollIntervalSeconds` (serialized) | 2 | keep | Sets worst-case "opponent resolved → I see it" latency. PlayMode tests drive `Advance(2.5f)` ticks, so keep ≤ 2.4 or update the tests with it. |
+| Verdict / status copy (hard-coded) | "VICTORY — your side wins", "DEFEAT…", "DRAW", "MATCH EXPIRED — abandoned…", "Connection hiccup… retrying", "Turn N: broadsides fly..." | keep | Placeholder voice; a copy pass can retune freely — none of these strings are test-pinned verbatim except via `Does.Contain("VICTORY")` in one PlayMode assert. |
+
+## Generated scenes (`PvPHotseatDemoSceneBuilder` / `PvPNetplayDemoSceneBuilder`)
+
+Both builders share the spectator demo's board material and framing
+conventions; values below are hard-coded in the builders.
+
+| Knob | Current | Proposed | Rationale |
+| --- | --- | --- | --- |
+| Camera `orthographicSize` / position | 8.5 @ (11, 20, 0) | keep | Battle midline sits at sim x = 110 → world x = 11 (vs 12.5 in the mission scene); same 8.5 zoom as the reviewed spectator framing. |
+| Board cube | 30×1×16 @ (11, −0.55, 0) | keep | Covers the mirrored sim space at 0.1 world units per sim unit. |
+| Button size / spacing / margin | 130×40, 8 gap, 20 edge | keep | Eight order buttons fit one row at default game-view widths. |
+| Button fill color | (0.15, 0.25, 0.4, 0.9) | keep | Muted navy; readable TMP white labels without competing with the board. |
+| Order/HUD label layout | hud 60h @ −10; status 40h @ −75; order panel 140h @ 70 (hot-seat) / 116 (netplay) | keep | Netplay lifts the order panel above its second (menu) button row at y = 66. |
+| Label / button font sizes | 18 / 16 | keep | Denser than the mission scene's 20 — the PvP HUD carries three text blocks. |
+| Join-code input (netplay) | 8-char limit, LegacyRuntime 18pt, white field (0.9), gray italic "MATCH CODE" placeholder | keep | Legacy uGUI InputField keeps the interactive path off TMP; limit mirrors the server code length. |
+| Hot-seat handoff copy | "Side A locked in. Hand the seat to Side B…" | keep | The interstitial is a review-mandated fairness gate; copy is free to change, the extra confirm press is not. |
+
+## Constraints (do not tune past these)
+
+- **Fingerprint pins:** any Scenario-section change must update the
+  fingerprint constant in `tests/pvpScenario.test.ts`, the same constant
+  in the Unity EditMode suite, and `PvpScenario.cs` — and re-derive the
+  empirical fixtures: the seed-11 focus-fire win (vitest + the server
+  full-match test) and the hold-fire turn-limit draw.
+- **Schema mirrors:** `TurnDeltaLimit` (±90) and `SpeedDeltaLimit` (±2)
+  must equal `simOrderSchema`'s bounds; the join-code input's character
+  limit must equal `CODE_LENGTH`.
+- **No upper bound on `turnNumber`** in the submit schema — deliberate
+  (post-draw replays must reach the transaction to earn `409 match_over`;
+  Codex finding on PR #54). Do not "tidy" a max back in.
+- **TTL semantics:** polling must never bump `updatedAt` (idle polling
+  keeping a match alive would defeat abandonment detection). The
+  in-progress TTL must exceed any plausible order-authoring session.
+- **Orders cap ≥ fleet size** per side, or legal submissions start
+  failing validation.
+- **Poll interval vs tests:** PlayMode drives 2.5s ticks; a poll interval
+  above 2.4s silently stops polling in those tests.
+- **Modifier set is a product pin**, not a knob (see Scenario table).
+- Spectator playback knobs (timings, colors, bars, camera in the mission
+  scene) are owned by `spectator-tuning.md`; PvP scenes inherit the
+  renderer defaults automatically, and per-turn bar baselines derive from
+  `PvpScenario.BuildInitialState()` so hull/sail stat changes flow into
+  the bars with no extra wiring.
+
+## Regeneration
+
+Both PvP scenes are generated. After changing any builder value or
+serialized default, rebuild via `Assets → Armada → Build PvP Hotseat
+Demo Scene` / `Build PvP Netplay Demo Scene` (or batchmode
+`-executeMethod PvPHotseatDemoSceneBuilder.Build` /
+`PvPNetplayDemoSceneBuilder.Build`) and commit the scenes plus any new
+`.meta` files. Scenario or lifecycle constant changes need no scene
+rebuild but do ripple through the fingerprint/fixture pins above.
