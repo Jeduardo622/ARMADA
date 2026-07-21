@@ -10,27 +10,25 @@ using UnityEngine;
 namespace Armada.Client.Bootstrap
 {
     /// <summary>
-    /// Runtime composition root for the PvP hot-seat demo. Composes the
-    /// authenticated client service graph, builds a PvpHotseatFlow over
-    /// SimService, and hands the order-authoring UI its collaborators. Both
-    /// captains share this one client; match state between turns is held
-    /// client-side, which is a hot-seat-only affordance.
+    /// Runtime composition root for the networked PvP demo. Composes the
+    /// authenticated client service graph, builds a PvpNetplayFlow over
+    /// PvpMatchService, and hands the netplay UI its collaborators. Each
+    /// running client (editor Play Mode or the standalone build) is one
+    /// authenticated player; two clients play a match through the
+    /// server-authoritative pvp_api routes.
     /// </summary>
-    public sealed class PvpHotseatBootstrap : MonoBehaviour
+    public sealed class PvpNetplayBootstrap : MonoBehaviour
     {
         [Header("Config")]
         [SerializeField] private ArmadaClientConfig clientConfig;
         [SerializeField] private DeterministicSimHooks determinism;
 
         [Header("UI Wiring")]
-        [SerializeField] private PvpHotseatUIController orderUI;
+        [SerializeField] private PvpNetplayUIController netplayUI;
         [SerializeField] private Playback.SpectatorRenderer spectator;
 
-        [Header("Run")]
-        [SerializeField] private int seed = PvpScenario.DefaultSeed;
-
         private AuthService _authService;
-        private PvpHotseatFlow _flow;
+        private PvpNetplayFlow _flow;
 
         // Composition happens in Awake so the wired collaborators are in
         // place before any sibling Start runs; Unity does not guarantee
@@ -39,21 +37,21 @@ namespace Armada.Client.Bootstrap
         {
             if (clientConfig == null)
             {
-                Debug.LogError("[PvpHotseatBootstrap] Missing client config asset.");
+                Debug.LogError("[PvpNetplayBootstrap] Missing client config asset.");
                 return;
             }
 
             // Each bootstrap composes an authenticated service graph; two
             // roots in one scene would race guest sessions for the same UI
             // wiring, so composition roots refuse to run together.
-            if (FindFirstObjectByType<ArmadaBootstrap>() != null || FindFirstObjectByType<Mission07Bootstrap>() != null || FindFirstObjectByType<Mission08Bootstrap>() != null || FindFirstObjectByType<Mission09Bootstrap>() != null || FindFirstObjectByType<Mission10Bootstrap>() != null || FindFirstObjectByType<PvpNetplayBootstrap>() != null)
+            if (FindFirstObjectByType<ArmadaBootstrap>() != null || FindFirstObjectByType<Mission07Bootstrap>() != null || FindFirstObjectByType<Mission08Bootstrap>() != null || FindFirstObjectByType<Mission09Bootstrap>() != null || FindFirstObjectByType<Mission10Bootstrap>() != null || FindFirstObjectByType<PvpHotseatBootstrap>() != null)
             {
-                Debug.LogError("[PvpHotseatBootstrap] Another composition root is active in the scene; refusing to compose a second authenticated service graph.");
+                Debug.LogError("[PvpNetplayBootstrap] Another composition root is active in the scene; refusing to compose a second authenticated service graph.");
                 return;
             }
 
             determinism?.ApplyFixedTimestep();
-            determinism?.ApplySeed(seed);
+            determinism?.ApplySeed();
 
             var json = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
             var flags = new FeatureFlags(clientConfig.FeatureToggles);
@@ -64,26 +62,26 @@ namespace Armada.Client.Bootstrap
             var authService = new AuthService(apiClient, json);
             authServiceRef = authService;
 
-            var simService = new SimService(apiClient, flags, json);
+            var matchService = new PvpMatchService(apiClient, flags);
 
             _authService = authService;
-            _flow = new PvpHotseatFlow(simService, seed);
+            _flow = new PvpNetplayFlow(matchService);
 
-            if (orderUI != null)
+            if (netplayUI != null)
             {
-                orderUI.Compose(_flow, spectator);
+                netplayUI.Compose(_flow, spectator);
             }
         }
 
         private async void Start()
         {
-            if (_flow == null || orderUI == null)
+            if (_flow == null || netplayUI == null)
             {
                 return;
             }
 
             await _authService.GetTokenAsync();
-            orderUI.BeginMatch();
+            netplayUI.ShowMenu();
         }
 
         private sealed class AuthProxy : IAuthProvider

@@ -1513,6 +1513,316 @@ namespace Armada.Client.Tests.PlayMode
             }
         }
 
+        private sealed class FakeNetplayMatchClient : IPvpMatchClient
+        {
+            public PvpSubmitOrdersRequest LastSubmit { get; private set; }
+            public string SubmittedMatchId { get; private set; }
+            public int Polls { get; private set; }
+
+            private const string MatchId = "7e57ab1e-0000-4000-8000-00000000c0de";
+
+            private static SimState StartState() => PvpScenario.BuildInitialState();
+
+            private static PvpMatchView View(string status, int turnNumber, SimState state, List<Mission01TurnRecord> turns, bool opponentJoined, string result = null)
+            {
+                return new PvpMatchView
+                {
+                    Id = MatchId,
+                    Code = "TESTC0DE",
+                    Status = status,
+                    ScenarioCode = PvpScenario.ScenarioCode,
+                    Seed = status == "COMPLETED" ? 11 : (int?)null,
+                    TurnNumber = turnNumber,
+                    TurnLimit = PvpScenario.TurnLimit,
+                    Result = result,
+                    State = state,
+                    Turns = turns,
+                    YourSide = "side_a",
+                    OpponentJoined = opponentJoined
+                };
+            }
+
+            private static SimState SweptState()
+            {
+                var state = StartState();
+                state.Turn = 2;
+                foreach (var ship in state.Ships)
+                {
+                    if (ship.Side == "enemy")
+                    {
+                        ship.Hp = 0;
+                    }
+                }
+
+                return state;
+            }
+
+            private static List<Mission01TurnRecord> ResolvedTurns()
+            {
+                return new List<Mission01TurnRecord>
+                {
+                    new Mission01TurnRecord
+                    {
+                        Turn = 1,
+                        Hash = "net-fake-hash",
+                        Summary = new SimSummary { PlayerRemaining = 2, EnemyRemaining = 0, Sunk = new List<string> { "bravo-frigate-a", "bravo-frigate-b" } },
+                        Events = new List<SimEvent>
+                        {
+                            new SimEvent
+                            {
+                                Type = "broadside",
+                                ShipId = "alpha-frigate-a",
+                                TargetShipId = "bravo-frigate-a",
+                                Side = "starboard",
+                                Hit = true,
+                                Ammo = "chain",
+                                TargetRemaining = new SimRemaining { Hp = 0, Sail = 40, Crew = 50 }
+                            },
+                            new SimEvent
+                            {
+                                Type = "broadside",
+                                ShipId = "alpha-frigate-b",
+                                TargetShipId = "bravo-frigate-b",
+                                Side = "starboard",
+                                Hit = true,
+                                TargetRemaining = new SimRemaining { Hp = 0, Sail = 80, Crew = 50 }
+                            }
+                        }
+                    }
+                };
+            }
+
+            public Task<ServiceResult<PvpMatchResponse>> CreateMatchAsync()
+            {
+                return Ok(View("WAITING_FOR_OPPONENT", 1, StartState(), new List<Mission01TurnRecord>(), opponentJoined: false));
+            }
+
+            public Task<ServiceResult<PvpMatchResponse>> JoinMatchAsync(string code)
+            {
+                throw new System.InvalidOperationException("creator flow never joins");
+            }
+
+            // Simulates a transport drop on the next submission; the server
+            // never received it, so the reconcile poll shows no staged
+            // orders.
+            public bool FailNextSubmit;
+            private bool _reconcilePending;
+
+            public Task<ServiceResult<PvpSubmitOrdersResponse>> SubmitOrdersAsync(string matchId, PvpSubmitOrdersRequest request)
+            {
+                if (FailNextSubmit)
+                {
+                    FailNextSubmit = false;
+                    _reconcilePending = true;
+                    return Task.FromResult(new ServiceResult<PvpSubmitOrdersResponse>
+                    {
+                        Success = false,
+                        Status = 0,
+                        ErrorReason = "transport_dropped"
+                    });
+                }
+
+                SubmittedMatchId = matchId;
+                LastSubmit = request;
+                // The opponent has not submitted yet: orders staged only.
+                return Task.FromResult(new ServiceResult<PvpSubmitOrdersResponse>
+                {
+                    Data = new PvpSubmitOrdersResponse
+                    {
+                        Resolved = false,
+                        Match = View("IN_PROGRESS", 1, StartState(), new List<Mission01TurnRecord>(), opponentJoined: true)
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<PvpMatchResponse>> GetMatchAsync(string matchId)
+            {
+                if (_reconcilePending)
+                {
+                    // The failed submission never landed: live match, no
+                    // staged orders from this side (YouSubmitted false).
+                    _reconcilePending = false;
+                    return Ok(View("IN_PROGRESS", 1, StartState(), new List<Mission01TurnRecord>(), opponentJoined: true));
+                }
+
+                Polls++;
+                if (Polls == 1)
+                {
+                    // Still waiting for the opponent to join.
+                    return Ok(View("WAITING_FOR_OPPONENT", 1, StartState(), new List<Mission01TurnRecord>(), opponentJoined: false));
+                }
+                if (Polls == 2)
+                {
+                    // Opponent joined; the match is live.
+                    return Ok(View("IN_PROGRESS", 1, StartState(), new List<Mission01TurnRecord>(), opponentJoined: true));
+                }
+
+                // After our submission the opponent's orders landed and the
+                // server resolved turn 1 as a side A sweep.
+                return Ok(View("COMPLETED", 2, SweptState(), ResolvedTurns(), opponentJoined: true, result: "side_a"));
+            }
+
+            private static Task<ServiceResult<PvpMatchResponse>> Ok(PvpMatchView view)
+            {
+                return Task.FromResult(new ServiceResult<PvpMatchResponse>
+                {
+                    Data = new PvpMatchResponse { Match = view },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator PvpNetplay_CreatorFlowSubmitsOwnSideOnlyAndPlaysServerResolvedTurn()
+        {
+            // Inactive objects so Update never runs; the test drives
+            // Advance/Tick with fixed deltas and asserts state, never
+            // rendered output.
+            var spectatorObject = new GameObject("pvp-netplay-spectator-test");
+            spectatorObject.SetActive(false);
+            var controllerObject = new GameObject("pvp-netplay-controller-test");
+            controllerObject.SetActive(false);
+            try
+            {
+                var spectator = spectatorObject.AddComponent<SpectatorRenderer>();
+                var controller = controllerObject.AddComponent<PvpNetplayUIController>();
+                var fakeClient = new FakeNetplayMatchClient();
+                var flow = new PvpNetplayFlow(fakeClient);
+
+                controller.Compose(flow, spectator);
+                controller.ShowMenu();
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.Menu));
+
+                // Create: the fake resolves synchronously here, but awaits of
+                // completed tasks are a platform timing detail — wait bounded
+                // for each phase instead of asserting intermediate states.
+                controller.OnCreateMatch();
+                var deadline = System.Diagnostics.Stopwatch.StartNew();
+                while (controller.Phase != PvpNetplayUIController.NetplayPhase.WaitingForOpponentJoin
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.WaitingForOpponentJoin));
+
+                // First poll: still waiting. Second poll: opponent joined,
+                // order entry opens for OUR side only.
+                controller.Advance(2.5f);
+                deadline.Restart();
+                while (fakeClient.Polls < 1 && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.WaitingForOpponentJoin));
+
+                controller.Advance(2.5f);
+                deadline.Restart();
+                while (controller.Phase != PvpNetplayUIController.NetplayPhase.OrderEntry
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.OrderEntry));
+                Assert.That(controller.CurrentSession.SideLabel, Is.EqualTo("A"));
+                Assert.That(controller.CurrentSession.Drafts, Has.Count.EqualTo(2));
+
+                // An ambiguous submit failure (transport drop) must NOT be
+                // terminal: the reconcile poll finds no staged orders on the
+                // server and reopens order entry for re-authoring.
+                fakeClient.FailNextSubmit = true;
+                controller.OnCycleTarget();
+                controller.OnConfirmOrders();
+                deadline.Restart();
+                while (controller.Phase == PvpNetplayUIController.NetplayPhase.OrderEntry
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.WaitingForResolution));
+                controller.Advance(0.1f);
+                deadline.Restart();
+                while (controller.Phase != PvpNetplayUIController.NetplayPhase.OrderEntry
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.OrderEntry));
+                Assert.That(fakeClient.LastSubmit, Is.Null, "the dropped submission never reached the server");
+
+                // Author side A's orders: alpha-a chain-shots bravo-a.
+                controller.OnCycleTarget();
+                controller.OnToggleAmmo();
+                controller.OnNextShip();
+                controller.OnCycleTarget();
+                controller.OnCycleTarget();
+                controller.OnConfirmOrders();
+
+                deadline.Restart();
+                while (controller.Phase != PvpNetplayUIController.NetplayPhase.WaitingForResolution
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.WaitingForResolution));
+
+                // The submission carried ONLY our side's ships, bound to the
+                // server's current turn.
+                Assert.That(fakeClient.SubmittedMatchId, Is.EqualTo(flow.MatchId));
+                Assert.That(fakeClient.LastSubmit.TurnNumber, Is.EqualTo(1));
+                Assert.That(fakeClient.LastSubmit.Orders, Has.Count.EqualTo(2));
+                foreach (var order in fakeClient.LastSubmit.Orders)
+                {
+                    Assert.That(order.ShipId, Does.StartWith("alpha-"));
+                }
+                Assert.That(fakeClient.LastSubmit.Orders[0].TargetShipId, Is.EqualTo("bravo-frigate-a"));
+                Assert.That(fakeClient.LastSubmit.Orders[0].Ammo, Is.EqualTo("chain"));
+                Assert.That(fakeClient.LastSubmit.Orders[1].TargetShipId, Is.EqualTo("bravo-frigate-b"));
+                Assert.That(fakeClient.LastSubmit.Orders[1].Ammo, Is.Null);
+
+                // The resolution poll discovers the server-resolved turn and
+                // hands it to the spectator from the pre-turn snapshot.
+                controller.Advance(2.5f);
+                deadline.Restart();
+                while (controller.Phase != PvpNetplayUIController.NetplayPhase.Playback
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.Playback));
+
+                Assert.That(spectator.TryGetMarkerPosition("bravo-frigate-b", out var bravoStart), Is.True);
+                Assert.That(bravoStart.x, Is.EqualTo(22f).Within(0.001f));
+
+                var sawChainBroadside = false;
+                for (var tick = 0; tick < 200 && !spectator.IsFinished; tick++)
+                {
+                    spectator.Tick(0.5f);
+                    if (spectator.CurrentStep?.Kind == PlaybackStepKind.Broadside && spectator.CurrentStep.ChainShot)
+                    {
+                        sawChainBroadside = true;
+                    }
+                }
+                Assert.That(spectator.IsFinished, Is.True);
+                Assert.That(sawChainBroadside, Is.True);
+                Assert.That(spectator.HudText, Does.Contain("VICTORY"));
+                Assert.That(spectator.HudText, Does.Contain("side A applied: hull 240"));
+
+                // Playback completion lands on the match verdict.
+                controller.Advance(0.1f);
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.Finished));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(spectatorObject);
+                UnityEngine.Object.Destroy(controllerObject);
+            }
+
+            yield return null;
+        }
+
         [UnityTest]
         public IEnumerator PvpHotseat_BothSidesOrdersResolveOneTurnAndSpectatorPlaysItBack()
         {

@@ -1008,6 +1008,49 @@ namespace Armada.Client.Core
         public Mission10Outcome Outcome { get; set; }
     }
 
+    // PvP match lifecycle models (docs/api/openapi.yaml PvpMatchView /
+    // PvpSubmitOrdersRequest / PvpSubmitOrdersResponse).
+    [Serializable]
+    public sealed class PvpMatchView
+    {
+        public string Id { get; set; }
+        public string Code { get; set; }
+        public string Status { get; set; }
+        public string ScenarioCode { get; set; }
+        // Null until the match completes (the server withholds the live
+        // seed: it would be a local outcome oracle).
+        public int? Seed { get; set; }
+        public int TurnNumber { get; set; }
+        public int TurnLimit { get; set; }
+        public string Result { get; set; }
+        public SimState State { get; set; }
+        public List<Mission01TurnRecord> Turns { get; set; }
+        public string YourSide { get; set; }
+        public bool YouSubmitted { get; set; }
+        public bool OpponentJoined { get; set; }
+        public bool OpponentSubmitted { get; set; }
+    }
+
+    [Serializable]
+    public sealed class PvpMatchResponse
+    {
+        public PvpMatchView Match { get; set; }
+    }
+
+    [Serializable]
+    public sealed class PvpSubmitOrdersRequest
+    {
+        public int TurnNumber { get; set; }
+        public List<SimOrder> Orders { get; set; }
+    }
+
+    [Serializable]
+    public sealed class PvpSubmitOrdersResponse
+    {
+        public bool Resolved { get; set; }
+        public PvpMatchView Match { get; set; }
+    }
+
     [Serializable]
     public sealed class ConfigSnapshot
     {

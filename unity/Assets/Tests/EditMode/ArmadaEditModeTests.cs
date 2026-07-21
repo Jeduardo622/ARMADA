@@ -707,6 +707,140 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 1, EnemyRemaining = 1 }, PvpScenario.TurnLimit), Is.EqualTo(PvpHotseatFlow.ResultDraw));
         }
 
+        private sealed class ScriptedPvpMatchClient : IPvpMatchClient
+        {
+            public string LastJoinCode;
+            public PvpMatchView NextView;
+
+            public Task<ServiceResult<PvpMatchResponse>> CreateMatchAsync() => Result();
+
+            public Task<ServiceResult<PvpMatchResponse>> JoinMatchAsync(string code)
+            {
+                LastJoinCode = code;
+                return Result();
+            }
+
+            public Task<ServiceResult<PvpSubmitOrdersResponse>> SubmitOrdersAsync(string matchId, PvpSubmitOrdersRequest request)
+            {
+                return Task.FromResult(new ServiceResult<PvpSubmitOrdersResponse>
+                {
+                    Data = new PvpSubmitOrdersResponse { Resolved = false, Match = NextView },
+                    Success = true,
+                    Status = System.Net.HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<PvpMatchResponse>> GetMatchAsync(string matchId) => Result();
+
+            private Task<ServiceResult<PvpMatchResponse>> Result()
+            {
+                return Task.FromResult(new ServiceResult<PvpMatchResponse>
+                {
+                    Data = new PvpMatchResponse { Match = NextView },
+                    Success = true,
+                    Status = System.Net.HttpStatusCode.OK
+                });
+            }
+        }
+
+        [Test]
+        public void PvpNetplayModels_MatchBackendWireShapesAndFlowTracksPlaybackTurns()
+        {
+            var settings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+
+            // Participant view straight off docs/api/openapi.yaml
+            // PvpMatchView: live matches carry seed: null (withheld as an
+            // outcome oracle) and hidden info stays boolean-only.
+            const string liveJson =
+                "{\"match\":{\"id\":\"7e57ab1e-0000-4000-8000-000000000001\",\"code\":\"ABCD2345\"," +
+                "\"status\":\"IN_PROGRESS\",\"scenarioCode\":\"pvp-skirmish-2v2\",\"seed\":null," +
+                "\"turnNumber\":2,\"turnLimit\":20,\"result\":null," +
+                "\"state\":{\"turn\":2,\"wind\":{\"direction\":90,\"speed\":0},\"ships\":[" +
+                "{\"id\":\"alpha-frigate-a\",\"side\":\"player\",\"position\":{\"x\":0,\"y\":30},\"heading\":0,\"speed\":3,\"hp\":98,\"sail\":80,\"crew\":50}]}," +
+                "\"turns\":[{\"turn\":1,\"hash\":\"h1\",\"summary\":{\"playerRemaining\":2,\"enemyRemaining\":2,\"sunk\":[]},\"events\":[]}]," +
+                "\"yourSide\":\"side_b\",\"youSubmitted\":false,\"opponentJoined\":true,\"opponentSubmitted\":true}}";
+
+            var live = JsonConvert.DeserializeObject<PvpMatchResponse>(liveJson, settings).Match;
+            Assert.That(live.Seed, Is.Null);
+            Assert.That(live.YourSide, Is.EqualTo("side_b"));
+            Assert.That(live.OpponentSubmitted, Is.True);
+            Assert.That(live.Turns, Has.Count.EqualTo(1));
+            Assert.That(live.State.Ships[0].Hp, Is.EqualTo(98));
+
+            const string doneJson = "{\"match\":{\"id\":\"7e57ab1e-0000-4000-8000-000000000001\",\"status\":\"COMPLETED\",\"seed\":11,\"result\":\"side_a\",\"turnNumber\":7,\"turnLimit\":20,\"turns\":[]}}";
+            Assert.That(JsonConvert.DeserializeObject<PvpMatchResponse>(doneJson, settings).Match.Seed, Is.EqualTo(11));
+
+            // Submit request serializes to exactly the strict backend shape:
+            // {turnNumber, orders}, round shot omitting the ammo key.
+            var submit = new PvpSubmitOrdersRequest
+            {
+                TurnNumber = 3,
+                Orders = new List<SimOrder>
+                {
+                    new SimOrder { ShipId = "alpha-frigate-a", Action = "broadside", TargetShipId = "bravo-frigate-a", Side = "starboard" }
+                }
+            };
+            var submitJson = JsonConvert.SerializeObject(submit, settings);
+            Assert.That(submitJson, Does.Contain("\"turnNumber\":3"));
+            Assert.That(submitJson, Does.Contain("\"orders\":[{"));
+            Assert.That(submitJson, Does.Not.Contain("ammo"));
+            Assert.That(submitJson, Does.Not.Contain("state"));
+
+            // Flow-level join + playback bookkeeping (plain C#, scripted
+            // client): join codes are normalized, and dequeuing a resolved
+            // turn hands back the pre-turn fleet snapshot then advances.
+            var client = new ScriptedPvpMatchClient();
+            var startState = PvpScenario.BuildInitialState();
+            client.NextView = new PvpMatchView
+            {
+                Id = "7e57ab1e-0000-4000-8000-000000000002",
+                Status = "IN_PROGRESS",
+                TurnNumber = 1,
+                TurnLimit = PvpScenario.TurnLimit,
+                State = startState,
+                Turns = new List<Mission01TurnRecord>(),
+                YourSide = "side_b",
+                OpponentJoined = true
+            };
+
+            var flow = new PvpNetplayFlow(client);
+            flow.JoinAsync("  abcd2345 ").GetAwaiter().GetResult();
+            Assert.That(client.LastJoinCode, Is.EqualTo("ABCD2345"));
+            Assert.That(flow.EngineSide, Is.EqualTo("enemy"));
+            Assert.That(flow.OwnLivingShips(), Has.Count.EqualTo(2));
+            Assert.That(flow.OwnLivingShips()[0].Side, Is.EqualTo("enemy"));
+            Assert.That(flow.TryDequeuePlaybackTurn(out _), Is.False);
+
+            // The server resolves turn 1: the next poll carries the record
+            // and the post-turn state.
+            var postTurnState = PvpScenario.BuildInitialState();
+            postTurnState.Turn = 2;
+            postTurnState.Ships[0].Hp = 42;
+            client.NextView = new PvpMatchView
+            {
+                Id = client.NextView.Id,
+                Status = "IN_PROGRESS",
+                TurnNumber = 2,
+                TurnLimit = PvpScenario.TurnLimit,
+                State = postTurnState,
+                Turns = new List<Mission01TurnRecord>
+                {
+                    new Mission01TurnRecord { Turn = 1, Hash = "h1", Events = new List<SimEvent>() }
+                },
+                YourSide = "side_b",
+                OpponentJoined = true
+            };
+            flow.PollAsync().GetAwaiter().GetResult();
+
+            Assert.That(flow.TryDequeuePlaybackTurn(out var playback), Is.True);
+            Assert.That(playback.Record.Turn, Is.EqualTo(1));
+            // Snapshot is the fleet BEFORE the turn, not the view's current
+            // (post-turn) state.
+            Assert.That(playback.ShipsAtTurnStart[0].Hp, Is.EqualTo(120));
+            // A second dequeue waits for the next resolved turn.
+            Assert.That(flow.TryDequeuePlaybackTurn(out _), Is.False);
+        }
+
         [Test]
         public void MissionCompleteResponse_DeserializesBackendPayload()
         {

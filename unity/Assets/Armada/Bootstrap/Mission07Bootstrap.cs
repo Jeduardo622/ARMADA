@@ -52,7 +52,7 @@ namespace Armada.Client.Bootstrap
             // authenticated service graph. A second graph would open a second
             // guest session with a different player and race it for the same
             // UI wiring, so composition roots must not run together.
-            if (FindFirstObjectByType<ArmadaBootstrap>() != null || FindFirstObjectByType<Mission08Bootstrap>() != null || FindFirstObjectByType<Mission09Bootstrap>() != null || FindFirstObjectByType<Mission10Bootstrap>() != null || FindFirstObjectByType<PvpHotseatBootstrap>() != null)
+            if (FindFirstObjectByType<ArmadaBootstrap>() != null || FindFirstObjectByType<Mission08Bootstrap>() != null || FindFirstObjectByType<Mission09Bootstrap>() != null || FindFirstObjectByType<Mission10Bootstrap>() != null || FindFirstObjectByType<PvpHotseatBootstrap>() != null || FindFirstObjectByType<PvpNetplayBootstrap>() != null)
             {
                 Debug.LogError("[Mission07Bootstrap] Another composition root is active in the scene; refusing to compose a second authenticated service graph.");
                 return;
