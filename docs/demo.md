@@ -53,6 +53,8 @@ presets, and bar geometry are design-tunable placeholders on
 
 - All colors, speeds, and the sim-to-world scale are design-tunable
   placeholders on `SpectatorRenderer` (`unity/Assets/Armada/Playback/`).
+  The full knob inventory, applied values, and tuning constraints live in
+  the draft spec at `docs/design/spectator-tuning.md`.
 - The scene is generated: rerun `Assets → Armada → Build Spectator Demo
   Scene` (menu) after changing the builder to rebuild it deterministically.
 - The backend URL and toggles live in

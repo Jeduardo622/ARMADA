@@ -48,7 +48,7 @@ public static class SpectatorDemoSceneBuilder
         cameraObject.tag = "MainCamera";
         var camera = cameraObject.GetComponent<Camera>();
         camera.orthographic = true;
-        camera.orthographicSize = 9f;
+        camera.orthographicSize = 8.5f;
         camera.clearFlags = CameraClearFlags.SolidColor;
         camera.backgroundColor = new Color(0.03f, 0.08f, 0.15f);
         cameraObject.transform.position = new Vector3(12.5f, 20f, 0f);
@@ -70,7 +70,7 @@ public static class SpectatorDemoSceneBuilder
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
         var hudLabel = CreateLabel(canvasObject.transform, "SpectatorHud", anchorTop: true);
-        hudLabel.text = "Waiting for run... (Space pause, Right Arrow step, 1-4 speed)";
+        hudLabel.text = "Waiting for run... (Space pause, Right Arrow step, 1-4 speed, +/- cycle)";
         var statusLabel = CreateLabel(canvasObject.transform, "MissionStatus", anchorTop: false);
         statusLabel.text = string.Empty;
 
