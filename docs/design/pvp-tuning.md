@@ -15,22 +15,26 @@ deliberately not duplicated here.
 
 ## Scenario (`src/sim/pvpScenario.ts`, mirrored in `unity/.../Core/PvpScenario.cs`)
 
-> ⚠ Everything in this section is **fingerprint-pinned** in
-> `tests/pvpScenario.test.ts` AND the Unity EditMode suite. Changing any
-> value is a design change: update both fingerprint constants, the C#
-> mirror, and re-derive the empirical fixtures (see Constraints).
+> ⚠ Everything in this section **except `PVP_DEFAULT_SEED`** is
+> **fingerprint-pinned** in `tests/pvpScenario.test.ts` AND the Unity
+> EditMode suite. Changing a pinned value is a design change: update both
+> fingerprint constants, the C# mirror, and re-derive the empirical
+> fixtures (see Constraints). The default seed is not part of the
+> fingerprint — it is pinned separately by the seed-11 fixtures and the
+> C# `PvpScenario.DefaultSeed` mirror, so tuning only the seed touches
+> those but neither fingerprint constant.
 
 | Knob | Current | Proposed | Rationale / derived effect |
 | --- | --- | --- | --- |
 | `PVP_TURN_LIMIT` | 20 | keep | Focus-fire wins land around turn 6–8; 20 gives maneuver-heavy play headroom while keeping stalemates bounded. Timeout = draw. |
-| `FRIGATE_HP` | 120 | keep | ~3 broadside hits to sink (base damage 25 + 0–5 variance at opening stats); sets match length together with the hit chance below. |
+| `FRIGATE_HP` | 120 | keep | 4–5 round-shot hits to sink (25–30 hull per hit at opening stats: base 25 + 0–5 variance; 4 hits only at maximum variance); sets match length together with the hit chance below. |
 | `FRIGATE_SAIL` | 80 | keep | Feeds base damage (`18 + floor(sail/25)` = +3) and is the chain-shot target pool. |
 | `FRIGATE_CREW` | 50 | keep | Only cosmetic in v1 (boarding deferred); becomes live if boarding joins the modifier set. |
 | `FRIGATE_SPEED` | 3 | keep | +1 hit chance (`floor(v/2)`), +4 base damage (`floor(v·1.5)`); speedDelta orders swing damage ±3 without a movement phase. |
 | `LINE_SEPARATION` | 220 | keep | Opening range 220 → range penalty 4 → ~69% hit chance at start. The single biggest lethality lever: −50 range ≈ +1% hit per 50 units. |
 | `LINE_SPREAD` | 30 | keep | ±30 y keeps the four markers visually separated at the shared 0.1 world-scale framing. |
 | `WIND_DIRECTION` / `WIND_SPEED` | 90 / 0 | keep | Cosmetic in v1 (no `windMovement`); speed 0 keeps it inert even if flags flip accidentally. |
-| `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). Pinned fixture: seed-11 focus-fire-vs-split is a side A win inside the limit. |
+| `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). **Not in the fingerprint**; pinned by the seed-11 focus-fire-vs-split fixtures (vitest + server full-match test) and the C# `DefaultSeed` mirror. |
 | Modifier set | `{ chainShot: true }` | keep | **Product pin, not a tuning knob.** No movement phase by consequence; flipping `windMovement`/`ramming` in is scenario v2 and needs explicit sign-off. |
 
 ## Match lifecycle policy (`src/routes/pvp.ts`)
@@ -43,7 +47,7 @@ deliberately not duplicated here.
 | Join-code length / alphabet | 8 chars, `A–Z2–9` minus `0/O/1/I/L` (31 glyphs) | keep | Read-aloud safe; 31⁸ ≈ 8.5e11 codes keeps collisions negligible for the 3-attempt create loop. |
 | `CODE_CREATE_ATTEMPTS` | 3 | keep | Collision retries before giving up; at the code space above this should never be observed. |
 | Orders per submission (zod cap, hard-coded) | 8 | keep | Must stay ≥ ships per side (2); headroom for larger scenario variants without a contract change. |
-| Server seed range (hard-coded) | `randomInt(0, 2^31−1)` | keep | Full non-negative int32 space; no gameplay effect beyond variety. |
+| Server seed range (hard-coded) | `randomInt(0, 2147483647)` → 0…2³¹−2 | keep | `crypto.randomInt`'s maximum is exclusive, so 2³¹−1 itself is unreachable; effectively the full non-negative int32 space minus one value, with no gameplay effect beyond variety. |
 
 ## Order-entry surface (`unity/.../Services/PvpOrderSession.cs`)
 
@@ -57,7 +61,7 @@ deliberately not duplicated here.
 
 | Knob | Current | Proposed | Rationale |
 | --- | --- | --- | --- |
-| `pollIntervalSeconds` (serialized) | 2 | keep | Sets worst-case "opponent resolved → I see it" latency. PlayMode tests drive `Advance(2.5f)` ticks, so keep ≤ 2.4 or update the tests with it. |
+| `pollIntervalSeconds` (serialized) | 2 | keep | Sets worst-case "opponent resolved → I see it" latency. PlayMode tests drive `Advance(2.5f)` ticks and polling fires at `_pollDueIn <= 0`, so intervals up to and including 2.5 still poll; above 2.5 update the tests with it. |
 | Verdict / status copy (hard-coded) | "VICTORY — your side wins", "DEFEAT…", "DRAW", "MATCH EXPIRED — abandoned…", "Connection hiccup… retrying", "Turn N: broadsides fly..." | keep | Placeholder voice; a copy pass can retune freely — none of these strings are test-pinned verbatim except via `Does.Contain("VICTORY")` in one PlayMode assert. |
 
 ## Generated scenes (`PvPHotseatDemoSceneBuilder` / `PvPNetplayDemoSceneBuilder`)
@@ -78,11 +82,14 @@ conventions; values below are hard-coded in the builders.
 
 ## Constraints (do not tune past these)
 
-- **Fingerprint pins:** any Scenario-section change must update the
-  fingerprint constant in `tests/pvpScenario.test.ts`, the same constant
-  in the Unity EditMode suite, and `PvpScenario.cs` — and re-derive the
-  empirical fixtures: the seed-11 focus-fire win (vitest + the server
-  full-match test) and the hold-fire turn-limit draw.
+- **Fingerprint pins:** any Scenario-section change other than
+  `PVP_DEFAULT_SEED` must update the fingerprint constant in
+  `tests/pvpScenario.test.ts`, the same constant in the Unity EditMode
+  suite, and `PvpScenario.cs` — and re-derive the empirical fixtures:
+  the seed-11 focus-fire win (vitest + the server full-match test) and
+  the hold-fire turn-limit draw. Tuning only the default seed skips both
+  fingerprint constants but still re-derives the fixtures and updates
+  the C# `DefaultSeed` mirror.
 - **Schema mirrors:** `TurnDeltaLimit` (±90) and `SpeedDeltaLimit` (±2)
   must equal `simOrderSchema`'s bounds; the join-code input's character
   limit must equal `CODE_LENGTH`.
@@ -94,8 +101,9 @@ conventions; values below are hard-coded in the builders.
   in-progress TTL must exceed any plausible order-authoring session.
 - **Orders cap ≥ fleet size** per side, or legal submissions start
   failing validation.
-- **Poll interval vs tests:** PlayMode drives 2.5s ticks; a poll interval
-  above 2.4s silently stops polling in those tests.
+- **Poll interval vs tests:** PlayMode drives 2.5s ticks and the poll
+  condition is `<= 0`, so the boundary is exactly 2.5s — a poll interval
+  above 2.5s silently stops polling in those tests.
 - **Modifier set is a product pin**, not a knob (see Scenario table).
 - Spectator playback knobs (timings, colors, bars, camera in the mission
   scene) are owned by `spectator-tuning.md`; PvP scenes inherit the
