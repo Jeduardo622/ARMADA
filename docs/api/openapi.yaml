@@ -711,6 +711,91 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SimEvent'
+    PvpMatchView:
+      type: object
+      description: >-
+        Participant-facing view of a PvP match. Opponent information is
+        limited to presence and a submitted-this-turn boolean; staged
+        opponent orders are never included before the turn resolves (they
+        surface only through resolved turn records in `turns`).
+      required:
+        [id, code, status, scenarioCode, seed, turnNumber, turnLimit, state,
+         turns, yourSide, youSubmitted, opponentJoined, opponentSubmitted]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          description: Join code shared out of band with the opponent.
+        status:
+          type: string
+          enum: [WAITING_FOR_OPPONENT, IN_PROGRESS, COMPLETED]
+        scenarioCode:
+          type: string
+          example: pvp-skirmish-2v2
+        seed:
+          type: integer
+        turnNumber:
+          type: integer
+          minimum: 1
+          description: Next turn to resolve; submissions must bind to it.
+        turnLimit:
+          type: integer
+        result:
+          type: string
+          nullable: true
+          enum: [side_a, side_b, draw, null]
+        state:
+          $ref: '#/components/schemas/SimState'
+        turns:
+          type: array
+          description: Resolved turn records, appended per turn index.
+          items:
+            $ref: '#/components/schemas/MissionTurnRecord'
+        yourSide:
+          type: string
+          enum: [side_a, side_b]
+        youSubmitted:
+          type: boolean
+        opponentJoined:
+          type: boolean
+        opponentSubmitted:
+          type: boolean
+    PvpMatchResponse:
+      type: object
+      required: [match]
+      properties:
+        match:
+          $ref: '#/components/schemas/PvpMatchView'
+    PvpSubmitOrdersRequest:
+      type: object
+      required: [turnNumber, orders]
+      additionalProperties: false
+      properties:
+        turnNumber:
+          type: integer
+          minimum: 1
+          description: >-
+            The match turn these orders bind to; a mismatch with the match's
+            current turn is rejected with 409 turn_conflict instead of
+            landing on a later turn.
+        orders:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/SimOrder'
+    PvpSubmitOrdersResponse:
+      type: object
+      required: [resolved, match]
+      properties:
+        resolved:
+          type: boolean
+          description: >-
+            True when this submission completed the turn (both sides in) and
+            the engine resolved it; false while waiting for the opponent.
+        match:
+          $ref: '#/components/schemas/PvpMatchView'
     Mission03StartRequest:
       type: object
       properties:
@@ -2690,6 +2775,200 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /pvp/matches:
+    post:
+      summary: Create a PvP match (server picks seed, scenario, and modifiers)
+      description: >-
+        The request body is ignored: creation is fully server-authoritative.
+        The caller is seated as side_a and receives the join code to share.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Match created, waiting for an opponent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PvpMatchResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled (pvp_api)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /pvp/matches/{code}/join:
+    post:
+      summary: Join a waiting PvP match by its join code
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Joined as side_b; the match is now in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PvpMatchResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled (pvp_api)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Match or player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            Match already has both seats (match_full; a lost concurrent join
+            race maps here without retry) or the caller already holds a seat
+            (already_joined).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /pvp/matches/{id}/orders:
+    post:
+      summary: Submit one side's orders for the bound turn
+      description: >-
+        Carries ONLY the turn binding and the orders — the server never
+        accepts client-supplied match state. When the opposing side's orders
+        for the same turn are already staged, the server resolves exactly one
+        engine turn, appends the turn record, and advances the match.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PvpSubmitOrdersRequest'
+      responses:
+        '200':
+          description: Orders staged (resolved=false) or turn resolved (resolved=true)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PvpSubmitOrdersResponse'
+        '400':
+          description: >-
+            Invalid body, or the fairness guard rejected the orders
+            (order_side_mismatch: ordering ships outside your side or sunk
+            ships; target_side_mismatch: targeting your own side, unknown, or
+            sunk ships), or payload too large.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled (pvp_api) or caller is not a participant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Match not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            Turn binding rejected: turn_conflict (the body echoes the match's
+            expectedTurn) for stale or replayed submissions,
+            orders_already_submitted for a resubmission of the bound turn,
+            match_not_started before an opponent joins, or match_over (the
+            body echoes the result) after completion.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Persisted match state failed validation (match_state_invalid)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /pvp/matches/{id}:
+    get:
+      summary: Poll the participant-facing match state
+      description: >-
+        Non-participants receive the same 404 shape as a missing match so
+        match ids cannot be probed. Opponent orders are never present before
+        resolution.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Participant view of the match
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PvpMatchResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled (pvp_api)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Match not found, or the caller is not a participant
           content:
             application/json:
               schema:
