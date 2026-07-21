@@ -43,6 +43,7 @@ namespace Armada.Client.UI
         private string _joinCode = string.Empty;
         private float _pollDueIn;
         private bool _pollInFlight;
+        private bool _submitInFlight;
 
         public NetplayPhase Phase { get; private set; } = NetplayPhase.Menu;
 
@@ -122,6 +123,10 @@ namespace Armada.Client.UI
             var orders = _session.BuildOrders();
             _session = null;
             Phase = NetplayPhase.WaitingForResolution;
+            // A full interval before the first poll: polling while the
+            // submission is in flight could let a stale pre-resolution view
+            // race the response (the in-flight gate below is the backstop).
+            _pollDueIn = pollIntervalSeconds;
             SetStatus($"Turn {_flow.View.TurnNumber}: orders away — waiting for the enemy captain...");
             SetOrderText(string.Empty);
             ActiveRequest = SubmitAsync(orders);
@@ -140,7 +145,7 @@ namespace Armada.Client.UI
                 case NetplayPhase.WaitingForOpponentJoin:
                 case NetplayPhase.WaitingForResolution:
                     _pollDueIn -= dt;
-                    if (_pollDueIn <= 0f && !_pollInFlight)
+                    if (_pollDueIn <= 0f && !_pollInFlight && !_submitInFlight)
                     {
                         _pollDueIn = pollIntervalSeconds;
                         ActiveRequest = PollAsync();
@@ -188,10 +193,27 @@ namespace Armada.Client.UI
 
         private async Task SubmitAsync(List<SimOrder> orders)
         {
-            var result = await _flow.SubmitOrdersAsync(orders);
+            _submitInFlight = true;
+            ServiceResult<PvpSubmitOrdersResponse> result;
+            try
+            {
+                result = await _flow.SubmitOrdersAsync(orders);
+            }
+            finally
+            {
+                _submitInFlight = false;
+            }
+
             if (!result.Success)
             {
-                Fail($"submit_failed:{result.ErrorReason ?? result.Status.ToString()}");
+                // A failed response is ambiguous: the server may have
+                // committed the submission (or even resolved the turn)
+                // before the transport dropped. Stay in the waiting phase
+                // and reconcile against the participant view instead of
+                // declaring a terminal error — the next poll either finds a
+                // resolved turn, finds youSubmitted, or reopens order entry.
+                SetStatus($"Order submission uncertain ({result.Status}) — checking with the server...");
+                _pollDueIn = 0f;
                 return;
             }
 
@@ -230,7 +252,19 @@ namespace Armada.Client.UI
 
                 if (Phase == NetplayPhase.WaitingForResolution)
                 {
-                    BeginPlaybackIfTurnReady();
+                    if (BeginPlaybackIfTurnReady())
+                    {
+                        return;
+                    }
+
+                    // Reconciliation after an ambiguous submit failure: no
+                    // resolved turn and the server has no staged orders from
+                    // us, so the submission never landed — re-author it.
+                    if (_flow.View?.YouSubmitted == false)
+                    {
+                        SetStatus("Submission was not received — please re-enter orders.");
+                        BeginOrderEntry();
+                    }
                 }
             }
             finally
@@ -239,11 +273,11 @@ namespace Armada.Client.UI
             }
         }
 
-        private void BeginPlaybackIfTurnReady()
+        private bool BeginPlaybackIfTurnReady()
         {
             if (!_flow.TryDequeuePlaybackTurn(out var playback))
             {
-                return;
+                return false;
             }
 
             if (_spectator != null && playback.ShipsAtTurnStart != null)
@@ -264,6 +298,8 @@ namespace Armada.Client.UI
             {
                 AfterPlayback();
             }
+
+            return true;
         }
 
         private void AfterPlayback()

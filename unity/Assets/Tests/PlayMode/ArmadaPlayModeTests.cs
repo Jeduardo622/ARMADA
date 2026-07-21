@@ -1602,8 +1602,26 @@ namespace Armada.Client.Tests.PlayMode
                 throw new System.InvalidOperationException("creator flow never joins");
             }
 
+            // Simulates a transport drop on the next submission; the server
+            // never received it, so the reconcile poll shows no staged
+            // orders.
+            public bool FailNextSubmit;
+            private bool _reconcilePending;
+
             public Task<ServiceResult<PvpSubmitOrdersResponse>> SubmitOrdersAsync(string matchId, PvpSubmitOrdersRequest request)
             {
+                if (FailNextSubmit)
+                {
+                    FailNextSubmit = false;
+                    _reconcilePending = true;
+                    return Task.FromResult(new ServiceResult<PvpSubmitOrdersResponse>
+                    {
+                        Success = false,
+                        Status = 0,
+                        ErrorReason = "transport_dropped"
+                    });
+                }
+
                 SubmittedMatchId = matchId;
                 LastSubmit = request;
                 // The opponent has not submitted yet: orders staged only.
@@ -1621,6 +1639,14 @@ namespace Armada.Client.Tests.PlayMode
 
             public Task<ServiceResult<PvpMatchResponse>> GetMatchAsync(string matchId)
             {
+                if (_reconcilePending)
+                {
+                    // The failed submission never landed: live match, no
+                    // staged orders from this side (YouSubmitted false).
+                    _reconcilePending = false;
+                    return Ok(View("IN_PROGRESS", 1, StartState(), new List<Mission01TurnRecord>(), opponentJoined: true));
+                }
+
                 Polls++;
                 if (Polls == 1)
                 {
@@ -1702,6 +1728,29 @@ namespace Armada.Client.Tests.PlayMode
                 Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.OrderEntry));
                 Assert.That(controller.CurrentSession.SideLabel, Is.EqualTo("A"));
                 Assert.That(controller.CurrentSession.Drafts, Has.Count.EqualTo(2));
+
+                // An ambiguous submit failure (transport drop) must NOT be
+                // terminal: the reconcile poll finds no staged orders on the
+                // server and reopens order entry for re-authoring.
+                fakeClient.FailNextSubmit = true;
+                controller.OnCycleTarget();
+                controller.OnConfirmOrders();
+                deadline.Restart();
+                while (controller.Phase == PvpNetplayUIController.NetplayPhase.OrderEntry
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.WaitingForResolution));
+                controller.Advance(0.1f);
+                deadline.Restart();
+                while (controller.Phase != PvpNetplayUIController.NetplayPhase.OrderEntry
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpNetplayUIController.NetplayPhase.OrderEntry));
+                Assert.That(fakeClient.LastSubmit, Is.Null, "the dropped submission never reached the server");
 
                 // Author side A's orders: alpha-a chain-shots bravo-a.
                 controller.OnCycleTarget();

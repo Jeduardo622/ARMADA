@@ -141,6 +141,14 @@ namespace Armada.Client.Services
 
         private void RefreshView(PvpMatchView match)
         {
+            // Monotonic guard: a poll started before a submission can land
+            // after it; its pre-resolution view must never overwrite a newer
+            // one (the server's turnNumber only ever advances).
+            if (View != null && match.TurnNumber < View.TurnNumber)
+            {
+                return;
+            }
+
             // _turnStartState deliberately lags behind: it advances only
             // when TryDequeuePlaybackTurn consumes a resolved turn.
             View = match;
