@@ -58,6 +58,9 @@ change here (see Regeneration below).
 | `barLift` | 1.2 | 1.4 | Doubles the clearance margin over the enemy capsule top (y = 1.5) flagged in the PR #50 review; bars now sit at y = 1.9. |
 | `hullBarColor` | (0.40, 0.95, 0.40) | keep | Bright green reads against the dark sea the bars actually render over. |
 | `sailBarColor` | (0.95, 0.90, 0.55) | keep | Yellow distinct from hull green at a glance. |
+| Hull bar z-offset (`PositionBars`, hard-coded) | 0.45 | keep | Screen-up for the top-down camera; hull sits above sail. |
+| Sail bar z-offset (`PositionBars`, hard-coded) | 0.30 | keep | 0.15 spacing from the hull bar exceeds the 0.12 bar depth, so the bars never overlap. |
+| Bar cross-section (`SpawnBar`, hard-coded) | 0.08 × 0.12 (h × d) | keep | Thin enough to read as an overlay, thick enough to survive the orthographic zoom. |
 
 ## SpectatorDemoSceneBuilder (`unity/Assets/Editor/SpectatorDemoSceneBuilder.cs`)
 
@@ -69,6 +72,8 @@ change here (see Regeneration below).
 | Board cube | 30×1×16 @ (12.5, −0.55, 0) | keep | Covers sim space (x 0–250, y ±60 at 0.1 world units per sim unit). |
 | Sea material color | (0.07, 0.22, 0.36) | keep | Dark sea keeps all five flash/side colors legible. |
 | Label font size | 20 | keep | Single HUD line fits comfortably at default game-view resolutions. |
+| Label rect (hard-coded) | ±10 edge offset, −40 width inset, 60 height | keep | Two-line safety height with a small margin off the screen edges. |
+| Directional light rotation (hard-coded) | (50, −30, 0) | keep | Unity's default key-light angle; markers are flat-tinted so lighting is non-critical. |
 | Initial HUD hint | "Waiting for run... (Space pause, Right Arrow step, 1-4 speed)" | append "+/- cycle" | The +/− preset-cycle bindings shipped in PR #50 but were missing from the hint. |
 
 ## Constraints (do not tune past these)
