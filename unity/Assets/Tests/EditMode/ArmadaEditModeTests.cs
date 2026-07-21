@@ -816,7 +816,14 @@ namespace Armada.Client.Tests.EditMode
 
             UnityEngine.TestTools.LogAssert.Expect(LogType.Error, failureLog);
             var first = authService.GetTokenAsync();
-            Assert.That(inFlightField.GetValue(authService), Is.SameAs(first));
+            // The slot holds the request only while it is pending. On hosts
+            // where the refused connection fails synchronously (Linux GameCI:
+            // curl error in 0 ms before the first yield) the task is already
+            // complete here and is deliberately never stored.
+            if (!first.IsCompleted)
+            {
+                Assert.That(inFlightField.GetValue(authService), Is.SameAs(first));
+            }
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             while (!first.IsCompleted && stopwatch.Elapsed < TimeSpan.FromSeconds(15))
