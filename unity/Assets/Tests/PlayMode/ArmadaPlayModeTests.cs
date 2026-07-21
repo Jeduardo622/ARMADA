@@ -1423,5 +1423,277 @@ namespace Armada.Client.Tests.PlayMode
 
             yield return null;
         }
+
+        private sealed class FakePvpSimPreviewClient : ISimPreviewClient
+        {
+            public readonly List<SimPreviewRequest> Requests = new();
+
+            // Scripted two-turn side-A win: turn 1 sinks bravo-a and mauls
+            // bravo-b to 60 hull; turn 2 sinks bravo-b. nextState clones the
+            // request state so the flow's chaining mirrors the real server
+            // contract.
+            public Task<SimPreviewResult> PreviewAsync(SimPreviewRequest request)
+            {
+                Requests.Add(request);
+                var finalTurn = Requests.Count >= 2;
+
+                int HpFor(SimShip ship) =>
+                    ship.Side != "enemy" ? ship.Hp
+                    : ship.Id == "bravo-frigate-a" ? 0
+                    : finalTurn ? 0 : 60;
+
+                var nextShips = new List<SimShip>();
+                foreach (var ship in request.State.Ships)
+                {
+                    nextShips.Add(new SimShip
+                    {
+                        Id = ship.Id,
+                        Side = ship.Side,
+                        Position = new SimVector2 { X = ship.Position.X, Y = ship.Position.Y },
+                        Heading = ship.Heading,
+                        Speed = ship.Speed,
+                        Hp = HpFor(ship),
+                        Sail = ship.Sail,
+                        Crew = ship.Crew
+                    });
+                }
+
+                var events = finalTurn
+                    ? new List<SimEvent>
+                    {
+                        new SimEvent
+                        {
+                            Type = "broadside",
+                            ShipId = "alpha-frigate-a",
+                            TargetShipId = "bravo-frigate-b",
+                            Side = "starboard",
+                            Hit = true,
+                            TargetRemaining = new SimRemaining { Hp = 0, Sail = 40, Crew = 50 }
+                        }
+                    }
+                    : new List<SimEvent>
+                    {
+                        new SimEvent { Type = "maneuver", ShipId = "alpha-frigate-a", Heading = 15, TurnDelta = 15, SpeedDelta = 1 },
+                        new SimEvent
+                        {
+                            Type = "broadside",
+                            ShipId = "alpha-frigate-a",
+                            TargetShipId = "bravo-frigate-a",
+                            Side = "starboard",
+                            Hit = true,
+                            TargetRemaining = new SimRemaining { Hp = 0, Sail = 80, Crew = 50 }
+                        },
+                        new SimEvent
+                        {
+                            Type = "broadside",
+                            ShipId = "alpha-frigate-b",
+                            TargetShipId = "bravo-frigate-b",
+                            Side = "starboard",
+                            Hit = true,
+                            Ammo = "chain",
+                            TargetRemaining = new SimRemaining { Hp = 60, Sail = 40, Crew = 50 }
+                        }
+                    };
+
+                return Task.FromResult(new SimPreviewResult
+                {
+                    Turn = request.Turn,
+                    NextState = new SimState
+                    {
+                        Turn = request.Turn + 1,
+                        Wind = request.State.Wind,
+                        Ships = nextShips
+                    },
+                    Events = events,
+                    Summary = finalTurn
+                        ? new SimSummary { PlayerRemaining = 2, EnemyRemaining = 0, Sunk = new List<string> { "bravo-frigate-a", "bravo-frigate-b" } }
+                        : new SimSummary { PlayerRemaining = 2, EnemyRemaining = 1, Sunk = new List<string> { "bravo-frigate-a" } },
+                    Hash = finalTurn ? "pvp-fake-hash-2" : "pvp-fake-hash-1"
+                });
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator PvpHotseat_BothSidesOrdersResolveOneTurnAndSpectatorPlaysItBack()
+        {
+            // Inactive objects so Update never runs; the test drives the
+            // controller's public handlers and the spectator's Tick directly
+            // and asserts state, never rendered output.
+            var spectatorObject = new GameObject("pvp-spectator-test");
+            spectatorObject.SetActive(false);
+            var controllerObject = new GameObject("pvp-controller-test");
+            controllerObject.SetActive(false);
+            try
+            {
+                var spectator = spectatorObject.AddComponent<SpectatorRenderer>();
+                var controller = controllerObject.AddComponent<PvpHotseatUIController>();
+                var fakeClient = new FakePvpSimPreviewClient();
+                var flow = new PvpHotseatFlow(fakeClient);
+
+                controller.Compose(flow, spectator);
+                controller.BeginMatch();
+
+                // Turn 1, side A: alpha-a broadsides bravo-a, alpha-b holds.
+                Assert.That(controller.Phase, Is.EqualTo(PvpHotseatUIController.HotseatPhase.SideAEntry));
+                Assert.That(controller.CurrentSession.SideLabel, Is.EqualTo("A"));
+                controller.OnCycleTarget();
+                controller.OnTurnRight();
+                controller.OnSpeedUp();
+                controller.OnConfirmSide();
+
+                // Confirm lands on the hand-the-seat interstitial, so a
+                // double-press can never submit default side-B orders; the
+                // next confirm opens a fresh side-B session.
+                Assert.That(controller.Phase, Is.EqualTo(PvpHotseatUIController.HotseatPhase.SideBHandoff));
+                Assert.That(controller.CurrentSession, Is.Null);
+                controller.OnConfirmSide();
+
+                // Turn 1, side B: bravo-a fires chain at alpha-a, bravo-b
+                // maneuvers.
+                Assert.That(controller.Phase, Is.EqualTo(PvpHotseatUIController.HotseatPhase.SideBEntry));
+                Assert.That(controller.CurrentSession.SideLabel, Is.EqualTo("B"));
+                controller.OnCycleTarget();
+                controller.OnToggleAmmo();
+                controller.OnNextShip();
+                controller.OnTurnLeft();
+                controller.OnConfirmSide();
+
+                // The fake resolves synchronously on this platform, but a
+                // pending-task assertion here would be timing-dependent
+                // (completed-task awaits continue synchronously); wait
+                // bounded for the playback phase instead.
+                var deadline = System.Diagnostics.Stopwatch.StartNew();
+                while (controller.Phase != PvpHotseatUIController.HotseatPhase.Playback
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpHotseatUIController.HotseatPhase.Playback));
+
+                // The submitted request carried BOTH sides' orders for one
+                // turn of the pinned scenario, with the pinned modifier set.
+                Assert.That(fakeClient.Requests, Has.Count.EqualTo(1));
+                var request = fakeClient.Requests[0];
+                Assert.That(request.Seed, Is.EqualTo(PvpScenario.DefaultSeed));
+                Assert.That(request.Turn, Is.EqualTo(1));
+                Assert.That(request.Modifiers.ChainShot, Is.True);
+                Assert.That(request.Modifiers.ShipUpgrades, Is.Null);
+                Assert.That(request.State.Ships, Has.Count.EqualTo(4));
+                Assert.That(request.Orders, Has.Count.EqualTo(4));
+
+                var orderByShip = new Dictionary<string, SimOrder>();
+                foreach (var order in request.Orders)
+                {
+                    orderByShip[order.ShipId] = order;
+                }
+
+                Assert.That(orderByShip["alpha-frigate-a"].Action, Is.EqualTo("broadside"));
+                Assert.That(orderByShip["alpha-frigate-a"].TargetShipId, Is.EqualTo("bravo-frigate-a"));
+                Assert.That(orderByShip["alpha-frigate-a"].TurnDelta, Is.EqualTo(15));
+                Assert.That(orderByShip["alpha-frigate-a"].SpeedDelta, Is.EqualTo(1));
+                Assert.That(orderByShip["alpha-frigate-b"].Action, Is.EqualTo("maneuver"));
+                Assert.That(orderByShip["bravo-frigate-a"].Action, Is.EqualTo("broadside"));
+                Assert.That(orderByShip["bravo-frigate-a"].TargetShipId, Is.EqualTo("alpha-frigate-a"));
+                Assert.That(orderByShip["bravo-frigate-a"].Ammo, Is.EqualTo("chain"));
+                Assert.That(orderByShip["bravo-frigate-b"].TurnDelta, Is.EqualTo(-15));
+
+                // Spectator playback animates the resolved turn from the
+                // turn-start ship snapshot; markers spawn at the pinned
+                // scenario positions (0.1 world units per sim unit).
+                Assert.That(spectator.TryGetMarkerPosition("alpha-frigate-a", out var alphaStart), Is.True);
+                Assert.That(alphaStart.x, Is.EqualTo(0f).Within(0.001f));
+                Assert.That(alphaStart.z, Is.EqualTo(3f).Within(0.001f));
+                Assert.That(spectator.TryGetMarkerPosition("bravo-frigate-b", out var bravoStart), Is.True);
+                Assert.That(bravoStart.x, Is.EqualTo(22f).Within(0.001f));
+
+                var sawChainBroadside = false;
+                for (var tick = 0; tick < 200 && !spectator.IsFinished; tick++)
+                {
+                    spectator.Tick(0.5f);
+                    if (spectator.CurrentStep?.Kind == PlaybackStepKind.Broadside && spectator.CurrentStep.ChainShot)
+                    {
+                        sawChainBroadside = true;
+                    }
+                }
+                Assert.That(spectator.IsFinished, Is.True);
+                Assert.That(sawChainBroadside, Is.True);
+                Assert.That(spectator.HudText, Does.Contain("Turn 1 complete"));
+
+                // An ongoing match loops back to side A entry with the
+                // chained server state: bravo-a is sunk, bravo-b still up.
+                controller.PollPlayback();
+                Assert.That(controller.Phase, Is.EqualTo(PvpHotseatUIController.HotseatPhase.SideAEntry));
+                Assert.That(flow.MatchResult, Is.EqualTo(PvpHotseatFlow.ResultOngoing));
+                Assert.That(flow.TurnNumber, Is.EqualTo(2));
+
+                // Turn 2, side A: the only living target is bravo-b.
+                controller.OnCycleTarget();
+                Assert.That(controller.CurrentSession.CurrentDraft.TargetShipId, Is.EqualTo("bravo-frigate-b"));
+                controller.OnConfirmSide();
+                controller.OnConfirmSide();
+
+                // Turn 2, side B: only bravo-b is left to command.
+                Assert.That(controller.Phase, Is.EqualTo(PvpHotseatUIController.HotseatPhase.SideBEntry));
+                Assert.That(controller.CurrentSession.Drafts, Has.Count.EqualTo(1));
+                controller.OnConfirmSide();
+
+                deadline.Restart();
+                while (controller.Phase != PvpHotseatUIController.HotseatPhase.Playback
+                    && deadline.Elapsed.TotalSeconds < 5)
+                {
+                    yield return null;
+                }
+                Assert.That(controller.Phase, Is.EqualTo(PvpHotseatUIController.HotseatPhase.Playback));
+
+                // The turn-2 request chained the resolved turn-1 state.
+                Assert.That(fakeClient.Requests, Has.Count.EqualTo(2));
+                var second = fakeClient.Requests[1];
+                Assert.That(second.Turn, Is.EqualTo(2));
+                Assert.That(second.Orders, Has.Count.EqualTo(3));
+                foreach (var ship in second.State.Ships)
+                {
+                    if (ship.Id == "bravo-frigate-a")
+                    {
+                        Assert.That(ship.Hp, Is.Zero);
+                    }
+                    if (ship.Id == "bravo-frigate-b")
+                    {
+                        Assert.That(ship.Hp, Is.EqualTo(60));
+                    }
+                }
+
+                // Mid-battle playback keeps readout bars on the battle-start
+                // maxima: bravo-b at 60/120 hull reads half, not full.
+                Assert.That(spectator.TryGetReadoutFractions("bravo-frigate-b", out var hullMid, out _), Is.True);
+                Assert.That(hullMid, Is.EqualTo(0.5f).Within(0.001f));
+
+                for (var tick = 0; tick < 200 && !spectator.IsFinished; tick++)
+                {
+                    spectator.Tick(0.5f);
+                }
+                Assert.That(spectator.IsFinished, Is.True);
+
+                // Generic completion line: the match verdict plus per-side
+                // applied (remaining-delta) loss totals for the final turn
+                // (bravo-b's last 60 hull).
+                Assert.That(spectator.HudText, Does.Contain("SIDE A WINS at turn 2"));
+                Assert.That(spectator.HudText, Does.Contain("side A applied: hull 60"));
+                Assert.That(spectator.HudText, Does.Contain("side B applied: hull 0"));
+
+                // Playback completion advances the hot-seat loop to the
+                // match verdict.
+                controller.PollPlayback();
+                Assert.That(controller.Phase, Is.EqualTo(PvpHotseatUIController.HotseatPhase.Finished));
+                Assert.That(flow.MatchResult, Is.EqualTo(PvpHotseatFlow.ResultSideA));
+                Assert.That(flow.TurnNumber, Is.EqualTo(3));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(spectatorObject);
+                UnityEngine.Object.Destroy(controllerObject);
+            }
+
+            yield return null;
+        }
     }
 }

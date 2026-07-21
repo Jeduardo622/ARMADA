@@ -571,6 +571,143 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void PvpScenario_FingerprintMatchesBackendPinAndOrderSessionBuildsWireOrders()
+        {
+            // Must equal EXPECTED_FINGERPRINT in tests/pvpScenario.test.ts so
+            // the client and server pin the identical deterministic scenario.
+            const string expected =
+                "pvp-skirmish-2v2|turnLimit=20|modifiers=chainShot|wind=90:0|" +
+                "alpha-frigate-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
+                "alpha-frigate-b:player:0,-30:h0:v3:hp120:sl80:cw50|" +
+                "bravo-frigate-a:enemy:220,30:h180:v3:hp120:sl80:cw50|" +
+                "bravo-frigate-b:enemy:220,-30:h180:v3:hp120:sl80:cw50";
+
+            Assert.That(PvpScenario.Fingerprint(), Is.EqualTo(expected));
+            Assert.That(PvpScenario.FingerprintOf(PvpScenario.BuildInitialState()), Is.EqualTo(expected));
+
+            // The v1 modifier set is chain shot only; absent flags must be
+            // omitted so the payload carries exactly the pinned set.
+            var settings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+            Assert.That(
+                JsonConvert.SerializeObject(PvpScenario.BuildModifiers(), settings),
+                Is.EqualTo("{\"chainShot\":true}"));
+            Assert.That(JsonConvert.SerializeObject(new SimModifiers(), settings), Is.EqualTo("{}"));
+
+            // Order session drafts map to the wire order surface: a set
+            // target makes a broadside (round shot omits the ammo key), no
+            // target stays a pure maneuver.
+            var state = PvpScenario.BuildInitialState();
+            var sideA = new List<SimShip> { state.Ships[0], state.Ships[1] };
+            var sideB = new List<SimShip> { state.Ships[2], state.Ships[3] };
+            var session = new PvpOrderSession("A", sideA, sideB);
+
+            session.AdjustTurn(1);          // +15
+            session.AdjustSpeed(1);         // +1
+            session.CycleTarget();          // bravo-frigate-a
+            session.NextShip();
+            session.CycleTarget();          // bravo-frigate-a
+            session.CycleTarget();          // bravo-frigate-b
+            session.ToggleAmmo();           // chain
+            session.AdjustTurn(-1);         // -15
+
+            var orders = session.BuildOrders();
+            Assert.That(orders, Has.Count.EqualTo(2));
+
+            Assert.That(orders[0].ShipId, Is.EqualTo("alpha-frigate-a"));
+            Assert.That(orders[0].Action, Is.EqualTo("broadside"));
+            Assert.That(orders[0].TargetShipId, Is.EqualTo("bravo-frigate-a"));
+            Assert.That(orders[0].Side, Is.EqualTo("starboard"));
+            Assert.That(orders[0].TurnDelta, Is.EqualTo(15));
+            Assert.That(orders[0].SpeedDelta, Is.EqualTo(1));
+            Assert.That(JsonConvert.SerializeObject(orders[0], settings), Does.Not.Contain("ammo"));
+
+            Assert.That(orders[1].ShipId, Is.EqualTo("alpha-frigate-b"));
+            Assert.That(orders[1].TargetShipId, Is.EqualTo("bravo-frigate-b"));
+            Assert.That(orders[1].TurnDelta, Is.EqualTo(-15));
+            Assert.That(orders[1].Ammo, Is.EqualTo("chain"));
+
+            // Cycling past the last enemy returns to hold-fire, and a
+            // maneuver-only draft never carries target/side/ammo keys.
+            session.CycleTarget();
+            var maneuverOnly = session.BuildOrders()[1];
+            Assert.That(maneuverOnly.Action, Is.EqualTo("maneuver"));
+            Assert.That(maneuverOnly.TargetShipId, Is.Null);
+            Assert.That(maneuverOnly.Side, Is.Null);
+            Assert.That(maneuverOnly.Ammo, Is.Null);
+
+            // Draft clamps mirror simOrderSchema bounds.
+            for (var i = 0; i < 20; i++)
+            {
+                session.AdjustTurn(1);
+                session.AdjustSpeed(-1);
+            }
+            Assert.That(session.CurrentDraft.TurnDelta, Is.EqualTo(90));
+            Assert.That(session.CurrentDraft.SpeedDelta, Is.EqualTo(-2));
+        }
+
+        private sealed class RejectingPvpPreviewClient : ISimPreviewClient
+        {
+            public int Calls { get; private set; }
+
+            public Task<SimPreviewResult> PreviewAsync(SimPreviewRequest request)
+            {
+                Calls++;
+                return Task.FromResult<SimPreviewResult>(null);
+            }
+        }
+
+        [Test]
+        public void PvpHotseatFlow_RejectsUnfairOrdersAndClassifiesResultsLikeTheBackend()
+        {
+            // Mirrors validateSideOrders/pvpResultForTurn rejection rows in
+            // tests/pvpScenario.test.ts; the fake never resolves, so any
+            // client call means a guard failed. Synchronously-completed
+            // tasks make blocking on the result safe here.
+            var client = new RejectingPvpPreviewClient();
+            var flow = new PvpHotseatFlow(client);
+            var maneuver = new SimOrder { ShipId = "alpha-frigate-a", Action = "maneuver" };
+            var sideBManeuver = new SimOrder { ShipId = "bravo-frigate-a", Action = "maneuver" };
+
+            // Side A ordering a bravo ship (and vice versa) is rejected.
+            var swapped = flow.SubmitTurnAsync(
+                new List<SimOrder> { sideBManeuver },
+                new List<SimOrder> { maneuver }).GetAwaiter().GetResult();
+            Assert.That(swapped.Success, Is.False);
+            Assert.That(swapped.FailureReason, Is.EqualTo("order_side_mismatch"));
+
+            // Friendly fire is rejected.
+            var friendly = flow.SubmitTurnAsync(
+                new List<SimOrder>
+                {
+                    new SimOrder { ShipId = "alpha-frigate-a", Action = "broadside", TargetShipId = "alpha-frigate-b", Side = "starboard" }
+                },
+                new List<SimOrder> { sideBManeuver }).GetAwaiter().GetResult();
+            Assert.That(friendly.Success, Is.False);
+            Assert.That(friendly.FailureReason, Is.EqualTo("target_side_mismatch"));
+
+            // Unknown ships and null order lists are rejected.
+            var unknown = flow.SubmitTurnAsync(
+                new List<SimOrder> { new SimOrder { ShipId = "ghost-ship", Action = "pass" } },
+                new List<SimOrder> { sideBManeuver }).GetAwaiter().GetResult();
+            Assert.That(unknown.FailureReason, Is.EqualTo("order_side_mismatch"));
+            var missing = flow.SubmitTurnAsync(null, new List<SimOrder>()).GetAwaiter().GetResult();
+            Assert.That(missing.FailureReason, Is.EqualTo("orders_missing"));
+
+            // No rejected submit ever reached the preview client, and the
+            // match state never advanced.
+            Assert.That(client.Calls, Is.Zero);
+            Assert.That(flow.TurnNumber, Is.EqualTo(1));
+            Assert.That(flow.MatchResult, Is.EqualTo(PvpHotseatFlow.ResultOngoing));
+
+            // Result classification mirrors pvpResultForTurn row for row.
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 0, EnemyRemaining = 0 }, 3), Is.EqualTo(PvpHotseatFlow.ResultDraw));
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 2, EnemyRemaining = 0 }, 3), Is.EqualTo(PvpHotseatFlow.ResultSideA));
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 0, EnemyRemaining = 1 }, 3), Is.EqualTo(PvpHotseatFlow.ResultSideB));
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 1, EnemyRemaining = 1 }, 3), Is.EqualTo(PvpHotseatFlow.ResultOngoing));
+            Assert.That(PvpHotseatFlow.ClassifyResult(new SimSummary { PlayerRemaining = 1, EnemyRemaining = 1 }, PvpScenario.TurnLimit), Is.EqualTo(PvpHotseatFlow.ResultDraw));
+        }
+
+        [Test]
         public void MissionCompleteResponse_DeserializesBackendPayload()
         {
             // Mirrors the /missions/{code}/complete response contract in

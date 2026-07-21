@@ -327,6 +327,8 @@ namespace Armada.Client.Core
         // server-side modifier knobs are added as client features need them.
         [JsonProperty("shipUpgrades", NullValueHandling = NullValueHandling.Ignore)]
         public bool? ShipUpgrades { get; set; }
+        [JsonProperty("chainShot", NullValueHandling = NullValueHandling.Ignore)]
+        public bool? ChainShot { get; set; }
     }
 
     [Serializable]

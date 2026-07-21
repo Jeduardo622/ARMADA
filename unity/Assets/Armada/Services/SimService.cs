@@ -10,7 +10,7 @@ using UnityEngine.Networking;
 
 namespace Armada.Client.Services
 {
-    public sealed class SimService
+    public sealed class SimService : ISimPreviewClient
     {
         private readonly ApiClient _client;
         private readonly FeatureFlags _flags;
