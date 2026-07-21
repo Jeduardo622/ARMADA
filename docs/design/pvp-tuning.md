@@ -34,7 +34,7 @@ deliberately not duplicated here.
 | `LINE_SEPARATION` | 220 | keep | Opening range 220 → range penalty 4 → ~69% hit chance at start. The single biggest lethality lever: −50 range ≈ +1% hit per 50 units. |
 | `LINE_SPREAD` | 30 | keep | ±30 y keeps the four markers visually separated at the shared 0.1 world-scale framing. |
 | `WIND_DIRECTION` / `WIND_SPEED` | 90 / 0 | keep | Cosmetic in v1 (no `windMovement`); speed 0 keeps it inert even if flags flip accidentally. |
-| `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). **Not in the fingerprint**; pinned by the seed-11 focus-fire-vs-split fixtures (vitest + server full-match test) and the C# `DefaultSeed` mirror. |
+| `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). **Not in the fingerprint**; pinned by the seed-11 focus-fire-vs-split fixtures (vitest + server full-match test), the C# `DefaultSeed` mirror, AND the serialized `seed` baked into `PvPHotseatDemo.unity` (regenerate the scene when tuning). |
 | Modifier set | `{ chainShot: true }` | keep | **Product pin, not a tuning knob.** No movement phase by consequence; flipping `windMovement`/`ramming` in is scenario v2 and needs explicit sign-off. |
 
 ## Match lifecycle policy (`src/routes/pvp.ts`)
@@ -88,8 +88,11 @@ conventions; values below are hard-coded in the builders.
   suite, and `PvpScenario.cs` — and re-derive the empirical fixtures:
   the seed-11 focus-fire win (vitest + the server full-match test) and
   the hold-fire turn-limit draw. Tuning only the default seed skips both
-  fingerprint constants but still re-derives the fixtures and updates
-  the C# `DefaultSeed` mirror.
+  fingerprint constants but still re-derives the fixtures, updates the
+  C# `DefaultSeed` mirror, **and regenerates `PvPHotseatDemo.unity`** —
+  the scene stores the bootstrap's serialized `seed`, which does not
+  follow the C# default (netplay is unaffected: its seed is
+  server-picked).
 - **Schema mirrors:** `TurnDeltaLimit` (±90) and `SpeedDeltaLimit` (±2)
   must equal `simOrderSchema`'s bounds; the join-code input's character
   limit must equal `CODE_LENGTH`.
@@ -119,4 +122,7 @@ Demo Scene` / `Build PvP Netplay Demo Scene` (or batchmode
 `-executeMethod PvPHotseatDemoSceneBuilder.Build` /
 `PvPNetplayDemoSceneBuilder.Build`) and commit the scenes plus any new
 `.meta` files. Scenario or lifecycle constant changes need no scene
-rebuild but do ripple through the fingerprint/fixture pins above.
+rebuild — with one exception: `PVP_DEFAULT_SEED` is baked into the
+hot-seat scene as the bootstrap's serialized `seed`, so seed tuning
+regenerates `PvPHotseatDemo.unity` too. Everything else ripples only
+through the fingerprint/fixture pins above.
