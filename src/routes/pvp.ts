@@ -1,5 +1,5 @@
 import { randomInt } from 'crypto';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ensureFlag, validateJsonLimit } from './utils.js';
@@ -30,6 +30,21 @@ import {
 export const MATCH_STATUS_WAITING = 'WAITING_FOR_OPPONENT';
 export const MATCH_STATUS_IN_PROGRESS = 'IN_PROGRESS';
 export const MATCH_STATUS_COMPLETED = 'COMPLETED';
+export const MATCH_STATUS_EXPIRED = 'EXPIRED';
+
+// Abandonment TTLs, measured from updatedAt: submissions and lifecycle
+// transitions bump it, polling deliberately does not — two captains idly
+// polling a match with no orders coming is exactly an abandoned match.
+// Expiry is enforced lazily on join/submit/get plus an opportunistic sweep
+// on create, so no background job is needed. Values are design-tunable
+// placeholders pending playtest feedback.
+export const MATCH_WAITING_TTL_MS = 30 * 60 * 1000;
+export const MATCH_IN_PROGRESS_TTL_MS = 60 * 60 * 1000;
+
+// Open matches (waiting or in progress) one player may hold at once. A
+// soft cap: two perfectly concurrent creates can exceed it by one, which
+// bounds storage abuse just as well without another locking dance.
+export const MAX_OPEN_MATCHES_PER_PLAYER = 3;
 
 export const MATCH_SIDE_A = 'side_a';
 export const MATCH_SIDE_B = 'side_b';
@@ -114,6 +129,39 @@ function isUniqueViolation(error: unknown) {
   return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002';
 }
 
+function ttlCutoff(status: string, now = Date.now()): Date | null {
+  if (status === MATCH_STATUS_WAITING) {
+    return new Date(now - MATCH_WAITING_TTL_MS);
+  }
+  if (status === MATCH_STATUS_IN_PROGRESS) {
+    return new Date(now - MATCH_IN_PROGRESS_TTL_MS);
+  }
+  return null;
+}
+
+// Works for both the root client and a transaction client.
+type MatchWriter = { match: Pick<PrismaClient['match'], 'updateMany'> };
+
+// Lazy expiry: a conditional claim keyed to the row's current status and
+// staleness, so it can never race a live transition (the same conditional
+// updateMany discipline as every other transition). Returns true when this
+// call performed the expiry.
+async function expireIfStale(
+  db: MatchWriter,
+  match: { id: string; status: string; updatedAt: Date }
+): Promise<boolean> {
+  const cutoff = ttlCutoff(match.status);
+  if (!cutoff || match.updatedAt >= cutoff) {
+    return false;
+  }
+
+  const expired = await db.match.updateMany({
+    where: { id: match.id, status: match.status, updatedAt: { lt: cutoff } },
+    data: { status: MATCH_STATUS_EXPIRED }
+  });
+  return expired.count === 1;
+}
+
 // The participant-facing view of a match. Opponent identity is limited to
 // presence + submission status; staged opponent orders are NEVER included
 // before the turn resolves (they surface only through resolved turn events).
@@ -154,6 +202,42 @@ export function registerPvpRoutes(app: FastifyInstance) {
     const player = await app.prisma.player.findUnique({ where: { id: playerId } });
     if (!player) {
       return reply.status(404).send({ error: 'player_not_found' });
+    }
+
+    // Opportunistic abandonment sweep: every create expires whatever has
+    // gone stale globally (two bounded UPDATEs over the status index), so
+    // abandoned matches cannot accumulate even though there is no
+    // background job. This also releases the sweeping player's own stale
+    // matches before the cap below is counted.
+    const now = Date.now();
+    await app.prisma.match.updateMany({
+      where: {
+        status: MATCH_STATUS_WAITING,
+        updatedAt: { lt: new Date(now - MATCH_WAITING_TTL_MS) }
+      },
+      data: { status: MATCH_STATUS_EXPIRED }
+    });
+    await app.prisma.match.updateMany({
+      where: {
+        status: MATCH_STATUS_IN_PROGRESS,
+        updatedAt: { lt: new Date(now - MATCH_IN_PROGRESS_TTL_MS) }
+      },
+      data: { status: MATCH_STATUS_EXPIRED }
+    });
+
+    // Soft per-player cap on open matches (completed/expired never count).
+    const openMatches = await app.prisma.match.count({
+      where: {
+        status: { in: [MATCH_STATUS_WAITING, MATCH_STATUS_IN_PROGRESS] },
+        participants: { some: { playerId } }
+      }
+    });
+    if (openMatches >= MAX_OPEN_MATCHES_PER_PLAYER) {
+      return reply.status(409).send({
+        error: 'match_limit_reached',
+        openMatches,
+        limit: MAX_OPEN_MATCHES_PER_PLAYER
+      });
     }
 
     // The server picks everything: seed, scenario, modifiers, initial state.
@@ -210,6 +294,14 @@ export function registerPvpRoutes(app: FastifyInstance) {
 
     const code = (request.params as { code: string }).code.toUpperCase();
 
+    // Lazy expiry runs BEFORE the join transaction so the expiry write
+    // survives the rejection (a throw inside the transaction would roll it
+    // back). The in-transaction status checks stay authoritative.
+    const peek = await app.prisma.match.findUnique({ where: { code } });
+    if (peek) {
+      await expireIfStale(app.prisma, peek);
+    }
+
     const join = () =>
       app.prisma.$transaction(async (tx) => {
         const match = await tx.match.findUnique({
@@ -218,6 +310,9 @@ export function registerPvpRoutes(app: FastifyInstance) {
         });
         if (!match) {
           throw new MatchRejection(404, { error: 'match_not_found' });
+        }
+        if (match.status === MATCH_STATUS_EXPIRED) {
+          throw new MatchRejection(409, { error: 'match_expired' });
         }
         if (match.participants.some((participant) => participant.playerId === playerId)) {
           throw new MatchRejection(409, { error: 'already_joined' });
@@ -290,6 +385,13 @@ export function registerPvpRoutes(app: FastifyInstance) {
     const matchId = idParsed.data;
     const { turnNumber, orders } = parsed.data;
 
+    // Lazy expiry before the transaction (durable even when the submit is
+    // rejected); the conditional bind below never matches an EXPIRED row.
+    const peek = await app.prisma.match.findUnique({ where: { id: matchId } });
+    if (peek) {
+      await expireIfStale(app.prisma, peek);
+    }
+
     const submit = () =>
       app.prisma.$transaction(async (tx) => {
         // Conditional touch of the Match row first: it binds the submission
@@ -321,6 +423,9 @@ export function registerPvpRoutes(app: FastifyInstance) {
           }
           if (existing.status === MATCH_STATUS_WAITING) {
             throw new MatchRejection(409, { error: 'match_not_started' });
+          }
+          if (existing.status === MATCH_STATUS_EXPIRED) {
+            throw new MatchRejection(409, { error: 'match_expired' });
           }
           if (existing.status === MATCH_STATUS_COMPLETED) {
             throw new MatchRejection(409, { error: 'match_over', result: existing.result });
@@ -508,6 +613,13 @@ export function registerPvpRoutes(app: FastifyInstance) {
       // Non-participants get the same shape as a missing match so match ids
       // cannot be probed for existence.
       return reply.status(404).send({ error: 'match_not_found' });
+    }
+
+    // Polls are how abandoned matches usually get noticed: expire lazily so
+    // the waiting client sees EXPIRED instead of waiting forever. Polling
+    // never bumps updatedAt, so it cannot keep a match alive.
+    if (await expireIfStale(app.prisma, match)) {
+      match.status = MATCH_STATUS_EXPIRED;
     }
 
     return { match: matchView(match, match.participants, playerId) };

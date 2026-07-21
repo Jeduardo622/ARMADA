@@ -241,6 +241,14 @@ namespace Armada.Client.UI
                     return;
                 }
 
+                // An abandoned match expires server-side; stop waiting on it
+                // in every polling phase instead of spinning forever.
+                if (_flow.View?.Status == "EXPIRED")
+                {
+                    FinishExpired();
+                    return;
+                }
+
                 if (Phase == NetplayPhase.WaitingForOpponentJoin)
                 {
                     if (_flow.View.Status == "IN_PROGRESS" || _flow.View.OpponentJoined)
@@ -313,7 +321,20 @@ namespace Armada.Client.UI
                 return;
             }
 
+            if (view.Status == "EXPIRED")
+            {
+                FinishExpired();
+                return;
+            }
+
             BeginOrderEntry();
+        }
+
+        private void FinishExpired()
+        {
+            Phase = NetplayPhase.Finished;
+            SetStatus("MATCH EXPIRED — abandoned. Restart the scene to create or join a new match.");
+            SetOrderText(string.Empty);
         }
 
         private void BeginOrderEntry()

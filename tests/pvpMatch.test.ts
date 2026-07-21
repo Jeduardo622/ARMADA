@@ -38,6 +38,7 @@ type MatchRow = {
   state: unknown;
   turnEvents: unknown;
   result: string | null;
+  updatedAt: Date;
 };
 type ParticipantRow = {
   id: string;
@@ -87,7 +88,8 @@ prisma.match.create = async (args: any) => {
     turnNumber: args.data.turnNumber,
     state: args.data.state,
     turnEvents: args.data.turnEvents,
-    result: null
+    result: null,
+    updatedAt: new Date()
   };
   matchStore.set(id, row);
   const nested = args.data.participants?.create;
@@ -121,14 +123,43 @@ prisma.match.updateMany = async (args: any) => {
   let count = 0;
   for (const row of matchStore.values()) {
     if (args.where.id !== undefined && row.id !== args.where.id) continue;
-    if (args.where.status !== undefined && row.status !== args.where.status) continue;
+    if (args.where.status !== undefined) {
+      if (typeof args.where.status === 'string') {
+        if (row.status !== args.where.status) continue;
+      } else if (args.where.status.in && !args.where.status.in.includes(row.status)) {
+        continue;
+      }
+    }
     if (args.where.turnNumber !== undefined && row.turnNumber !== args.where.turnNumber) continue;
+    if (args.where.updatedAt?.lt !== undefined && !(row.updatedAt < args.where.updatedAt.lt)) {
+      continue;
+    }
     const data = { ...args.data };
     delete data.updatedAt;
     Object.assign(row, data);
+    // Emulate prisma's @updatedAt: every update bumps the timestamp.
+    row.updatedAt = new Date();
     count++;
   }
   return { count };
+};
+
+prisma.match.count = async (args: any) => {
+  let count = 0;
+  for (const row of matchStore.values()) {
+    if (args.where.status?.in && !args.where.status.in.includes(row.status)) continue;
+    const somePlayer = args.where.participants?.some?.playerId;
+    if (
+      somePlayer &&
+      ![...participantStore.values()].some(
+        (p) => p.matchId === row.id && p.playerId === somePlayer
+      )
+    ) {
+      continue;
+    }
+    count++;
+  }
+  return count;
 };
 
 prisma.matchParticipant.create = async (args: any) => {
@@ -580,6 +611,67 @@ describe('pvp match lifecycle', () => {
     expect(replay.statusCode).toBe(409);
     expect(replay.json().error).toBe('match_over');
     expect(replay.json().result).toBe('draw');
+  });
+
+  it('caps open matches per player; completed and expired matches never count', async () => {
+    for (let i = 0; i < 3; i++) {
+      await createMatch();
+    }
+
+    const fourth = await app.inject({ method: 'POST', url: '/pvp/matches', headers: as(PLAYER_A) });
+    expect(fourth.statusCode).toBe(409);
+    expect(fourth.json().error).toBe('match_limit_reached');
+    expect(fourth.json().limit).toBe(3);
+
+    // Retiring one open match frees a slot.
+    const anyOpen = [...matchStore.values()].find((m) => m.status === 'WAITING_FOR_OPPONENT')!;
+    anyOpen.status = 'EXPIRED';
+    const fifth = await app.inject({ method: 'POST', url: '/pvp/matches', headers: as(PLAYER_A) });
+    expect(fifth.statusCode).toBe(200);
+  });
+
+  it('sweeps stale matches opportunistically on create', async () => {
+    const stale = await createMatch();
+    matchStore.get(stale.id)!.updatedAt = new Date(Date.now() - 31 * 60 * 1000);
+
+    const fresh = await createMatch(PLAYER_B);
+    expect(matchStore.get(stale.id)!.status).toBe('EXPIRED');
+    expect(matchStore.get(fresh.id)!.status).toBe('WAITING_FOR_OPPONENT');
+  });
+
+  it('expires a stale waiting match lazily on join', async () => {
+    const match = await createMatch();
+    matchStore.get(match.id)!.updatedAt = new Date(Date.now() - 31 * 60 * 1000);
+
+    const joined = await joinMatch(match.code);
+    expect(joined.statusCode).toBe(409);
+    expect(joined.json().error).toBe('match_expired');
+    // The expiry write survives the rejected join.
+    expect(matchStore.get(match.id)!.status).toBe('EXPIRED');
+  });
+
+  it('expires an idle in-progress match lazily on submit and poll', async () => {
+    const match = await createMatch();
+    await joinMatch(match.code);
+
+    // 59 minutes idle: still live, a submission goes through and bumps
+    // the activity clock.
+    matchStore.get(match.id)!.updatedAt = new Date(Date.now() - 59 * 60 * 1000);
+    const state = matchStore.get(match.id)!.state as { ships: Array<{ id: string; hp: number }> };
+    const live = await submitOrders(match.id, PLAYER_A, 1, sideAOrders(state));
+    expect(live.statusCode).toBe(200);
+
+    // 61 minutes idle: the next poll surfaces EXPIRED (polling itself
+    // never keeps a match alive), and a late submission is rejected.
+    matchStore.get(match.id)!.updatedAt = new Date(Date.now() - 61 * 60 * 1000);
+    const polled = await getState(match.id, PLAYER_B);
+    expect(polled.statusCode).toBe(200);
+    expect(polled.json().match.status).toBe('EXPIRED');
+    expect(matchStore.get(match.id)!.status).toBe('EXPIRED');
+
+    const late = await submitOrders(match.id, PLAYER_B, 1, sideBOrders(state));
+    expect(late.statusCode).toBe(409);
+    expect(late.json().error).toBe('match_expired');
   });
 
   it('requires authentication context and an existing player row', async () => {

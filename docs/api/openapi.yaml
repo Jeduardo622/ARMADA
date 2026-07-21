@@ -730,7 +730,12 @@ components:
           description: Join code shared out of band with the opponent.
         status:
           type: string
-          enum: [WAITING_FOR_OPPONENT, IN_PROGRESS, COMPLETED]
+          enum: [WAITING_FOR_OPPONENT, IN_PROGRESS, COMPLETED, EXPIRED]
+          description: >-
+            EXPIRED marks an abandoned match: waiting matches idle past the
+            waiting TTL or in-progress matches with no submission activity
+            past the idle TTL. Expiry is applied lazily on join/submit/poll
+            plus an opportunistic sweep on create.
         scenarioCode:
           type: string
           example: pvp-skirmish-2v2
@@ -2818,6 +2823,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            Open-match cap reached (match_limit_reached; the body echoes the
+            player's openMatches count and the limit). Completed and expired
+            matches never count toward the cap.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /pvp/matches/{code}/join:
     post:
       summary: Join a waiting PvP match by its join code
@@ -2857,8 +2871,9 @@ paths:
         '409':
           description: >-
             Match already has both seats (match_full; a lost concurrent join
-            race maps here without retry) or the caller already holds a seat
-            (already_joined).
+            race maps here without retry), the caller already holds a seat
+            (already_joined), or the match idled past its TTL
+            (match_expired).
           content:
             application/json:
               schema:
@@ -2929,8 +2944,9 @@ paths:
             Turn binding rejected (participants only): turn_conflict (the
             body echoes the match's expectedTurn) for stale or replayed
             submissions, orders_already_submitted for a resubmission of the
-            bound turn, match_not_started before an opponent joins, or
-            match_over (the body echoes the result) after completion.
+            bound turn, match_not_started before an opponent joins,
+            match_over (the body echoes the result) after completion, or
+            match_expired after the idle TTL.
           content:
             application/json:
               schema:

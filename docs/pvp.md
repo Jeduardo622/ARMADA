@@ -74,6 +74,10 @@ Both clients default to `http://localhost:4500`
   locally).
 - The server ignores any client-supplied state: it resolves from its own
   persisted match state with the modifier set pinned at creation.
+- Abandoned matches expire: 30 minutes unjoined, or 60 minutes without a
+  submission (polling does not keep a match alive). Expired matches show
+  MATCH EXPIRED on the next poll and refuse joins/orders. Each player can
+  hold at most 3 open matches; finished and expired ones never count.
 
 ## Playtest checklist
 
@@ -89,6 +93,9 @@ Both clients default to `http://localhost:4500`
       hold-fire fleets reach the turn-limit DRAW.
 - [ ] Killing the backend mid-wait shows "Connection hiccup ... retrying"
       and recovers when the backend returns.
+- [ ] A match left waiting/idle past its TTL shows MATCH EXPIRED on the
+      next poll instead of waiting forever; a fourth simultaneous open
+      match is refused (match_limit_reached).
 
 ## Notes
 
