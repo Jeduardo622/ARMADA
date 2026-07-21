@@ -1,9 +1,11 @@
 # Spectator Demo Design Tuning
 
-> **Status: DRAFT — pending design review.** Authored with the tuning slice,
-> following the Mission 07 precedent of drafting the missing design spec
-> alongside the implementation (see the QA notes in
-> `docs/content/missions/mission-07-burning-seas.md`).
+> **Status: Reviewed.** Applied values approved by @Jeduardo622 via the
+> PR #51 merge on 2026-07-21. Originally drafted alongside the tuning
+> slice, following the Mission 07 precedent of authoring the missing
+> design spec with the implementation (see the QA notes in
+> `docs/content/missions/mission-07-burning-seas.md`). Future value
+> changes reopen review: update the table and this status in the same PR.
 
 Consolidates every design-tunable placeholder in the spectator demo —
 `SpectatorRenderer` serialized defaults and `SpectatorDemoSceneBuilder`
