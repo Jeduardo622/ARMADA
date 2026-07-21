@@ -736,6 +736,12 @@ components:
           example: pvp-skirmish-2v2
         seed:
           type: integer
+          nullable: true
+          description: >-
+            Server-picked engine seed. Null until the match completes: with
+            the seed a client could run the deterministic engine locally as
+            an outcome oracle over candidate opponent orders. Revealed on
+            completion for replay verification.
         turnNumber:
           type: integer
           minimum: 1
@@ -2904,24 +2910,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Feature disabled (pvp_api) or caller is not a participant
+          description: Feature disabled (pvp_api)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Match not found
+          description: >-
+            Match not found, or the caller is not a participant — every
+            non-participant path returns this same shape so match ids cannot
+            be probed for existence, phase, or result.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: >-
-            Turn binding rejected: turn_conflict (the body echoes the match's
-            expectedTurn) for stale or replayed submissions,
-            orders_already_submitted for a resubmission of the bound turn,
-            match_not_started before an opponent joins, or match_over (the
-            body echoes the result) after completion.
+            Turn binding rejected (participants only): turn_conflict (the
+            body echoes the match's expectedTurn) for stale or replayed
+            submissions, orders_already_submitted for a resubmission of the
+            bound turn, match_not_started before an opponent joins, or
+            match_over (the body echoes the result) after completion.
           content:
             application/json:
               schema:

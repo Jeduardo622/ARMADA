@@ -53,7 +53,9 @@ const participantStore = new Map<string, ParticipantRow>();
 let idCounter = 0;
 let simulateJoinRaceP2002 = false;
 
-const nextId = () => `row-${++idCounter}`;
+// UUID-shaped ids: the routes 404 malformed match ids before touching the
+// store, so store rows must carry well-formed ids.
+const nextId = () => `00000000-0000-4000-8000-${String(++idCounter).padStart(12, '0')}`;
 const p2002 = () => {
   const error = new Error('unique constraint') as Error & { code?: string };
   error.code = 'P2002';
@@ -303,7 +305,10 @@ describe('pvp match lifecycle', () => {
     expect(match.state.turn).toBe(1);
     expect(match.state.ships).toHaveLength(4);
     expect(match.code).toMatch(/^[A-Z2-9]{8}$/);
-    // Server-picked seed, not the client's.
+    // Server-picked seed, not the client's — and withheld from the view
+    // until completion (a live seed is a local outcome oracle).
+    expect(match.seed).toBeNull();
+    expect(typeof matchStore.get(match.id)!.seed).toBe('number');
     expect(matchStore.get(match.id)!.modifiers).toEqual({ chainShot: true });
   });
 
@@ -434,10 +439,17 @@ describe('pvp match lifecycle', () => {
     });
     expect(smuggled.statusCode).toBe(400);
 
-    // Non-participants cannot submit or peek; polling gives the missing-
-    // match shape so ids cannot be probed.
+    // Non-participants cannot submit or peek; every path gives the missing-
+    // match shape so ids cannot be probed. A mismatched turn number must not
+    // leak the differentiated turn_conflict/match_over diagnostics either —
+    // those would let any authenticated caller track a match's progress.
     const intruderSubmit = await submitOrders(match.id, PLAYER_C, 1, []);
-    expect(intruderSubmit.statusCode).toBe(403);
+    expect(intruderSubmit.statusCode).toBe(404);
+    expect(intruderSubmit.json().error).toBe('match_not_found');
+    const intruderStaleTurn = await submitOrders(match.id, PLAYER_C, 5, []);
+    expect(intruderStaleTurn.statusCode).toBe(404);
+    expect(intruderStaleTurn.json().error).toBe('match_not_found');
+    expect(intruderStaleTurn.body).not.toContain('expectedTurn');
     const intruderPeek = await getState(match.id, PLAYER_C);
     expect(intruderPeek.statusCode).toBe(404);
     expect(intruderPeek.json().error).toBe('match_not_found');
@@ -491,12 +503,83 @@ describe('pvp match lifecycle', () => {
     expect(finalView.json().match.status).toBe('COMPLETED');
     expect(finalView.json().match.result).toBe('side_a');
     expect(finalView.body).toContain('broadside');
+    // The seed is revealed once the match completes.
+    expect(finalView.json().match.seed).toBe(PVP_DEFAULT_SEED);
 
     // The completed match refuses further submissions.
     const late = await submitOrders(match.id, PLAYER_A, resolvedTurns + 1, []);
     expect(late.statusCode).toBe(409);
     expect(late.json().error).toBe('match_over');
     expect(late.json().result).toBe('side_a');
+  });
+
+  it('gives malformed match ids the uniform missing-match shape instead of a Prisma cast error', async () => {
+    const match = await createMatch();
+    await joinMatch(match.code);
+
+    const badGet = await getState('not-a-uuid', PLAYER_A);
+    expect(badGet.statusCode).toBe(404);
+    expect(badGet.json().error).toBe('match_not_found');
+
+    const badSubmit = await submitOrders('not-a-uuid', PLAYER_A, 1, []);
+    expect(badSubmit.statusCode).toBe(404);
+    expect(badSubmit.json().error).toBe('match_not_found');
+  });
+
+  it('resolves turns with the modifiers persisted at creation, not the current factory', async () => {
+    const match = await createMatch();
+    await joinMatch(match.code);
+
+    // Simulate an older match created before chain shot existed: with the
+    // persisted set empty, a chain-shot order must resolve as round shot.
+    matchStore.get(match.id)!.modifiers = {};
+
+    const state = matchStore.get(match.id)!.state as { ships: Array<{ id: string; hp: number }> };
+    await submitOrders(match.id, PLAYER_A, 1, [
+      fire(PVP_SIDE_A_SHIP_IDS[0], PVP_SIDE_B_SHIP_IDS[0], 'chain'),
+      fire(PVP_SIDE_A_SHIP_IDS[1], PVP_SIDE_B_SHIP_IDS[0], 'chain')
+    ]);
+    const resolved = await submitOrders(match.id, PLAYER_B, 1, sideBOrders(state));
+    expect(resolved.statusCode).toBe(200);
+    expect(resolved.json().resolved).toBe(true);
+
+    // Chain shot marks its broadside events with ammo: 'chain'; under the
+    // persisted flag-off set the events must stay round-shot shaped.
+    const events = resolved.json().match.turns[0].events as Array<{ ammo?: string }>;
+    expect(events.some((event) => event.ammo === 'chain')).toBe(false);
+  });
+
+  it('completes a turn-limit stalemate as a draw and still answers replays with match_over', async () => {
+    const match = await createMatch();
+    await joinMatch(match.code);
+
+    const holdOrders = (ids: readonly string[]): SimOrder[] =>
+      ids.map((shipId) => ({ shipId, action: 'maneuver', turnDelta: 0, speedDelta: 0 }));
+
+    for (let turn = 1; turn <= PVP_TURN_LIMIT; turn++) {
+      const a = await submitOrders(match.id, PLAYER_A, turn, holdOrders(PVP_SIDE_A_SHIP_IDS));
+      expect(a.statusCode).toBe(200);
+      const b = await submitOrders(match.id, PLAYER_B, turn, holdOrders(PVP_SIDE_B_SHIP_IDS));
+      expect(b.statusCode).toBe(200);
+      expect(b.json().resolved).toBe(true);
+    }
+
+    const view = await getState(match.id, PLAYER_A);
+    expect(view.json().match.status).toBe('COMPLETED');
+    expect(view.json().match.result).toBe('draw');
+    expect(view.json().match.turnNumber).toBe(PVP_TURN_LIMIT + 1);
+
+    // The server-returned post-draw binding (turnLimit + 1) must earn the
+    // documented match_over, not a schema 400.
+    const replay = await submitOrders(
+      match.id,
+      PLAYER_A,
+      PVP_TURN_LIMIT + 1,
+      holdOrders(PVP_SIDE_A_SHIP_IDS)
+    );
+    expect(replay.statusCode).toBe(409);
+    expect(replay.json().error).toBe('match_over');
+    expect(replay.json().result).toBe('draw');
   });
 
   it('requires authentication context and an existing player row', async () => {

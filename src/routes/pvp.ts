@@ -15,6 +15,7 @@ import {
 import {
   SimOrder,
   SimState,
+  simModifiersSchema,
   simOrderSchema,
   simStateSchema
 } from '../sim/types.js';
@@ -50,11 +51,17 @@ const submitOrdersSchema = z
     // Binds the submission to the turn the client saw (the #39 tier-binding
     // pattern): a stale or replayed submission no longer matches the match's
     // current turnNumber and is rejected instead of silently landing on a
-    // later turn.
-    turnNumber: z.number().int().min(1).max(PVP_TURN_LIMIT),
+    // later turn. No upper bound here: after a turn-limit draw the match's
+    // turnNumber is PVP_TURN_LIMIT + 1 and a replay of that binding must
+    // reach the transaction to earn its documented 409 match_over.
+    turnNumber: z.number().int().min(1),
     orders: z.array(simOrderSchema).max(8)
   })
   .strict();
+
+// Match ids are UUID columns; a malformed id cannot name a match, so it gets
+// the uniform missing-match shape instead of leaking a Prisma cast error.
+const matchIdSchema = z.string().uuid();
 
 const turnRecordSchema = z.object({
   turn: z.number().int(),
@@ -118,7 +125,10 @@ function matchView(match: MatchRow, participants: ParticipantRow[], playerId: st
     code: match.code,
     status: match.status,
     scenarioCode: match.scenarioCode,
-    seed: match.seed,
+    // Withheld until completion: with the seed a client can run the
+    // deterministic engine locally as an outcome oracle over candidate
+    // opponent orders. Post-completion it supports replay verification.
+    seed: match.status === MATCH_STATUS_COMPLETED ? match.seed : null,
     turnNumber: match.turnNumber,
     turnLimit: PVP_TURN_LIMIT,
     result: match.result,
@@ -273,7 +283,11 @@ export function registerPvpRoutes(app: FastifyInstance) {
       return;
     }
 
-    const matchId = (request.params as { id: string }).id;
+    const idParsed = matchIdSchema.safeParse((request.params as { id: string }).id);
+    if (!idParsed.success) {
+      return reply.status(404).send({ error: 'match_not_found' });
+    }
+    const matchId = idParsed.data;
     const { turnNumber, orders } = parsed.data;
 
     const submit = () =>
@@ -289,8 +303,20 @@ export function registerPvpRoutes(app: FastifyInstance) {
           data: { updatedAt: new Date() }
         });
         if (bound.count !== 1) {
-          const existing = await tx.match.findUnique({ where: { id: matchId } });
-          if (!existing) {
+          const existing = await tx.match.findUnique({
+            where: { id: matchId },
+            include: { participants: true }
+          });
+          // Non-participants get the uniform missing-match shape on every
+          // branch: the differentiated statuses below would otherwise let
+          // any authenticated caller probe a match's existence, phase,
+          // current turn, or winner through this error path.
+          if (
+            !existing ||
+            !existing.participants.some(
+              (participant: ParticipantRow) => participant.playerId === playerId
+            )
+          ) {
             throw new MatchRejection(404, { error: 'match_not_found' });
           }
           if (existing.status === MATCH_STATUS_WAITING) {
@@ -317,7 +343,9 @@ export function registerPvpRoutes(app: FastifyInstance) {
           (participant: ParticipantRow) => participant.playerId === playerId
         );
         if (!you) {
-          throw new MatchRejection(403, { error: 'forbidden' });
+          // Same anti-probing shape as the GET route: a non-participant
+          // cannot learn that the match exists.
+          throw new MatchRejection(404, { error: 'match_not_found' });
         }
 
         const engineSide = ENGINE_SIDE[you.side as keyof typeof ENGINE_SIDE];
@@ -364,13 +392,21 @@ export function registerPvpRoutes(app: FastifyInstance) {
         const sideAOrders: SimOrder[] = you.side === MATCH_SIDE_A ? orders : opponentOrders.data;
         const sideBOrders: SimOrder[] = you.side === MATCH_SIDE_A ? opponentOrders.data : orders;
 
+        // Resolution uses the modifier set persisted at creation, so a
+        // later change to the scenario factory can never switch an
+        // in-progress match's rules mid-game.
+        const modifiersParsed = simModifiersSchema.safeParse(match.modifiers);
+        if (!modifiersParsed.success) {
+          throw new MatchRejection(500, { error: 'match_state_invalid' });
+        }
+
         const preview = resolveSimPreview({
           schemaVersion: 1,
           seed: match.seed,
           turn: turnNumber,
           state: { ...stateParsed.data, turn: turnNumber } as SimState,
           orders: [...sideAOrders, ...sideBOrders],
-          modifiers: createPvpModifiers()
+          modifiers: modifiersParsed.data
         });
 
         const record = {
@@ -457,9 +493,12 @@ export function registerPvpRoutes(app: FastifyInstance) {
       return;
     }
 
-    const matchId = (request.params as { id: string }).id;
+    const idParsed = matchIdSchema.safeParse((request.params as { id: string }).id);
+    if (!idParsed.success) {
+      return reply.status(404).send({ error: 'match_not_found' });
+    }
     const match = await app.prisma.match.findUnique({
-      where: { id: matchId },
+      where: { id: idParsed.data },
       include: { participants: true }
     });
     if (!match) {
