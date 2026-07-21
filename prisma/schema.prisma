@@ -25,6 +25,53 @@ model Player {
   missions    MissionProgress[]
   telemetry   TelemetryEvent[]
   upgrades    PlayerShipUpgrade[]
+  matchSeats  MatchParticipant[]
+}
+
+// Server-authoritative PvP match lifecycle (pvp_api routes). Status/side/
+// result are TEXT with app-level constants (src/routes/pvp.ts) rather than
+// Postgres enums to keep the migration additive and the rollback a plain
+// table drop.
+model Match {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  status       String   @default("WAITING_FOR_OPPONENT")
+  scenarioCode String
+  seed         Int
+  modifiers    Json
+  // Next turn to resolve; submit-orders binds {matchId, turnNumber} and
+  // mismatches are rejected (409 turn_conflict).
+  turnNumber   Int      @default(1)
+  // Current SimState. Server-written only: no route ever persists
+  // client-supplied state.
+  state        Json
+  // Append-only per-turn records [{turn, hash, summary, events}].
+  turnEvents   Json     @default("[]")
+  result       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  participants MatchParticipant[]
+
+  @@index([status])
+}
+
+model MatchParticipant {
+  id            String   @id @default(uuid())
+  matchId       String
+  match         Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerId      String
+  player        Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  side          String
+  // Orders staged for turn pendingTurn; never returned to the opponent
+  // before the turn resolves.
+  pendingOrders Json?
+  pendingTurn   Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([matchId, side])
+  @@unique([matchId, playerId])
+  @@index([playerId])
 }
 
 model InventoryItem {

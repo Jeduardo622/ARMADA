@@ -58,7 +58,10 @@ const featureFlags = [
   { name: 'inventory_api', description: 'Enable inventory endpoints' },
   { name: 'sim_stub', description: 'Expose deterministic sim stub' },
   { name: 'telemetry_ingest', description: 'Allow telemetry ingestion' },
-  { name: 'config_api', description: 'Serve config snapshots' }
+  { name: 'config_api', description: 'Serve config snapshots' },
+  // Player-facing PvP match lifecycle; unlike inventory_grant_api this mints
+  // nothing, so the force-enable loop is the right place for it.
+  { name: 'pvp_api', description: 'Enable PvP match endpoints' }
 ];
 
 function checksum(content: unknown) {

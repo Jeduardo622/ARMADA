@@ -19,6 +19,7 @@ import { registerPlayerRoutes } from './routes/player.js';
 import { registerInventoryRoutes } from './routes/inventory.js';
 import { registerUpgradeRoutes } from './routes/upgrades.js';
 import { registerMissionRoutes } from './routes/missions.js';
+import { registerPvpRoutes } from './routes/pvp.js';
 import { registerSimRoutes } from './routes/sim.js';
 import { registerTelemetryRoutes } from './routes/telemetry.js';
 import { registerConfigRoutes } from './routes/config.js';
@@ -58,7 +59,18 @@ export function buildServer(options?: BuildOptions) {
         create: async (data: unknown) => data
       },
       configSnapshot: { findFirst: async () => null, findUnique: async () => null },
-      featureFlag: { findUnique: async () => ({ enabled: true }) }
+      featureFlag: { findUnique: async () => ({ enabled: true }) },
+      match: {
+        create: async (data: unknown) => data,
+        findUnique: async () => null,
+        updateMany: async () => ({ count: 0 })
+      },
+      matchParticipant: {
+        create: async (data: unknown) => data,
+        findFirst: async () => null,
+        findMany: async () => [],
+        updateMany: async () => ({ count: 0 })
+      }
     } as unknown as PrismaClient);
     app.decorate('redis', {
       ping: async () => 'PONG',
@@ -94,6 +106,7 @@ export function buildServer(options?: BuildOptions) {
   registerInventoryRoutes(app);
   registerUpgradeRoutes(app);
   registerMissionRoutes(app);
+  registerPvpRoutes(app);
   registerSimRoutes(app);
   registerTelemetryRoutes(app);
   registerConfigRoutes(app);
