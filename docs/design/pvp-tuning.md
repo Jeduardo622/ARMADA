@@ -42,18 +42,23 @@ deliberately not duplicated here.
 ### Design note: the v1 dominant strategy (accepted for the demo)
 
 With no movement phase, range and bearing never change, which collapses
-the order surface: turning strictly hurts the turner (heading drift adds
-your own broadside angle penalty, `floor(diff/15)` per 15°, and nothing
-else reads heading), while speed ramping strictly helps (+`floor(v/2)`
-hit chance and +`floor(v·1.5)` base damage, with no positional cost
-since nothing moves). Optimal v1 play is therefore **speed +2 every
-turn, never turn, focus fire** — the maneuver buttons are trap options,
-and chain-vs-round plus target selection are the only live decisions.
-This is accepted for the demo: it keeps matches legible and short. It is
-also the headline motivation for scenario v2 (`windMovement` +
-`ramming`), where heading and speed buy position instead of only
-modifying gunnery. Do not "fix" this by tuning the v1 numbers — no
-constant in this spec changes the dominance structure.
+the order surface. Heading matters only through your own broadside angle
+penalty (`floor(diff/15)` per 15° off the target bearing; nothing else
+reads heading), so the entire depth of maneuvering is **one free
+alignment press**: same-row targets sit at bearing 0° (already aligned),
+cross-row targets at ±15° rounded (one 15° press removes one penalty
+point, e.g. 68% → 69% hit), and any turn beyond alignment only hurts.
+Speed ramping strictly helps (+`floor(v/2)` hit chance and
++`floor(v·1.5)` base damage, with no positional cost since nothing
+moves). Optimal v1 play is therefore **align to your target's bearing
+once (re-align one press when switching rows), speed +2 every turn,
+focus fire** — beyond that single alignment the maneuver buttons are
+trap options, and chain-vs-round plus target selection are the only
+live decisions. This is accepted for the demo: it keeps matches legible
+and short. It is also the headline motivation for scenario v2
+(`windMovement` + `ramming`), where heading and speed buy position
+instead of only modifying gunnery. Do not "fix" this by tuning the v1
+numbers — no constant in this spec changes the dominance structure.
 
 ## Match lifecycle policy (`src/routes/pvp.ts`)
 
