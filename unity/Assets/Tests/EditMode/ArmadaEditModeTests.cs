@@ -571,6 +571,81 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void PvpScenario_FingerprintMatchesBackendPinAndOrderSessionBuildsWireOrders()
+        {
+            // Must equal EXPECTED_FINGERPRINT in tests/pvpScenario.test.ts so
+            // the client and server pin the identical deterministic scenario.
+            const string expected =
+                "pvp-skirmish-2v2|turnLimit=20|modifiers=chainShot|wind=90:0|" +
+                "alpha-frigate-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
+                "alpha-frigate-b:player:0,-30:h0:v3:hp120:sl80:cw50|" +
+                "bravo-frigate-a:enemy:220,30:h180:v3:hp120:sl80:cw50|" +
+                "bravo-frigate-b:enemy:220,-30:h180:v3:hp120:sl80:cw50";
+
+            Assert.That(PvpScenario.Fingerprint(), Is.EqualTo(expected));
+            Assert.That(PvpScenario.FingerprintOf(PvpScenario.BuildInitialState()), Is.EqualTo(expected));
+
+            // The v1 modifier set is chain shot only; absent flags must be
+            // omitted so the payload carries exactly the pinned set.
+            var settings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+            Assert.That(
+                JsonConvert.SerializeObject(PvpScenario.BuildModifiers(), settings),
+                Is.EqualTo("{\"chainShot\":true}"));
+            Assert.That(JsonConvert.SerializeObject(new SimModifiers(), settings), Is.EqualTo("{}"));
+
+            // Order session drafts map to the wire order surface: a set
+            // target makes a broadside (round shot omits the ammo key), no
+            // target stays a pure maneuver.
+            var state = PvpScenario.BuildInitialState();
+            var sideA = new List<SimShip> { state.Ships[0], state.Ships[1] };
+            var sideB = new List<SimShip> { state.Ships[2], state.Ships[3] };
+            var session = new PvpOrderSession("A", sideA, sideB);
+
+            session.AdjustTurn(1);          // +15
+            session.AdjustSpeed(1);         // +1
+            session.CycleTarget();          // bravo-frigate-a
+            session.NextShip();
+            session.CycleTarget();          // bravo-frigate-a
+            session.CycleTarget();          // bravo-frigate-b
+            session.ToggleAmmo();           // chain
+            session.AdjustTurn(-1);         // -15
+
+            var orders = session.BuildOrders();
+            Assert.That(orders, Has.Count.EqualTo(2));
+
+            Assert.That(orders[0].ShipId, Is.EqualTo("alpha-frigate-a"));
+            Assert.That(orders[0].Action, Is.EqualTo("broadside"));
+            Assert.That(orders[0].TargetShipId, Is.EqualTo("bravo-frigate-a"));
+            Assert.That(orders[0].Side, Is.EqualTo("starboard"));
+            Assert.That(orders[0].TurnDelta, Is.EqualTo(15));
+            Assert.That(orders[0].SpeedDelta, Is.EqualTo(1));
+            Assert.That(JsonConvert.SerializeObject(orders[0], settings), Does.Not.Contain("ammo"));
+
+            Assert.That(orders[1].ShipId, Is.EqualTo("alpha-frigate-b"));
+            Assert.That(orders[1].TargetShipId, Is.EqualTo("bravo-frigate-b"));
+            Assert.That(orders[1].TurnDelta, Is.EqualTo(-15));
+            Assert.That(orders[1].Ammo, Is.EqualTo("chain"));
+
+            // Cycling past the last enemy returns to hold-fire, and a
+            // maneuver-only draft never carries target/side/ammo keys.
+            session.CycleTarget();
+            var maneuverOnly = session.BuildOrders()[1];
+            Assert.That(maneuverOnly.Action, Is.EqualTo("maneuver"));
+            Assert.That(maneuverOnly.TargetShipId, Is.Null);
+            Assert.That(maneuverOnly.Side, Is.Null);
+            Assert.That(maneuverOnly.Ammo, Is.Null);
+
+            // Draft clamps mirror simOrderSchema bounds.
+            for (var i = 0; i < 20; i++)
+            {
+                session.AdjustTurn(1);
+                session.AdjustSpeed(-1);
+            }
+            Assert.That(session.CurrentDraft.TurnDelta, Is.EqualTo(90));
+            Assert.That(session.CurrentDraft.SpeedDelta, Is.EqualTo(-2));
+        }
+
+        [Test]
         public void MissionCompleteResponse_DeserializesBackendPayload()
         {
             // Mirrors the /missions/{code}/complete response contract in

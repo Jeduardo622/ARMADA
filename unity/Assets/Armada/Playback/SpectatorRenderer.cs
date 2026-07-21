@@ -71,6 +71,8 @@ namespace Armada.Client.Playback
         private readonly Dictionary<string, Marker> _markers = new();
         private TurnPlayback _playback;
         private Mission10Outcome _outcome;
+        private int _turnLimit;
+        private string _completionLine;
         private PlaybackStep _currentStep;
         private float _stepElapsed;
         private float _stepDuration;
@@ -147,20 +149,45 @@ namespace Armada.Client.Playback
         /// </summary>
         public void BeginOutcome(Mission10Outcome outcome)
         {
-            ClearMarkers();
+            var ships = Mission10Scenario.BuildExpectedStart(outcome.Seed).State.Ships;
+            BeginTurns(
+                ships,
+                outcome.Turns,
+                outcome.TurnLimit,
+                $"Spectating {outcome.MissionCode} (seed {outcome.Seed})...",
+                completionLine: null);
             _outcome = outcome;
+        }
+
+        /// <summary>
+        /// Generic playback entry (PvP hot-seat and other non-mission
+        /// consumers): markers spawn at the supplied ship snapshot, then the
+        /// turn records animate them. The completion line replaces the
+        /// mission outcome summary on finish; applied per-side loss totals
+        /// are appended either way.
+        /// </summary>
+        public void BeginTurns(
+            IReadOnlyList<SimShip> shipsAtStart,
+            IReadOnlyList<Mission01TurnRecord> turns,
+            int turnLimit,
+            string introLine,
+            string completionLine)
+        {
+            ClearMarkers();
+            _outcome = null;
+            _turnLimit = turnLimit;
+            _completionLine = completionLine;
             _currentStep = null;
             _stepArmed = false;
             IsFinished = false;
 
-            var ships = Mission10Scenario.BuildExpectedStart(outcome.Seed).State.Ships;
-            foreach (var ship in ships)
+            foreach (var ship in shipsAtStart)
             {
                 SpawnMarker(ship);
             }
 
-            _playback = new TurnPlayback(ships, outcome.Turns);
-            SetHud($"Spectating {outcome.MissionCode} (seed {outcome.Seed})...");
+            _playback = new TurnPlayback(shipsAtStart, turns);
+            SetHud(introLine);
         }
 
         public bool TryGetMarkerPosition(string shipId, out Vector3 position)
@@ -298,7 +325,7 @@ namespace Armada.Client.Playback
             {
                 case PlaybackStepKind.TurnStart:
                     _stepDuration = turnBannerSeconds;
-                    SetHud($"Turn {step.Turn}/{_outcome.TurnLimit}");
+                    SetHud($"Turn {step.Turn}/{_turnLimit}");
                     break;
                 case PlaybackStepKind.Maneuver:
                     _stepDuration = maneuverSeconds;
@@ -393,6 +420,19 @@ namespace Armada.Client.Playback
         private void FinishRun()
         {
             IsFinished = true;
+            if (_outcome == null)
+            {
+                // Generic (non-mission) playback: report the caller's line
+                // plus both sides' applied (remaining-delta) loss totals.
+                var sideA = _playback.PlayerInflicted;
+                var sideB = _playback.EnemyInflicted;
+                SetHud(
+                    $"{_completionLine ?? "Playback complete"}"
+                    + $" | side A applied: hull {sideA.Hull}, sail {sideA.Sail}, crew {sideA.Crew}"
+                    + $" | side B applied: hull {sideB.Hull}, sail {sideB.Sail}, crew {sideB.Crew}");
+                return;
+            }
+
             var bonuses = _outcome?.BonusObjectives;
             var inflicted = _playback.PlayerInflicted;
             SetHud(
