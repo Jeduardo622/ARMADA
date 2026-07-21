@@ -747,6 +747,20 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(PlaybackEase.Progress(-1f, 1f), Is.Zero);
             Assert.That(PlaybackEase.Progress(2f, 1f), Is.EqualTo(1f));
             Assert.That(PlaybackEase.Progress(0.5f, 1f), Is.EqualTo(0.5f).Within(0.0001f));
+
+            // Readout accessor: the tracked remaining blocks that power the
+            // renderer's HP/sail bars reflect the last reported event values,
+            // or the initial scenario stats for untouched ships.
+            Assert.That(playback.TryGetRemaining("enemy-clipper-a", out var clipperRemaining), Is.True);
+            Assert.That(clipperRemaining.Hp, Is.EqualTo(120));
+            Assert.That(clipperRemaining.Sail, Is.EqualTo(80));
+            Assert.That(playback.TryGetRemaining("player-sloop-b", out var rammerRemaining), Is.True);
+            Assert.That(rammerRemaining.Hp, Is.EqualTo(112));
+            Assert.That(playback.TryGetRemaining("player-sloop-a", out var untouchedRemaining), Is.True);
+            Assert.That(untouchedRemaining.Hp, Is.EqualTo(120));
+            Assert.That(untouchedRemaining.Sail, Is.EqualTo(80));
+            Assert.That(playback.TryGetRemaining("missing-ship", out _), Is.False);
+            Assert.That(playback.TryGetRemaining(null, out _), Is.False);
         }
 
         [Test]
@@ -781,6 +795,58 @@ namespace Armada.Client.Tests.EditMode
             var cached = authService.GetTokenAsync();
             Assert.That(cached.IsCompleted, Is.True);
             Assert.That(cached.Result, Is.EqualTo("held-token"));
+            Assert.That(inFlightField.GetValue(authService), Is.Null);
+        }
+
+        // Failure-path companion to the shared in-flight test above (PR #49
+        // security-review follow-up): a connection error must resolve to
+        // null, clear the in-flight slot, and let the next caller start a
+        // fresh request instead of awaiting the stale failed task.
+        [UnityEngine.TestTools.UnityTest]
+        public System.Collections.IEnumerator AuthService_FailedTokenRequestClearsInFlightSlotForRetry()
+        {
+            // Port 1 on loopback refuses connections, so the request fails
+            // fast without touching the network.
+            var apiClient = new ApiClient("http://127.0.0.1:1", null);
+            var authService = new AuthService(apiClient, null);
+            var inFlightField = typeof(AuthService).GetField(
+                "_inFlightRequest",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var failureLog = new System.Text.RegularExpressions.Regex(@"\[Auth\] Failed to obtain token");
+
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, failureLog);
+            var first = authService.GetTokenAsync();
+            // The slot holds the request only while it is pending. On hosts
+            // where the refused connection fails synchronously (Linux GameCI:
+            // curl error in 0 ms before the first yield) the task is already
+            // complete here and is deliberately never stored.
+            if (!first.IsCompleted)
+            {
+                Assert.That(inFlightField.GetValue(authService), Is.SameAs(first));
+            }
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            while (!first.IsCompleted && stopwatch.Elapsed < TimeSpan.FromSeconds(15))
+            {
+                yield return null;
+            }
+
+            Assert.That(first.IsCompleted, Is.True, "first token request never completed");
+            Assert.That(first.Result, Is.Null);
+            Assert.That(inFlightField.GetValue(authService), Is.Null);
+
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, failureLog);
+            var second = authService.GetTokenAsync();
+            Assert.That(second, Is.Not.SameAs(first));
+
+            stopwatch.Restart();
+            while (!second.IsCompleted && stopwatch.Elapsed < TimeSpan.FromSeconds(15))
+            {
+                yield return null;
+            }
+
+            Assert.That(second.IsCompleted, Is.True, "second token request never completed");
+            Assert.That(second.Result, Is.Null);
             Assert.That(inFlightField.GetValue(authService), Is.Null);
         }
 

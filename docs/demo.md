@@ -3,7 +3,8 @@
 Watch the repo's first Unity scene play back a resolved Mission 10 run —
 the pinned seed-2 mixed-battery orders (chain shot into the rigging for
 three turns, then round shot to sink) — animated from the server's turn
-event stream. Spectate only; there is no player input yet.
+event stream. Spectate only — no gameplay input, but the playback itself
+can be paused, stepped, and speed-scaled (see Controls).
 
 ## 1. Run the backend
 
@@ -32,6 +33,21 @@ round shot flashes orange, rams flash white. Player ships are green
 cubes, enemies red capsules. The top HUD line narrates each step and
 finishes with the outcome, bonus objectives, and damage totals derived
 from applied (remaining-block) losses, never nominal rolls.
+
+## Controls
+
+- **Space** — pause / resume playback.
+- **Right Arrow** — while paused, play exactly one playback step
+  (banner, maneuver, move, or attack flash), then freeze again.
+- **1–4** — playback speed presets ×0.5, ×1, ×2, ×4.
+- **+ / −** — cycle up/down through the speed presets.
+
+The HUD line appends `PAUSED` and the current speed whenever they differ
+from normal playback. Every ship marker carries a hull bar (top, green)
+and sail bar (below it, yellow) scaled by remaining/initial values from
+the same applied remaining blocks that drive the damage totals. Bindings,
+presets, and bar geometry are design-tunable placeholders on
+`SpectatorRenderer`.
 
 ## Notes
 

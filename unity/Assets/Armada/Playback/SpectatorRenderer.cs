@@ -37,6 +37,21 @@ namespace Armada.Client.Playback
         [SerializeField] private Color chainShotFlashColor = new Color(0.20f, 0.90f, 1.00f);
         [SerializeField] private Color ramFlashColor = Color.white;
 
+        [Header("Playback controls (design-tunable placeholder bindings)")]
+        [SerializeField] private KeyCode pauseKey = KeyCode.Space;
+        [SerializeField] private KeyCode stepKey = KeyCode.RightArrow;
+        [SerializeField] private KeyCode speedUpKey = KeyCode.Equals;
+        [SerializeField] private KeyCode speedDownKey = KeyCode.Minus;
+        [Tooltip("Speed presets bound to keys 1-4; +/- cycle through them.")]
+        [SerializeField] private float[] speedPresets = { 0.5f, 1f, 2f, 4f };
+
+        [Header("Readout bars (design-tunable placeholders)")]
+        [SerializeField] private float barWidth = 1.2f;
+        [Tooltip("Must clear the tallest marker: enemy capsules top out at y=1.5 under the top-down camera.")]
+        [SerializeField] private float barLift = 1.2f;
+        [SerializeField] private Color hullBarColor = new Color(0.40f, 0.95f, 0.40f);
+        [SerializeField] private Color sailBarColor = new Color(0.95f, 0.90f, 0.55f);
+
         [Header("UI Wiring")]
         [SerializeField] private TMP_Text hudLabel;
 
@@ -47,6 +62,10 @@ namespace Armada.Client.Playback
             public Color BaseColor;
             public Vector3 MoveFrom;
             public Vector3 MoveTo;
+            public Transform HullBar;
+            public Transform SailBar;
+            public int MaxHull;
+            public int MaxSail;
         }
 
         private readonly Dictionary<string, Marker> _markers = new();
@@ -55,14 +74,55 @@ namespace Armada.Client.Playback
         private PlaybackStep _currentStep;
         private float _stepElapsed;
         private float _stepDuration;
+        private bool _stepArmed;
+        private string _lastMessage;
 
         /// <summary>Step currently being animated; test hook, may be null.</summary>
         public PlaybackStep CurrentStep => _currentStep;
 
-        /// <summary>Last HUD line written; test hook.</summary>
+        /// <summary>Last HUD line written (narration plus control status); test hook.</summary>
         public string HudText { get; private set; }
 
         public bool IsFinished { get; private set; }
+
+        /// <summary>While paused, ticks do nothing unless a single step is armed.</summary>
+        public bool IsPaused { get; private set; }
+
+        /// <summary>Scales elapsed time while a step animates; 1 is real time.</summary>
+        public float SpeedMultiplier { get; private set; } = 1f;
+
+        public void Pause()
+        {
+            IsPaused = true;
+            _stepArmed = false;
+            RefreshHudLabel();
+        }
+
+        public void Resume()
+        {
+            IsPaused = false;
+            _stepArmed = false;
+            RefreshHudLabel();
+        }
+
+        /// <summary>
+        /// While paused, arms exactly one playback step: subsequent ticks run
+        /// normally until the step ends, then playback freezes again.
+        /// </summary>
+        public void StepOnce()
+        {
+            if (IsPaused)
+            {
+                _stepArmed = true;
+            }
+        }
+
+        public void SetSpeed(float multiplier)
+        {
+            // Clamp bounds are design-tunable placeholders.
+            SpeedMultiplier = Mathf.Clamp(multiplier, 0.25f, 8f);
+            RefreshHudLabel();
+        }
 
         /// <summary>
         /// Entry point used by Mission10Bootstrap after the flow resolves.
@@ -90,6 +150,7 @@ namespace Armada.Client.Playback
             ClearMarkers();
             _outcome = outcome;
             _currentStep = null;
+            _stepArmed = false;
             IsFinished = false;
 
             var ships = Mission10Scenario.BuildExpectedStart(outcome.Seed).State.Ships;
@@ -116,13 +177,78 @@ namespace Armada.Client.Playback
 
         private void Update()
         {
+            PollControls();
             Tick(Time.deltaTime);
+        }
+
+        // Legacy Input manager polling (no Input System package in-project);
+        // bindings and presets are design-tunable placeholders. Kept out of
+        // Tick so tests drive controls through the public methods instead.
+        private void PollControls()
+        {
+            if (Input.GetKeyDown(pauseKey))
+            {
+                if (IsPaused)
+                {
+                    Resume();
+                }
+                else
+                {
+                    Pause();
+                }
+            }
+
+            if (IsPaused && Input.GetKeyDown(stepKey))
+            {
+                StepOnce();
+            }
+
+            for (var i = 0; speedPresets != null && i < speedPresets.Length && i < 4; i++)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha1 + i))
+                {
+                    SetSpeed(speedPresets[i]);
+                }
+            }
+
+            if (Input.GetKeyDown(speedUpKey) || Input.GetKeyDown(KeyCode.KeypadPlus))
+            {
+                CycleSpeedPreset(1);
+            }
+            if (Input.GetKeyDown(speedDownKey) || Input.GetKeyDown(KeyCode.KeypadMinus))
+            {
+                CycleSpeedPreset(-1);
+            }
+        }
+
+        private void CycleSpeedPreset(int direction)
+        {
+            if (speedPresets == null || speedPresets.Length == 0)
+            {
+                return;
+            }
+
+            var nearest = 0;
+            var bestDistance = float.MaxValue;
+            for (var i = 0; i < speedPresets.Length; i++)
+            {
+                var distance = Mathf.Abs(speedPresets[i] - SpeedMultiplier);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    nearest = i;
+                }
+            }
+
+            SetSpeed(speedPresets[Mathf.Clamp(nearest + direction, 0, speedPresets.Length - 1)]);
         }
 
         /// <summary>
         /// Advances playback by dt seconds. A tick either begins the next
         /// step or advances the active one, never both, so tests stepping
-        /// with fixed dt values see every step deterministically.
+        /// with fixed dt values see every step deterministically. Paused
+        /// playback ignores ticks unless a single step is armed; the speed
+        /// multiplier scales dt on the advance path only.
         /// </summary>
         public void Tick(float dt)
         {
@@ -131,25 +257,36 @@ namespace Armada.Client.Playback
                 return;
             }
 
+            if (IsPaused && !_stepArmed)
+            {
+                return;
+            }
+
             if (_currentStep == null)
             {
                 if (!_playback.TryStep(out var step))
                 {
+                    _stepArmed = false;
                     FinishRun();
+                    UpdateReadouts();
                     return;
                 }
 
                 BeginStep(step);
+                UpdateReadouts();
                 return;
             }
 
-            _stepElapsed += dt;
+            _stepElapsed += dt * SpeedMultiplier;
             var progress = PlaybackEase.Progress(_stepElapsed, _stepDuration);
             AnimateStep(progress);
             if (_stepElapsed >= _stepDuration)
             {
                 EndStep();
+                _stepArmed = false;
             }
+
+            UpdateReadouts();
         }
 
         private void BeginStep(PlaybackStep step)
@@ -281,12 +418,94 @@ namespace Armada.Client.Playback
                 markerRenderer.material.color = baseColor;
             }
 
-            _markers[ship.Id] = new Marker
+            var marker = new Marker
             {
                 Transform = primitive.transform,
                 Renderer = markerRenderer,
-                BaseColor = baseColor
+                BaseColor = baseColor,
+                MaxHull = Mathf.Max(1, ship.Hp),
+                MaxSail = Mathf.Max(1, ship.Sail),
+                HullBar = SpawnBar($"hull-bar-{ship.Id}", hullBarColor),
+                SailBar = SpawnBar($"sail-bar-{ship.Id}", sailBarColor)
             };
+            _markers[ship.Id] = marker;
+            PositionBars(marker, 1f, 1f);
+        }
+
+        // Bars parent to the renderer, not the marker, so heading rotations
+        // never spin them; UpdateReadouts re-anchors them above the marker.
+        private Transform SpawnBar(string name, Color color)
+        {
+            var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bar.name = name;
+            bar.transform.SetParent(transform, worldPositionStays: false);
+            bar.transform.localScale = new Vector3(barWidth, 0.08f, 0.12f);
+
+            var barRenderer = bar.GetComponent<Renderer>();
+            if (barRenderer != null)
+            {
+                barRenderer.material.color = color;
+            }
+
+            return bar.transform;
+        }
+
+        private void UpdateReadouts()
+        {
+            foreach (var pair in _markers)
+            {
+                var marker = pair.Value;
+                if (marker.Transform == null || _playback == null
+                    || !_playback.TryGetRemaining(pair.Key, out var remaining))
+                {
+                    continue;
+                }
+
+                PositionBars(
+                    marker,
+                    Mathf.Clamp01(remaining.Hp / (float)marker.MaxHull),
+                    Mathf.Clamp01(remaining.Sail / (float)marker.MaxSail));
+            }
+        }
+
+        private void PositionBars(Marker marker, float hullFraction, float sailFraction)
+        {
+            // Screen-up for the top-down camera is world +z, so the bars sit
+            // just "above" the marker; offsets are design-tunable placeholders.
+            PositionBar(marker.HullBar, marker.Transform.position, 0.45f, hullFraction);
+            PositionBar(marker.SailBar, marker.Transform.position, 0.30f, sailFraction);
+        }
+
+        private void PositionBar(Transform bar, Vector3 markerPosition, float zOffset, float fraction)
+        {
+            if (bar == null)
+            {
+                return;
+            }
+
+            bar.position = markerPosition + new Vector3(0f, barLift, zOffset);
+            var scale = bar.localScale;
+            scale.x = barWidth * fraction;
+            bar.localScale = scale;
+        }
+
+        /// <summary>
+        /// Readout bar fractions (remaining / initial) for a ship, read back
+        /// from the bar transforms; test hook.
+        /// </summary>
+        public bool TryGetReadoutFractions(string shipId, out float hullFraction, out float sailFraction)
+        {
+            hullFraction = 0f;
+            sailFraction = 0f;
+            if (shipId == null || !_markers.TryGetValue(shipId, out var marker)
+                || marker.HullBar == null || marker.SailBar == null || barWidth <= 0f)
+            {
+                return false;
+            }
+
+            hullFraction = marker.HullBar.localScale.x / barWidth;
+            sailFraction = marker.SailBar.localScale.x / barWidth;
+            return true;
         }
 
         private void ClearMarkers()
@@ -296,6 +515,14 @@ namespace Armada.Client.Playback
                 if (marker.Transform != null)
                 {
                     Destroy(marker.Transform.gameObject);
+                }
+                if (marker.HullBar != null)
+                {
+                    Destroy(marker.HullBar.gameObject);
+                }
+                if (marker.SailBar != null)
+                {
+                    Destroy(marker.SailBar.gameObject);
                 }
             }
 
@@ -339,12 +566,31 @@ namespace Armada.Client.Playback
 
         private void SetHud(string message)
         {
-            HudText = message;
+            _lastMessage = message;
+            RefreshHudLabel();
+            Debug.Log($"[Spectator] {message}");
+        }
+
+        // Re-composes the HUD line from the last narration plus control
+        // status, so pause/speed changes surface without waiting for the
+        // next playback step.
+        private void RefreshHudLabel()
+        {
+            var status = string.Empty;
+            if (IsPaused)
+            {
+                status += " | PAUSED (Right Arrow steps)";
+            }
+            if (!Mathf.Approximately(SpeedMultiplier, 1f))
+            {
+                status += $" | speed x{SpeedMultiplier:0.##}";
+            }
+
+            HudText = _lastMessage + status;
             if (hudLabel != null)
             {
-                hudLabel.text = message;
+                hudLabel.text = HudText;
             }
-            Debug.Log($"[Spectator] {message}");
         }
     }
 }
