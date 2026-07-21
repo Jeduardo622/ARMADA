@@ -1,5 +1,8 @@
 # Spectator Demo: Mission 10 "Sail-Cutter"
 
+> Looking for the two-player battle? The PvP demo (hot-seat and
+> two-client netplay) lives in [pvp.md](pvp.md).
+
 Watch the repo's first Unity scene play back a resolved Mission 10 run —
 the pinned seed-2 mixed-battery orders (chain shot into the rigging for
 three turns, then round shot to sink) — animated from the server's turn
