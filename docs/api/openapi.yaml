@@ -2872,8 +2872,9 @@ paths:
           description: >-
             Match already has both seats (match_full; a lost concurrent join
             race maps here without retry), the caller already holds a seat
-            (already_joined), or the match idled past its TTL
-            (match_expired).
+            (already_joined), the match idled past its TTL (match_expired),
+            or the caller is at the open-match cap (match_limit_reached —
+            joining grows the open-match set just like creating).
           content:
             application/json:
               schema:

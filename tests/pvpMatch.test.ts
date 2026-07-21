@@ -623,11 +623,20 @@ describe('pvp match lifecycle', () => {
     expect(fourth.json().error).toBe('match_limit_reached');
     expect(fourth.json().limit).toBe(3);
 
-    // Retiring one open match frees a slot.
-    const anyOpen = [...matchStore.values()].find((m) => m.status === 'WAITING_FOR_OPPONENT')!;
+    // The cap binds joins the same way: a capped player cannot grow their
+    // open-match set by accepting an invitation instead of creating.
+    const invitation = await createMatch(PLAYER_B);
+    const joinAtCap = await joinMatch(invitation.code, PLAYER_A);
+    expect(joinAtCap.statusCode).toBe(409);
+    expect(joinAtCap.json().error).toBe('match_limit_reached');
+
+    // Retiring one open match frees a slot for both paths.
+    const anyOpen = [...matchStore.values()].find(
+      (m) => m.status === 'WAITING_FOR_OPPONENT' && m.code !== invitation.code
+    )!;
     anyOpen.status = 'EXPIRED';
-    const fifth = await app.inject({ method: 'POST', url: '/pvp/matches', headers: as(PLAYER_A) });
-    expect(fifth.statusCode).toBe(200);
+    const joinFreed = await joinMatch(invitation.code, PLAYER_A);
+    expect(joinFreed.statusCode).toBe(200);
   });
 
   it('sweeps stale matches opportunistically on create', async () => {

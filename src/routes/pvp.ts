@@ -142,6 +142,21 @@ function ttlCutoff(status: string, now = Date.now()): Date | null {
 // Works for both the root client and a transaction client.
 type MatchWriter = { match: Pick<PrismaClient['match'], 'updateMany'> };
 
+type MatchCounter = { match: Pick<PrismaClient['match'], 'count'> };
+
+// Open (waiting or in-progress) matches this player holds a seat in.
+// Completed and expired matches never count. Used by both create and join
+// so the documented per-player limit cannot be bypassed by accepting
+// invitations instead of creating.
+function countOpenMatches(db: MatchCounter, playerId: string) {
+  return db.match.count({
+    where: {
+      status: { in: [MATCH_STATUS_WAITING, MATCH_STATUS_IN_PROGRESS] },
+      participants: { some: { playerId } }
+    }
+  });
+}
+
 // Lazy expiry: a conditional claim keyed to the row's current status and
 // staleness, so it can never race a live transition (the same conditional
 // updateMany discipline as every other transition). Returns true when this
@@ -226,12 +241,7 @@ export function registerPvpRoutes(app: FastifyInstance) {
     });
 
     // Soft per-player cap on open matches (completed/expired never count).
-    const openMatches = await app.prisma.match.count({
-      where: {
-        status: { in: [MATCH_STATUS_WAITING, MATCH_STATUS_IN_PROGRESS] },
-        participants: { some: { playerId } }
-      }
-    });
+    const openMatches = await countOpenMatches(app.prisma, playerId);
     if (openMatches >= MAX_OPEN_MATCHES_PER_PLAYER) {
       return reply.status(409).send({
         error: 'match_limit_reached',
@@ -300,6 +310,17 @@ export function registerPvpRoutes(app: FastifyInstance) {
     const peek = await app.prisma.match.findUnique({ where: { code } });
     if (peek) {
       await expireIfStale(app.prisma, peek);
+    }
+
+    // The same soft cap as create: accepting a seat grows the player's
+    // open-match set just like creating one.
+    const openMatches = await countOpenMatches(app.prisma, playerId);
+    if (openMatches >= MAX_OPEN_MATCHES_PER_PLAYER) {
+      return reply.status(409).send({
+        error: 'match_limit_reached',
+        openMatches,
+        limit: MAX_OPEN_MATCHES_PER_PLAYER
+      });
     }
 
     const join = () =>
