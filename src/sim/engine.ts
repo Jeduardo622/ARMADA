@@ -402,10 +402,9 @@ function resolveRam(
   // Counter-momentum damage (modifiers.mutualRamming): a target under way
   // strikes back with its own speed-scaled blow instead of the rammer
   // taking fractional recoil, so head-on exchanges cost both sides equally
-  // regardless of resolution order. The target's effective speed is the
-  // wind-adjusted value only (hazard/status penalties are movement-phase
-  // concerns and deliberately excluded to keep the rule simple and
-  // deterministic). undefined = legacy recoil rule.
+  // regardless of resolution order. Both speeds come from the same
+  // movement-adjusted effective speed the movement events carried.
+  // undefined = legacy recoil rule.
   targetCounterSpeed?: number
 ): SimEvent {
   const hullDamage = RAM_BASE_HULL_DAMAGE + effectiveSpeed * RAM_SPEED_HULL_DAMAGE;
@@ -578,6 +577,10 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
   if (windAware) {
     const obstacles = input.state.obstacles ?? [];
     const slowZones = input.state.slowZones ?? [];
+    // Movement never depends on other ships' positions, so every ship's
+    // move is computed the same way regardless of iteration order; the
+    // per-ship adjusted effective speed is kept for the mutual-ram sweep.
+    const movedSpeed = new Map<string, number>();
     for (const ship of resolutionOrder) {
       if (ship.hp <= 0) continue;
       const moveEvent = applyMovement(
@@ -589,11 +592,16 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
         sailSpeedBonus(playerTier(ship, 'sail'))
       );
       events.push(moveEvent);
-      // A ship under way that ends its move in contact with an enemy hull
-      // rams it. Stationary ships (effective speed 0) never initiate a ram
-      // but can still be struck by a moving enemy. Gated on the flag so
-      // flag-off resolution stays byte-identical.
-      if (ramming && moveEvent.type === 'movement' && moveEvent.effectiveSpeed > 0) {
+      if (moveEvent.type === 'movement') {
+        movedSpeed.set(ship.id, moveEvent.effectiveSpeed);
+      }
+      // Legacy sequential contact (modifiers.ramming without
+      // modifiers.mutualRamming): a ship under way that ends its move in
+      // contact with an enemy hull rams it, evaluated per mover in
+      // resolution order. Stationary ships never initiate but can be
+      // struck. Gated so flag-off resolution stays byte-identical
+      // (mission 09).
+      if (ramming && !mutualRamming && moveEvent.type === 'movement' && moveEvent.effectiveSpeed > 0) {
         for (const target of resolutionOrder) {
           // Recoil can sink the rammer mid-move; a sunk ship strikes no
           // further blows.
@@ -604,16 +612,34 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
             continue;
           }
           rammedPairs.add(pairKey);
-          events.push(
-            resolveRam(
-              ship,
-              target,
-              moveEvent.effectiveSpeed,
-              // Gated on the flag so flag-off resolution (mission 09) stays
-              // byte-identical to the legacy recoil rule.
-              mutualRamming ? effectiveSpeed(target, input.state.wind) : undefined
-            )
-          );
+          events.push(resolveRam(ship, target, moveEvent.effectiveSpeed));
+        }
+      }
+    }
+
+    // Mutual ramming contact sweep: evaluated AFTER every ship has moved,
+    // on final positions only, so whether a collision happens can never
+    // depend on which side's ships resolve first (sequential detection
+    // could register or skip the same pass depending on move order).
+    // Crossing at speed without ENDING within contact range is a clean
+    // near-miss for both orderings. Pairs are visited in sorted-id order
+    // for determinism; each side's blow scales with its own
+    // movement-adjusted effective speed, and the canonical event rammer is
+    // the ship under way (lower id when both are).
+    if (ramming && mutualRamming) {
+      for (let i = 0; i < resolutionOrder.length; i++) {
+        for (let j = i + 1; j < resolutionOrder.length; j++) {
+          const a = resolutionOrder[i];
+          const b = resolutionOrder[j];
+          if (a.hp <= 0 || b.hp <= 0 || a.side === b.side) continue;
+          if (distance(a, b) > RAM_CONTACT_RANGE) continue;
+          const speedA = movedSpeed.get(a.id) ?? 0;
+          const speedB = movedSpeed.get(b.id) ?? 0;
+          // Two anchored ships drifting in contact never collide.
+          if (speedA <= 0 && speedB <= 0) continue;
+          const [rammer, target, rammerSpeed, targetSpeed] =
+            speedA > 0 ? [a, b, speedA, speedB] : [b, a, speedB, speedA];
+          events.push(resolveRam(rammer, target, rammerSpeed, targetSpeed));
         }
       }
     }

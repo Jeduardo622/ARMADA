@@ -377,6 +377,74 @@ describe('mutual ramming modifier (the ram balance pass)', () => {
     const ram = mutualOff.events.find((event) => event.type === 'ram');
     expect(ram).toMatchObject({ hullDamage: 22, selfHullDamage: 11 });
   });
+
+  // Contact detection is order-independent: whether a collision happens is
+  // decided on final positions after everyone moved, so swapping which
+  // side owns the fast ship cannot change the outcome (sequential
+  // detection could register or skip the same pass depending on move
+  // order — Codex finding on the balance-pass review).
+  const overshootPair = (fastSide: 'player' | 'enemy'): SimState => ({
+    turn: 1,
+    wind: { direction: 90, speed: 0 },
+    ships: [
+      {
+        id: 'a-ship',
+        side: fastSide,
+        position: { x: 0, y: 0 },
+        heading: 0,
+        speed: 10,
+        hp: 120,
+        sail: 80,
+        crew: 50
+      },
+      {
+        id: 'b-ship',
+        side: fastSide === 'player' ? 'enemy' : 'player',
+        position: { x: 20, y: 0 },
+        heading: 180,
+        speed: 1,
+        hp: 120,
+        sail: 80,
+        crew: 50
+      }
+    ]
+  });
+
+  it('an overshooting pass is a near-miss for BOTH side assignments', () => {
+    // Fast ship travels 50, slow ship 5: final separation 35 > 25 — no
+    // contact, regardless of which side (and hence which resolution slot)
+    // owns the fast ship.
+    for (const fastSide of ['player', 'enemy'] as const) {
+      const result = resolveSimPreview({
+        schemaVersion: 1,
+        seed: 1,
+        turn: 1,
+        state: overshootPair(fastSide),
+        orders: [],
+        modifiers: { windMovement: true, ramming: true, mutualRamming: true }
+      });
+      expect(result.events.filter((event) => event.type === 'ram')).toHaveLength(0);
+    }
+  });
+
+  it('a symmetric collision damages both sides identically for BOTH side assignments', () => {
+    for (const aSide of ['player', 'enemy'] as const) {
+      const state = headOnPair(3);
+      state.ships[0].side = aSide;
+      state.ships[1].side = aSide === 'player' ? 'enemy' : 'player';
+      const result = resolveSimPreview({
+        schemaVersion: 1,
+        seed: 1,
+        turn: 1,
+        state,
+        orders: [],
+        modifiers: { windMovement: true, ramming: true, mutualRamming: true }
+      });
+      const ships = result.nextState.ships;
+      expect(ships[0].hp).toBe(98);
+      expect(ships[1].hp).toBe(98);
+    }
+  });
 });
 
 describe('side-order fairness guard (lifted by the slice-2 server routes)', () => {
