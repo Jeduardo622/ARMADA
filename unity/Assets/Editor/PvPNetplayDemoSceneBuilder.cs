@@ -61,7 +61,11 @@ public static class PvPNetplayDemoSceneBuilder
         var board = GameObject.CreatePrimitive(PrimitiveType.Cube);
         board.name = "Board";
         board.transform.position = new Vector3(11f, -0.55f, 0f);
-        board.transform.localScale = new Vector3(30f, 1f, 16f);
+        // Generous sea: windMovement lets ships sail well beyond the opening
+        // frame; the follow camera tracks them and this board keeps water
+        // under any realistic 20-turn line (extreme max-speed runs can still
+        // reach open void — cosmetic only).
+        board.transform.localScale = new Vector3(140f, 1f, 120f);
         board.GetComponent<Renderer>().sharedMaterial = boardMaterial;
 
         var canvasObject = new GameObject("HUD Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -82,6 +86,9 @@ public static class PvPNetplayDemoSceneBuilder
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
         var spectator = spectatorObject.GetComponent<SpectatorRenderer>();
         SetReference(spectator, "hudLabel", hudLabel);
+        // Moving fleets must stay in view: the renderer re-frames this
+        // camera every tick, never zooming tighter than the authored 8.5.
+        SetReference(spectator, "followCamera", camera);
 
         var netplayUIObject = new GameObject("PvpNetplayUI", typeof(PvpNetplayUIController));
         var netplayUI = netplayUIObject.GetComponent<PvpNetplayUIController>();

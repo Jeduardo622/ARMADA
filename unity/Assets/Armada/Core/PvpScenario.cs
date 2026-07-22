@@ -21,7 +21,9 @@ namespace Armada.Client.Core
 
         public static SimModifiers BuildModifiers()
         {
-            return new SimModifiers { ChainShot = true };
+            // Scenario v2: windMovement and ramming join chain shot, so
+            // heading and speed buy real position and contact is dangerous.
+            return new SimModifiers { ChainShot = true, WindMovement = true, Ramming = true };
         }
 
         public static SimState BuildInitialState()
@@ -29,7 +31,7 @@ namespace Armada.Client.Core
             return new SimState
             {
                 Turn = 1,
-                Wind = new SimWind { Direction = 90, Speed = 0 },
+                Wind = new SimWind { Direction = 90, Speed = 4 },
                 Ships = new List<SimShip>
                 {
                     BuildFrigate(SideAShipIds[0], "player", 0, 30, 0),
@@ -70,7 +72,7 @@ namespace Armada.Client.Core
             var builder = new StringBuilder();
             builder.Append(ScenarioCode);
             builder.Append("|turnLimit=").Append(TurnLimit);
-            builder.Append("|modifiers=chainShot");
+            builder.Append("|modifiers=chainShot,ramming,windMovement");
             builder.Append("|wind=").Append(state.Wind.Direction).Append(':').Append(state.Wind.Speed);
 
             foreach (var ship in state.Ships.OrderBy(s => s.Id, System.StringComparer.Ordinal))

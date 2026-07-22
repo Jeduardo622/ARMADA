@@ -55,6 +55,14 @@ namespace Armada.Client.Playback
         [Header("UI Wiring")]
         [SerializeField] private TMP_Text hudLabel;
 
+        [Header("Camera follow (optional; wired by the PvP scenes)")]
+        [Tooltip("When set, the orthographic camera re-frames every tick to keep all markers in view; null keeps the scene's fixed authored framing (mission scenes).")]
+        [SerializeField] private Camera followCamera;
+        [Tooltip("World units of margin kept around the outermost markers.")]
+        [SerializeField] private float followPadding = 2f;
+        [Tooltip("Never zoom tighter than the authored opening framing.")]
+        [SerializeField] private float followMinSize = 8.5f;
+
         private sealed class Marker
         {
             public Transform Transform;
@@ -330,6 +338,58 @@ namespace Armada.Client.Playback
             }
 
             UpdateReadouts();
+            UpdateFollowCamera();
+        }
+
+        // Keeps every marker inside the (orthographic, top-down) view once
+        // windMovement lets ships sail beyond the authored opening framing.
+        // Null camera (mission scenes) keeps the fixed framing untouched.
+        private void UpdateFollowCamera()
+        {
+            if (followCamera == null || _markers.Count == 0)
+            {
+                return;
+            }
+
+            var first = true;
+            var min = Vector3.zero;
+            var max = Vector3.zero;
+            foreach (var marker in _markers.Values)
+            {
+                if (marker.Transform == null)
+                {
+                    continue;
+                }
+
+                var position = marker.Transform.position;
+                if (first)
+                {
+                    min = position;
+                    max = position;
+                    first = false;
+                }
+                else
+                {
+                    min = Vector3.Min(min, position);
+                    max = Vector3.Max(max, position);
+                }
+            }
+
+            if (first)
+            {
+                return;
+            }
+
+            var center = (min + max) * 0.5f;
+            var cameraTransform = followCamera.transform;
+            cameraTransform.position = new Vector3(center.x, cameraTransform.position.y, center.z);
+
+            // Screen-up for the top-down camera is world +z; world x maps to
+            // screen x, scaled by the aspect ratio.
+            var halfZ = (max.z - min.z) * 0.5f + followPadding;
+            var aspect = followCamera.aspect > 0f ? followCamera.aspect : 1f;
+            var halfXAsSize = ((max.x - min.x) * 0.5f + followPadding) / aspect;
+            followCamera.orthographicSize = Mathf.Max(followMinSize, halfZ, halfXAsSize);
         }
 
         private void BeginStep(PlaybackStep step)

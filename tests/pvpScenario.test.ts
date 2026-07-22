@@ -28,7 +28,7 @@ afterAll(async () => {
 // Canonical fingerprint pinned on both sides; the Unity EditMode test
 // (PvpScenario) asserts the identical string for scenario parity.
 const EXPECTED_FINGERPRINT =
-  'pvp-skirmish-2v2|turnLimit=20|modifiers=chainShot|wind=90:0|' +
+  'pvp-skirmish-2v2|turnLimit=20|modifiers=chainShot,ramming,windMovement|wind=90:4|' +
   'alpha-frigate-a:player:0,30:h0:v3:hp120:sl80:cw50|' +
   'alpha-frigate-b:player:0,-30:h0:v3:hp120:sl80:cw50|' +
   'bravo-frigate-a:enemy:220,30:h180:v3:hp120:sl80:cw50|' +
@@ -77,12 +77,12 @@ describe('pvp skirmish scenario', () => {
     }
   });
 
-  it('pins the v1 modifier set to chain shot only', () => {
-    expect(createPvpModifiers()).toEqual({ chainShot: true });
+  it('pins the v2 modifier set: chain shot, ramming, and wind movement', () => {
+    expect(createPvpModifiers()).toEqual({ chainShot: true, ramming: true, windMovement: true });
     // Fresh object per call so a caller mutation cannot leak into the pin.
     const mutated = createPvpModifiers();
-    mutated.windMovement = true;
-    expect(createPvpModifiers()).toEqual({ chainShot: true });
+    mutated.statusEffects = true;
+    expect(createPvpModifiers()).toEqual({ chainShot: true, ramming: true, windMovement: true });
   });
 });
 
@@ -124,6 +124,11 @@ describe('both-sides order resolution (hot-seat contract)', () => {
     expect(maneuvered).toEqual(
       [...PVP_SIDE_A_SHIP_IDS, ...PVP_SIDE_B_SHIP_IDS].sort()
     );
+
+    // v2: windMovement emits a movement event per living ship, so the
+    // spectator has real position updates to animate.
+    const moved = result.events.filter((event) => event.type === 'movement');
+    expect(moved).toHaveLength(4);
   });
 
   it('resolves deterministically: identical input yields an identical hash', () => {
@@ -156,6 +161,12 @@ describe('both-sides order resolution (hot-seat contract)', () => {
     expect(result.nextState.turn).toBe(2);
   });
 });
+
+// The focus-fire fixture's resolved turn. tests/pvpMatch.test.ts pins the
+// SAME literal against server resolution with byte-identical order
+// generators; if either side drifts, one of the two exact-turn asserts
+// breaks and names the divergence.
+const PINNED_FOCUS_FIRE_TURN = 7;
 
 describe('pvp match loop (client-style state chaining)', () => {
   // Mirrors the hot-seat client loop: chain nextState back through
@@ -190,17 +201,96 @@ describe('pvp match loop (client-style state chaining)', () => {
   const firstAfloat = (state: SimState, ids: readonly string[]) =>
     ids.find((id) => (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0) ?? ids[0];
 
+  const isAfloat = (state: SimState, id: string) =>
+    (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0;
+
+  // Shared focus-vs-split strategy, legal under the server's fairness
+  // guard (living own ships, living targets only). tests/pvpMatch.test.ts
+  // uses byte-identical generators so the server full-match test pins the
+  // SAME engine inputs and the SAME resolved turn.
+  const focusFireSideA = (state: SimState): SimOrder[] =>
+    PVP_SIDE_A_SHIP_IDS.filter((id) => isAfloat(state, id)).map((id) =>
+      fire(id, firstAfloat(state, PVP_SIDE_B_SHIP_IDS))
+    );
+
+  const splitFireSideB = (state: SimState): SimOrder[] =>
+    PVP_SIDE_B_SHIP_IDS.map((id, index) => ({ id, index }))
+      .filter(({ id }) => isAfloat(state, id))
+      .map(({ id, index }) => {
+        const paired = PVP_SIDE_A_SHIP_IDS[index];
+        return fire(id, isAfloat(state, paired) ? paired : firstAfloat(state, PVP_SIDE_A_SHIP_IDS));
+      });
+
   it('a focus-fire side A beats a split-fire side B inside the turn limit (pinned fixture)', () => {
     const run = runMatch(PVP_DEFAULT_SEED, (_turn, state) => [
-      // Side A concentrates on the first bravo ship still afloat.
-      fire(PVP_SIDE_A_SHIP_IDS[0], firstAfloat(state, PVP_SIDE_B_SHIP_IDS)),
-      fire(PVP_SIDE_A_SHIP_IDS[1], firstAfloat(state, PVP_SIDE_B_SHIP_IDS)),
-      // Side B splits fire.
-      fire(PVP_SIDE_B_SHIP_IDS[0], PVP_SIDE_A_SHIP_IDS[0]),
-      fire(PVP_SIDE_B_SHIP_IDS[1], PVP_SIDE_A_SHIP_IDS[1])
+      ...focusFireSideA(state),
+      ...splitFireSideB(state)
     ]);
+    // v2: the lines close under windMovement, so the exchange is bloodier
+    // and faster to decide than the static v1 duel. The exact turn is also
+    // pinned by the server full-match test in tests/pvpMatch.test.ts.
     expect(run.result).toBe('side_a');
-    expect(run.turnCount).toBeLessThanOrEqual(PVP_TURN_LIMIT);
+    expect(run.turnCount).toBe(PINNED_FOCUS_FIRE_TURN);
+  });
+
+  it('v2 showcase: a head-on hold-fire pass produces rams with the first-mover edge, then a draw', () => {
+    let ramEvents = 0;
+    const run = runMatch(PVP_DEFAULT_SEED, (_turn, state) =>
+      state.ships
+        .filter((ship) => ship.hp > 0)
+        .map((ship) => ({
+          shipId: ship.id,
+          action: 'maneuver' as const,
+          turnDelta: 0,
+          speedDelta: 0
+        }))
+    );
+    // Count rams across the recorded summaries' source events via a second
+    // resolution pass would duplicate work; re-run and tally directly.
+    let state = createPvpSkirmishState();
+    for (let turn = 1; turn <= run.turnCount; turn++) {
+      const preview = resolveSimPreview({
+        schemaVersion: 1,
+        seed: PVP_DEFAULT_SEED,
+        turn,
+        state: { ...state, turn },
+        orders: state.ships
+          .filter((ship) => ship.hp > 0)
+          .map((ship) => ({ shipId: ship.id, action: 'maneuver' as const, turnDelta: 0, speedDelta: 0 })),
+        modifiers: createPvpModifiers()
+      });
+      ramEvents += preview.events.filter((event) => event.type === 'ram').length;
+      state = preview.nextState;
+    }
+
+    // Sailing straight at each other with no orders to fire: the fleets
+    // collide near midfield, exchange rams, sail through, and never
+    // re-engage — a draw at the limit. Resolution order (ship id) gives
+    // side A the ram initiative, so side B ends worse off; this asymmetry
+    // is documented in docs/design/pvp-tuning.md.
+    expect(run.result).toBe('draw');
+    expect(run.turnCount).toBe(PVP_TURN_LIMIT);
+    expect(ramEvents).toBe(4);
+    const hp = (id: string) => run.finalState.ships.find((ship) => ship.id === id)!.hp;
+    expect(hp(PVP_SIDE_A_SHIP_IDS[0])).toBe(98);
+    expect(hp(PVP_SIDE_A_SHIP_IDS[1])).toBe(98);
+    expect(hp(PVP_SIDE_B_SHIP_IDS[0])).toBe(76);
+    expect(hp(PVP_SIDE_B_SHIP_IDS[1])).toBe(76);
+  });
+
+  it('turning away on turn 1 avoids contact entirely (clean stall to the draw)', () => {
+    const run = runMatch(PVP_DEFAULT_SEED, (turn, state) =>
+      state.ships
+        .filter((ship) => ship.hp > 0)
+        .map((ship) => ({
+          shipId: ship.id,
+          action: 'maneuver' as const,
+          turnDelta: turn === 1 ? 90 : 0,
+          speedDelta: 0
+        }))
+    );
+    expect(run.result).toBe('draw');
+    expect(run.finalState.ships.every((ship) => ship.hp === 120)).toBe(true);
   });
 
   it('classifies results: mutual annihilation and timeout are draws', () => {

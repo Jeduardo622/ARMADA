@@ -1461,6 +1461,9 @@ namespace Armada.Client.Tests.PlayMode
                 var events = finalTurn
                     ? new List<SimEvent>
                     {
+                        // Far movement: sails well outside the authored
+                        // opening frame, so the follow camera must re-frame.
+                        new SimEvent { Type = "movement", ShipId = "alpha-frigate-a", Position = new SimVector2 { X = 400, Y = 30 } },
                         new SimEvent
                         {
                             Type = "broadside",
@@ -1885,10 +1888,23 @@ namespace Armada.Client.Tests.PlayMode
             spectatorObject.SetActive(false);
             var controllerObject = new GameObject("pvp-controller-test");
             controllerObject.SetActive(false);
+            var followCameraObject = new GameObject("pvp-follow-camera-test");
+            followCameraObject.SetActive(false);
             try
             {
                 var spectator = spectatorObject.AddComponent<SpectatorRenderer>();
                 var controller = controllerObject.AddComponent<PvpHotseatUIController>();
+
+                // Follow camera wired the way the PvP scene builders do it;
+                // a pinned aspect keeps the re-framing math deterministic.
+                var followCamera = followCameraObject.AddComponent<Camera>();
+                followCamera.orthographic = true;
+                followCamera.orthographicSize = 8.5f;
+                followCamera.aspect = 16f / 9f;
+                followCamera.transform.position = new Vector3(11f, 20f, 0f);
+                typeof(SpectatorRenderer)
+                    .GetField("followCamera", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(spectator, followCamera);
                 var fakeClient = new FakePvpSimPreviewClient();
                 var flow = new PvpHotseatFlow(fakeClient);
 
@@ -1939,6 +1955,8 @@ namespace Armada.Client.Tests.PlayMode
                 Assert.That(request.Seed, Is.EqualTo(PvpScenario.DefaultSeed));
                 Assert.That(request.Turn, Is.EqualTo(1));
                 Assert.That(request.Modifiers.ChainShot, Is.True);
+                Assert.That(request.Modifiers.WindMovement, Is.True);
+                Assert.That(request.Modifiers.Ramming, Is.True);
                 Assert.That(request.Modifiers.ShipUpgrades, Is.Null);
                 Assert.That(request.State.Ships, Has.Count.EqualTo(4));
                 Assert.That(request.Orders, Has.Count.EqualTo(4));
@@ -2035,6 +2053,13 @@ namespace Armada.Client.Tests.PlayMode
                 }
                 Assert.That(spectator.IsFinished, Is.True);
 
+                // The far movement (sim 400 → world x 40) sailed outside the
+                // authored frame; the follow camera re-centered on the fleet
+                // spread (world x 0..40 → 20) and zoomed out to fit it:
+                // max(8.5 min, halfZ, halfX/aspect) = (40/2 + 2) / (16/9).
+                Assert.That(followCamera.transform.position.x, Is.EqualTo(20f).Within(0.5f));
+                Assert.That(followCamera.orthographicSize, Is.EqualTo(22f / (16f / 9f)).Within(0.01f));
+
                 // Generic completion line: the match verdict plus per-side
                 // applied (remaining-delta) loss totals for the final turn
                 // (bravo-b's last 60 hull).
@@ -2053,6 +2078,7 @@ namespace Armada.Client.Tests.PlayMode
             {
                 UnityEngine.Object.Destroy(spectatorObject);
                 UnityEngine.Object.Destroy(controllerObject);
+                UnityEngine.Object.Destroy(followCameraObject);
             }
 
             yield return null;

@@ -329,6 +329,10 @@ namespace Armada.Client.Core
         public bool? ShipUpgrades { get; set; }
         [JsonProperty("chainShot", NullValueHandling = NullValueHandling.Ignore)]
         public bool? ChainShot { get; set; }
+        [JsonProperty("windMovement", NullValueHandling = NullValueHandling.Ignore)]
+        public bool? WindMovement { get; set; }
+        [JsonProperty("ramming", NullValueHandling = NullValueHandling.Ignore)]
+        public bool? Ramming { get; set; }
     }
 
     [Serializable]
