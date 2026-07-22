@@ -36,10 +36,13 @@ export const MATCH_STATUS_EXPIRED = 'EXPIRED';
 // transitions bump it, polling deliberately does not — two captains idly
 // polling a match with no orders coming is exactly an abandoned match.
 // Expiry is enforced lazily on join/submit/get plus an opportunistic sweep
-// on create, so no background job is needed. Values are design-tunable
-// placeholders pending playtest feedback.
+// on create, so no background job is needed. Values reviewed in
+// docs/design/pvp-tuning.md: 30 min covers asynchronously shared join
+// codes; 15 idle minutes is unambiguous abandonment when authoring a turn
+// takes one or two (and with no resume flow, a longer TTL only makes the
+// stranded opponent wait).
 export const MATCH_WAITING_TTL_MS = 30 * 60 * 1000;
-export const MATCH_IN_PROGRESS_TTL_MS = 60 * 60 * 1000;
+export const MATCH_IN_PROGRESS_TTL_MS = 15 * 60 * 1000;
 
 // Open matches (waiting or in progress) one player may hold at once. A
 // soft cap: two perfectly concurrent creates can exceed it by one, which

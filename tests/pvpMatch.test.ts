@@ -663,16 +663,16 @@ describe('pvp match lifecycle', () => {
     const match = await createMatch();
     await joinMatch(match.code);
 
-    // 59 minutes idle: still live, a submission goes through and bumps
+    // 14 minutes idle: still live, a submission goes through and bumps
     // the activity clock.
-    matchStore.get(match.id)!.updatedAt = new Date(Date.now() - 59 * 60 * 1000);
+    matchStore.get(match.id)!.updatedAt = new Date(Date.now() - 14 * 60 * 1000);
     const state = matchStore.get(match.id)!.state as { ships: Array<{ id: string; hp: number }> };
     const live = await submitOrders(match.id, PLAYER_A, 1, sideAOrders(state));
     expect(live.statusCode).toBe(200);
 
-    // 61 minutes idle: the next poll surfaces EXPIRED (polling itself
+    // 16 minutes idle: the next poll surfaces EXPIRED (polling itself
     // never keeps a match alive), and a late submission is rejected.
-    matchStore.get(match.id)!.updatedAt = new Date(Date.now() - 61 * 60 * 1000);
+    matchStore.get(match.id)!.updatedAt = new Date(Date.now() - 16 * 60 * 1000);
     const polled = await getState(match.id, PLAYER_B);
     expect(polled.statusCode).toBe(200);
     expect(polled.json().match.status).toBe('EXPIRED');

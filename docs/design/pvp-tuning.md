@@ -1,11 +1,13 @@
 # PvP Demo Design Tuning
 
-> **Status: DRAFT — pending design review.** Authored after the PvP demo
-> merged (PRs #53–#56), following the Mission 07 / spectator-tuning
-> precedent of writing the missing design spec against the shipped
-> implementation. No values are proposed changed yet: every **Proposed**
-> cell is `keep` until a design pass fills it in. Value changes land with
-> a status update in the same PR.
+> **Status: Reviewed.** Design pass run 2026-07-21; applied values
+> approved by @Jeduardo622 via the human merge of the design-pass PR.
+> Originally drafted against the shipped implementation (PRs #53–#56,
+> corrected in #58), following the Mission 07 / spectator-tuning
+> precedent. The pass applied one change (in-progress idle TTL, below),
+> confirmed every other value as a deliberate keep, and recorded the v1
+> dominant-strategy analysis. Future value changes reopen review: update
+> the table and this status in the same PR.
 
 Consolidates every design-tunable knob and placeholder constant in the
 PvP demo — scenario stats, match lifecycle policy, order-entry surface,
@@ -35,14 +37,35 @@ deliberately not duplicated here.
 | `LINE_SPREAD` | 30 | keep | ±30 y keeps the four markers visually separated at the shared 0.1 world-scale framing. |
 | `WIND_DIRECTION` / `WIND_SPEED` | 90 / 0 | keep | Cosmetic in v1 (no `windMovement`); speed 0 keeps it inert even if flags flip accidentally. |
 | `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). **Not in the fingerprint**; pinned by the seed-11 focus-fire-vs-split fixtures (vitest + server full-match test), the C# `DefaultSeed` mirror, AND the serialized `seed` baked into `PvPHotseatDemo.unity` (regenerate the scene when tuning). |
-| Modifier set | `{ chainShot: true }` | keep | **Product pin, not a tuning knob.** No movement phase by consequence; flipping `windMovement`/`ramming` in is scenario v2 and needs explicit sign-off. |
+| Modifier set | `{ chainShot: true }` | keep | **Product pin, not a tuning knob.** No movement phase by consequence; flipping `windMovement`/`ramming` in is scenario v2 and needs explicit sign-off. See the dominant-strategy note below for why v2 is the real balance lever. |
+
+### Design note: the v1 dominant strategy (accepted for the demo)
+
+With no movement phase, range and bearing never change, which collapses
+the order surface. Heading matters only through your own broadside angle
+penalty (`floor(diff/15)` per 15° off the target bearing; nothing else
+reads heading), so the entire depth of maneuvering is **one free
+alignment press**: same-row targets sit at bearing 0° (already aligned),
+cross-row targets at ±15° rounded (one 15° press removes one penalty
+point, e.g. 68% → 69% hit), and any turn beyond alignment only hurts.
+Speed ramping strictly helps (+`floor(v/2)` hit chance and
++`floor(v·1.5)` base damage, with no positional cost since nothing
+moves). Optimal v1 play is therefore **align to your target's bearing
+once (re-align one press when switching rows), speed +2 every turn,
+focus fire** — beyond that single alignment the maneuver buttons are
+trap options, and chain-vs-round plus target selection are the only
+live decisions. This is accepted for the demo: it keeps matches legible
+and short. It is also the headline motivation for scenario v2
+(`windMovement` + `ramming`), where heading and speed buy position
+instead of only modifying gunnery. Do not "fix" this by tuning the v1
+numbers — no constant in this spec changes the dominance structure.
 
 ## Match lifecycle policy (`src/routes/pvp.ts`)
 
 | Knob | Current | Proposed | Rationale |
 | --- | --- | --- | --- |
 | `MATCH_WAITING_TTL_MS` | 30 min | keep | How long a join code stays live. Generous for share-a-code-over-chat; not so long that dead lobbies pile up. |
-| `MATCH_IN_PROGRESS_TTL_MS` | 60 min | keep | Idle time (no submission) before an in-progress match expires. Must comfortably exceed real order-authoring time; polling never refreshes it by design. |
+| `MATCH_IN_PROGRESS_TTL_MS` | 60 min | 15 min (**applied**) | Idle time (no submission) before an in-progress match expires. Authoring a turn takes 1–2 minutes, so 15 idle minutes is unambiguous abandonment — and with no resume flow, a longer TTL only extends how long the stranded opponent stares at the waiting HUD (worst case was an hour). Still an order of magnitude above real authoring time; polling never refreshes it by design. |
 | `MAX_OPEN_MATCHES_PER_PLAYER` | 3 | keep | Soft cap, enforced on create AND join. Bounds storage abuse; 3 lets a playtest juggle a stuck match plus a fresh one. |
 | Join-code length / alphabet | 8 chars, `A–Z2–9` minus `0/O/1/I/L` (31 glyphs) | keep | Read-aloud safe; 31⁸ ≈ 8.5e11 codes keeps collisions negligible for the 3-attempt create loop. |
 | `CODE_CREATE_ATTEMPTS` | 3 | keep | Collision retries before giving up; at the code space above this should never be observed. |

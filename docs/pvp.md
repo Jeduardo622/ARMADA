@@ -74,7 +74,7 @@ Both clients default to `http://localhost:4500`
   locally).
 - The server ignores any client-supplied state: it resolves from its own
   persisted match state with the modifier set pinned at creation.
-- Abandoned matches expire: 30 minutes unjoined, or 60 minutes without a
+- Abandoned matches expire: 30 minutes unjoined, or 15 minutes without a
   submission (polling does not keep a match alive). Expired matches show
   MATCH EXPIRED on the next poll and refuse joins/orders. Each player can
   hold at most 3 open matches; finished and expired ones never count.
@@ -109,6 +109,6 @@ Both clients default to `http://localhost:4500`
   bookkeeping is the pre-turn fleet snapshot used to animate playback.
 - The scenario, fleet, and modifier set are fingerprint-pinned in
   `tests/pvpScenario.test.ts` and the Unity EditMode suite; deviations are
-  design changes, not tuning. The full knob inventory, current values,
-  and tuning constraints live in the draft spec at
+  design changes, not tuning. The full knob inventory, applied values,
+  and tuning constraints live in the reviewed spec at
   `docs/design/pvp-tuning.md`.
