@@ -23,7 +23,9 @@ namespace Armada.Client.Core
         {
             // Scenario v2: windMovement and ramming join chain shot, so
             // heading and speed buy real position and contact is dangerous.
-            return new SimModifiers { ChainShot = true, WindMovement = true, Ramming = true };
+            // mutualRamming (balance pass) makes head-on exchanges cost both
+            // sides equally regardless of resolution order.
+            return new SimModifiers { ChainShot = true, WindMovement = true, Ramming = true, MutualRamming = true };
         }
 
         public static SimState BuildInitialState()
@@ -72,7 +74,7 @@ namespace Armada.Client.Core
             var builder = new StringBuilder();
             builder.Append(ScenarioCode);
             builder.Append("|turnLimit=").Append(TurnLimit);
-            builder.Append("|modifiers=chainShot,ramming,windMovement");
+            builder.Append("|modifiers=chainShot,mutualRamming,ramming,windMovement");
             builder.Append("|wind=").Append(state.Wind.Direction).Append(':').Append(state.Wind.Speed);
 
             foreach (var ship in state.Ships.OrderBy(s => s.Id, System.StringComparer.Ordinal))

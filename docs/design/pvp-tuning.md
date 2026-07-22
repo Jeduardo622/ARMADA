@@ -36,7 +36,7 @@ deliberately not duplicated here.
 | `LINE_SPREAD` | 30 | keep | ±30 y keeps the four markers visually separated at the shared 0.1 world-scale framing. |
 | `WIND_DIRECTION` / `WIND_SPEED` | 90 / 4 (**applied, v2**) | keep | Live cross-breeze: direction 90 is perpendicular to the battle axis, so the mirror stays perfectly fair (a maneuver and its mirrored counterpart sit at the same point of sail); speed 4 gives ±2 effective speed on the tailwind/headwind arcs (mission convention), and both fleets open at a neutral beam reach. |
 | `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). **Not in the fingerprint**; pinned by the seed-11 focus-fire-vs-split fixtures (vitest + server full-match test), the C# `DefaultSeed` mirror, AND the serialized `seed` baked into `PvPHotseatDemo.unity` (regenerate the scene when tuning). |
-| Modifier set | `{ chainShot, ramming, windMovement }` (**applied, v2**) | keep | **Product pin, not a tuning knob** — v2 signed off by @Jeduardo622 (this PR). `windMovement` makes heading and speed buy real position; `ramming` makes contact within 25 units dangerous (`10 + 4×effectiveSpeed` hull to the target, half to the rammer). The two flags travel together: ram contact happens in the movement phase. |
+| Modifier set | `{ chainShot, mutualRamming, ramming, windMovement }` (**applied; ram balance pass**) | keep | **Product pin, not a tuning knob** — v2 signed off by @Jeduardo622; `mutualRamming` added by the ram balance pass. `windMovement` makes heading and speed buy real position; `ramming` makes contact within 25 units dangerous (`10 + 4×effectiveSpeed` hull to the target); `mutualRamming` replaces the rammer's fractional recoil with counter-momentum damage (`10 + 4×target's effective speed`) whenever the target is under way, so head-on exchanges cost both sides equally regardless of resolution order. Ram flags are only meaningful with `windMovement`. |
 
 ### Design note: v1's dominant strategy and what v2 changed
 
@@ -55,14 +55,18 @@ some headings faster than others. Empirically pinned properties
 win at turn 7 (bloodier than v1's static duel — three ships sink);
 straight-ahead hold-fire fleets collide near midfield, exchange exactly
 4 rams, sail through, and never re-engage (draw at the limit); turning
-away on turn 1 avoids contact entirely. **Known asymmetry, accepted and
-pinned:** resolution order is by ship id, so alpha-side ships move first
-and strike first in the ram band — in the head-on fixture side A ends
-98/98 hull vs side B's 76/76. This first-mover ram initiative is
-inherent to sequential resolution (called out since slice 1) and is now
-the top open balance question for a future pass; candidate levers live
-in the engine (ram damage split, contact range), not in this scenario's
-constants.
+away on turn 1 avoids contact entirely. **Resolved asymmetry (ram
+balance pass):** resolution order is by ship id, so alpha-side ships
+still *strike first* in the ram band — but under `modifiers.mutualRamming`
+every collision with a target under way costs both hulls the same
+counter-momentum damage, so the strike order no longer matters: the
+head-on fixture now ends 76/76 vs 76/76 (it was 98/98 vs 76/76 under
+plain `ramming`). The residual first-mover effects are marginal
+(broadside order matters only when a ship sinks mid-turn, and ramming a
+*stationary* target keeps the classic one-sided ram + recoil — which is
+intentional, not an initiative artifact). Mission 09 keeps the legacy
+recoil rule: the flag is opt-in and flag-off resolution is pinned
+byte-identical.
 
 ## Match lifecycle policy (`src/routes/pvp.ts`)
 

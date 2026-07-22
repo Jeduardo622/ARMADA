@@ -134,6 +134,14 @@ export const simModifiersSchema = z
     // modifiers.windMovement. Absent or false keeps the legacy contact-free
     // movement rules.
     ramming: z.boolean().optional(),
+    // Opt-in mutual ramming (balance refinement over modifiers.ramming,
+    // only meaningful with it): when the rammed target is itself under way,
+    // the rammer takes counter-momentum damage scaled by the target's
+    // effective speed instead of fractional recoil, so a head-on exchange
+    // costs both sides equally regardless of resolution order. A stationary
+    // target still yields the classic one-sided ram with recoil. Absent or
+    // false keeps the legacy recoil rule.
+    mutualRamming: z.boolean().optional(),
     // Opt-in chain shot: broadside orders may select ammo 'chain' to trade
     // hull damage for heavy sail/rigging damage. Absent or false keeps the
     // legacy round-shot damage split and ignores the ammo key entirely.

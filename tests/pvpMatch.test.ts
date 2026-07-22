@@ -355,6 +355,7 @@ describe('pvp match lifecycle', () => {
     expect(typeof matchStore.get(match.id)!.seed).toBe('number');
     expect(matchStore.get(match.id)!.modifiers).toEqual({
       chainShot: true,
+      mutualRamming: true,
       ramming: true,
       windMovement: true
     });
