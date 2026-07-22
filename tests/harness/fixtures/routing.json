@@ -1119,5 +1119,44 @@
         "typecheck"
       ]
     }
+  },
+  {
+    "id": "authed-shorthand-intent-protected",
+    "input": {
+      "description": "Show a clearer status when the player is not authed",
+      "changedPaths": [
+        "unity/Assets/Armada/UI/MissionUIController.cs"
+      ]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck",
+        "unity_compilation",
+        "unity_static",
+        "unity_tests"
+      ]
+    }
   }
 ]
