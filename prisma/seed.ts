@@ -60,7 +60,7 @@ const featureFlags = [
   { name: 'telemetry_ingest', description: 'Allow telemetry ingestion' },
   { name: 'config_api', description: 'Serve config snapshots' },
   // Player-facing PvP match lifecycle; unlike inventory_grant_api this mints
-  // nothing, so the force-enable loop is the right place for it.
+  // nothing, so it is seeded enabled with the other player-facing flags.
   { name: 'pvp_api', description: 'Enable PvP match endpoints' }
 ];
 
@@ -95,10 +95,13 @@ async function main() {
     }
   });
 
+  // Player-facing flags start enabled on first create only; reseeds preserve
+  // the current enabled state so an operator's DB kill-switch disable survives
+  // redeploys (tests/flags.test.ts pins this convention).
   for (const flag of featureFlags) {
     await prisma.featureFlag.upsert({
       where: { name: flag.name },
-      update: { enabled: true },
+      update: {},
       create: { ...flag, enabled: true }
     });
   }
