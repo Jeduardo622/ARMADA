@@ -2,15 +2,17 @@
 
 Two players fight the pinned symmetric 2v2 frigate skirmish
 (`pvp-skirmish-2v2`, scenario v2): identical fleets mirrored across the
-board under a live cross-breeze, modifier set `{ chainShot, ramming,
-windMovement }`. Each turn both captains author orders (turn delta,
+board under a live cross-breeze, modifier set `{ chainShot,
+mutualRamming, ramming, windMovement }`. Each turn both captains author orders (turn delta,
 speed delta, optional broadside target, round/chain ammo), the server
 resolves exactly one deterministic engine turn once both sides are in,
 and the resolved turn plays back through the spectator renderer. Ships
 really move: heading and speed buy position, closing raises everyone's
-hit chance and damage, sailing within 25 units rams (speed-scaled hull
-damage plus recoil on your own bow), and the wind arcs make some
-headings faster than others. Win by sinking both enemy frigates; mutual
+hit chance and damage, sailing within 25 units rams — and colliding with a ship
+that is itself under way hurts both hulls by each other's momentum, so
+head-on charges are mutual destruction, not a first-strike prize; only
+ramming a stationary target is one-sided (with recoil). The wind arcs
+make some headings faster than others. Win by sinking both enemy frigates; mutual
 annihilation or hitting the 20-turn limit is a draw.
 
 Two ways to play:

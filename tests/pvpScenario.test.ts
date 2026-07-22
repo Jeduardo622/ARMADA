@@ -28,7 +28,7 @@ afterAll(async () => {
 // Canonical fingerprint pinned on both sides; the Unity EditMode test
 // (PvpScenario) asserts the identical string for scenario parity.
 const EXPECTED_FINGERPRINT =
-  'pvp-skirmish-2v2|turnLimit=20|modifiers=chainShot,ramming,windMovement|wind=90:4|' +
+  'pvp-skirmish-2v2|turnLimit=20|modifiers=chainShot,mutualRamming,ramming,windMovement|wind=90:4|' +
   'alpha-frigate-a:player:0,30:h0:v3:hp120:sl80:cw50|' +
   'alpha-frigate-b:player:0,-30:h0:v3:hp120:sl80:cw50|' +
   'bravo-frigate-a:enemy:220,30:h180:v3:hp120:sl80:cw50|' +
@@ -77,12 +77,13 @@ describe('pvp skirmish scenario', () => {
     }
   });
 
-  it('pins the v2 modifier set: chain shot, ramming, and wind movement', () => {
-    expect(createPvpModifiers()).toEqual({ chainShot: true, ramming: true, windMovement: true });
+  it('pins the v2 modifier set: chain shot, mutual ramming, ramming, and wind movement', () => {
+    const expected = { chainShot: true, mutualRamming: true, ramming: true, windMovement: true };
+    expect(createPvpModifiers()).toEqual(expected);
     // Fresh object per call so a caller mutation cannot leak into the pin.
     const mutated = createPvpModifiers();
     mutated.statusEffects = true;
-    expect(createPvpModifiers()).toEqual({ chainShot: true, ramming: true, windMovement: true });
+    expect(createPvpModifiers()).toEqual(expected);
   });
 });
 
@@ -233,7 +234,7 @@ describe('pvp match loop (client-style state chaining)', () => {
     expect(run.turnCount).toBe(PINNED_FOCUS_FIRE_TURN);
   });
 
-  it('v2 showcase: a head-on hold-fire pass produces rams with the first-mover edge, then a draw', () => {
+  it('v2 showcase: a head-on hold-fire pass exchanges symmetric rams, then a draw', () => {
     let ramEvents = 0;
     const run = runMatch(PVP_DEFAULT_SEED, (_turn, state) =>
       state.ships
@@ -265,15 +266,17 @@ describe('pvp match loop (client-style state chaining)', () => {
 
     // Sailing straight at each other with no orders to fire: the fleets
     // collide near midfield, exchange rams, sail through, and never
-    // re-engage — a draw at the limit. Resolution order (ship id) gives
-    // side A the ram initiative, so side B ends worse off; this asymmetry
-    // is documented in docs/design/pvp-tuning.md.
+    // re-engage — a draw at the limit. Under modifiers.mutualRamming the
+    // exchange is symmetric REGARDLESS of resolution order: side A still
+    // strikes first (ship-id order), but every collision costs both hulls
+    // the same counter-momentum damage, so the old 98/76 first-mover
+    // split (pre-balance-pass) is gone.
     expect(run.result).toBe('draw');
     expect(run.turnCount).toBe(PVP_TURN_LIMIT);
     expect(ramEvents).toBe(4);
     const hp = (id: string) => run.finalState.ships.find((ship) => ship.id === id)!.hp;
-    expect(hp(PVP_SIDE_A_SHIP_IDS[0])).toBe(98);
-    expect(hp(PVP_SIDE_A_SHIP_IDS[1])).toBe(98);
+    expect(hp(PVP_SIDE_A_SHIP_IDS[0])).toBe(76);
+    expect(hp(PVP_SIDE_A_SHIP_IDS[1])).toBe(76);
     expect(hp(PVP_SIDE_B_SHIP_IDS[0])).toBe(76);
     expect(hp(PVP_SIDE_B_SHIP_IDS[1])).toBe(76);
   });
@@ -305,6 +308,74 @@ describe('pvp match loop (client-style state chaining)', () => {
 
   it('mirrored orders leave the scenario code stable (sanity)', () => {
     expect(PVP_SCENARIO_CODE).toBe('pvp-skirmish-2v2');
+  });
+});
+
+describe('mutual ramming modifier (the ram balance pass)', () => {
+  // Minimal head-on pair inside the closing band so the first mover's move
+  // ends in contact. No broadside orders → the resolution is rng-free and
+  // the damage numbers are exact.
+  const headOnPair = (targetSpeed: number): SimState => ({
+    turn: 1,
+    wind: { direction: 90, speed: 0 },
+    ships: [
+      {
+        id: 'a-ship',
+        side: 'player',
+        position: { x: 0, y: 0 },
+        heading: 0,
+        speed: 3,
+        hp: 120,
+        sail: 80,
+        crew: 50
+      },
+      {
+        id: 'b-ship',
+        side: 'enemy',
+        position: { x: 30, y: 0 },
+        heading: 180,
+        speed: targetSpeed,
+        hp: 120,
+        sail: 80,
+        crew: 50
+      }
+    ]
+  });
+
+  const resolveHeadOn = (targetSpeed: number, mutual: boolean) =>
+    resolveSimPreview({
+      schemaVersion: 1,
+      seed: 1,
+      turn: 1,
+      state: headOnPair(targetSpeed),
+      orders: [],
+      modifiers: { windMovement: true, ramming: true, ...(mutual ? { mutualRamming: true } : {}) }
+    });
+
+  it('a target under way strikes back with counter-momentum damage', () => {
+    const result = resolveHeadOn(3, true);
+    const ram = result.events.find((event) => event.type === 'ram');
+    expect(ram).toMatchObject({
+      shipId: 'a-ship',
+      targetShipId: 'b-ship',
+      // Rammer's blow: 10 + 4×3.
+      hullDamage: 22,
+      // Counter-momentum instead of recoil: 10 + 4×(target speed 3), not
+      // floor(0.5×22) = 11.
+      selfHullDamage: 22
+    });
+  });
+
+  it('a stationary target still yields the classic one-sided ram with recoil', () => {
+    const result = resolveHeadOn(0, true);
+    const ram = result.events.find((event) => event.type === 'ram');
+    expect(ram).toMatchObject({ hullDamage: 22, selfHullDamage: 11 });
+  });
+
+  it('flag off keeps the legacy recoil rule byte-identical (mission 09 safety)', () => {
+    const mutualOff = resolveHeadOn(3, false);
+    const ram = mutualOff.events.find((event) => event.type === 'ram');
+    expect(ram).toMatchObject({ hullDamage: 22, selfHullDamage: 11 });
   });
 });
 

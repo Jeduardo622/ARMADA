@@ -576,7 +576,7 @@ namespace Armada.Client.Tests.EditMode
             // Must equal EXPECTED_FINGERPRINT in tests/pvpScenario.test.ts so
             // the client and server pin the identical deterministic scenario.
             const string expected =
-                "pvp-skirmish-2v2|turnLimit=20|modifiers=chainShot,ramming,windMovement|wind=90:4|" +
+                "pvp-skirmish-2v2|turnLimit=20|modifiers=chainShot,mutualRamming,ramming,windMovement|wind=90:4|" +
                 "alpha-frigate-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
                 "alpha-frigate-b:player:0,-30:h0:v3:hp120:sl80:cw50|" +
                 "bravo-frigate-a:enemy:220,30:h180:v3:hp120:sl80:cw50|" +
@@ -591,7 +591,7 @@ namespace Armada.Client.Tests.EditMode
             var settings = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
             Assert.That(
                 JsonConvert.SerializeObject(PvpScenario.BuildModifiers(), settings),
-                Is.EqualTo("{\"chainShot\":true,\"windMovement\":true,\"ramming\":true}"));
+                Is.EqualTo("{\"chainShot\":true,\"windMovement\":true,\"ramming\":true,\"mutualRamming\":true}"));
             Assert.That(JsonConvert.SerializeObject(new SimModifiers(), settings), Is.EqualTo("{}"));
 
             // Order session drafts map to the wire order surface: a set

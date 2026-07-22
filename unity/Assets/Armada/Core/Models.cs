@@ -333,6 +333,8 @@ namespace Armada.Client.Core
         public bool? WindMovement { get; set; }
         [JsonProperty("ramming", NullValueHandling = NullValueHandling.Ignore)]
         public bool? Ramming { get; set; }
+        [JsonProperty("mutualRamming", NullValueHandling = NullValueHandling.Ignore)]
+        public bool? MutualRamming { get; set; }
     }
 
     [Serializable]

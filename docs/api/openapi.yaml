@@ -471,6 +471,13 @@ components:
           type: boolean
         ramming:
           type: boolean
+        mutualRamming:
+          type: boolean
+          description: >-
+            Refines ramming (only meaningful with it): a rammed target that
+            is under way strikes back with counter-momentum damage instead
+            of the rammer taking fractional recoil, so head-on exchanges
+            cost both sides equally regardless of resolution order.
         chainShot:
           type: boolean
     ShipUpgradeTiers:

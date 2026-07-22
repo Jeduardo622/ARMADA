@@ -395,9 +395,24 @@ function resolveBroadside(
   };
 }
 
-function resolveRam(rammer: ShipState, target: ShipState, effectiveSpeed: number): SimEvent {
+function resolveRam(
+  rammer: ShipState,
+  target: ShipState,
+  effectiveSpeed: number,
+  // Counter-momentum damage (modifiers.mutualRamming): a target under way
+  // strikes back with its own speed-scaled blow instead of the rammer
+  // taking fractional recoil, so head-on exchanges cost both sides equally
+  // regardless of resolution order. The target's effective speed is the
+  // wind-adjusted value only (hazard/status penalties are movement-phase
+  // concerns and deliberately excluded to keep the rule simple and
+  // deterministic). undefined = legacy recoil rule.
+  targetCounterSpeed?: number
+): SimEvent {
   const hullDamage = RAM_BASE_HULL_DAMAGE + effectiveSpeed * RAM_SPEED_HULL_DAMAGE;
-  const selfHullDamage = Math.floor(hullDamage * RAM_RECOIL_FRACTION);
+  const selfHullDamage =
+    targetCounterSpeed !== undefined && targetCounterSpeed > 0
+      ? RAM_BASE_HULL_DAMAGE + targetCounterSpeed * RAM_SPEED_HULL_DAMAGE
+      : Math.floor(hullDamage * RAM_RECOIL_FRACTION);
   target.hp = clamp(target.hp - hullDamage, 0, target.hp);
   rammer.hp = clamp(rammer.hp - selfHullDamage, 0, rammer.hp);
   return {
@@ -557,6 +572,7 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
 
   const windAware = input.modifiers?.windMovement === true;
   const ramming = input.modifiers?.ramming === true;
+  const mutualRamming = input.modifiers?.mutualRamming === true;
   const chainShotEnabled = input.modifiers?.chainShot === true;
   const rammedPairs = new Set<string>();
   if (windAware) {
@@ -588,7 +604,16 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
             continue;
           }
           rammedPairs.add(pairKey);
-          events.push(resolveRam(ship, target, moveEvent.effectiveSpeed));
+          events.push(
+            resolveRam(
+              ship,
+              target,
+              moveEvent.effectiveSpeed,
+              // Gated on the flag so flag-off resolution (mission 09) stays
+              // byte-identical to the legacy recoil rule.
+              mutualRamming ? effectiveSpeed(target, input.state.wind) : undefined
+            )
+          );
         }
       }
     }

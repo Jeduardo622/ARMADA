@@ -36,11 +36,15 @@ const WIND_SPEED = 4;
 // Scenario v2 modifier set (pinned; v1 was chain shot only): windMovement
 // turns heading and speed into real position, and ramming makes contact
 // dangerous — movement-phase contact within RAM_CONTACT_RANGE deals
-// speed-scaled hull damage plus recoil. Ramming is only meaningful with
-// windMovement, so the two flags travel together. A fresh object per call
-// so callers can never mutate a shared instance.
+// speed-scaled hull damage. mutualRamming (the ram balance pass) makes a
+// head-on exchange cost both sides equally regardless of resolution
+// order: a target under way strikes back with counter-momentum damage
+// instead of leaving the rammer with fractional recoil, which removes the
+// ship-id first-mover edge in symmetric collisions. Ramming flags are
+// only meaningful with windMovement, so the three travel together. A
+// fresh object per call so callers can never mutate a shared instance.
 export function createPvpModifiers(): SimModifiers {
-  return { chainShot: true, ramming: true, windMovement: true };
+  return { chainShot: true, mutualRamming: true, ramming: true, windMovement: true };
 }
 
 export function createPvpSkirmishState(): SimState {
@@ -105,7 +109,7 @@ export function pvpFingerprint(state: SimState = createPvpSkirmishState()): stri
   return [
     PVP_SCENARIO_CODE,
     `turnLimit=${PVP_TURN_LIMIT}`,
-    'modifiers=chainShot,ramming,windMovement',
+    'modifiers=chainShot,mutualRamming,ramming,windMovement',
     `wind=${state.wind.direction}:${state.wind.speed}`,
     ...ships
   ].join('|');
