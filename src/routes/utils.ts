@@ -12,10 +12,13 @@ export async function ensureFlag(
     return true;
   }
 
-  // fallback to DB flag state if Unleash is unavailable
-  const fallback = await app.prisma.featureFlag.findUnique({ where: { name: flagName } });
-  if (fallback?.enabled) {
-    return true;
+  // A ready flag service answering "disabled" is authoritative — the DB row
+  // must not override the kill switch. The DB is a fallback for outages only.
+  if (!app.flags.ready()) {
+    const fallback = await app.prisma.featureFlag.findUnique({ where: { name: flagName } });
+    if (fallback?.enabled) {
+      return true;
+    }
   }
 
   reply.status(403).send({ error: 'feature_disabled', flag: flagName });

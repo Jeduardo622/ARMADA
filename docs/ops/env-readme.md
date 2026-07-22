@@ -12,4 +12,14 @@
   - `BODY_LIMIT_BYTES` for request size caps.
   - `STORAGE_REGION` optional for MinIO/S3 region; bucket auto-created if missing.
   - `CONFIG_SIGNING_KEY` used to HMAC config responses; keep secret.
+- Feature flags: once the Unleash client syncs (`ready`), its answer is
+  authoritative — a flag left undefined or disabled there returns 403 even if
+  the DB `FeatureFlag` row is enabled. Define and enable every player-facing
+  flag (`missions_api`, `inventory_api`, `sim_stub`, `telemetry_ingest`,
+  `config_api`, `pvp_api`) in Unleash before rollout; the DB row is an
+  outage-only fallback, and reseeds preserve (never re-enable) its state.
+  Also define `inventory_grant_api` in Unleash and keep it **disabled**:
+  enabling trusted-service grants is done by turning it on in Unleash — a DB
+  row flip only takes effect on instances whose flag client never became
+  ready.
 
