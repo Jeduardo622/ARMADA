@@ -979,5 +979,145 @@
         "typecheck"
       ]
     }
+  },
+  {
+    "id": "unauthorized-intent-protected",
+    "input": {
+      "description": "Return 401 unauthorized for expired spectator sessions",
+      "changedPaths": [
+        "src/routes/pvp.ts"
+      ]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "oauth2-intent-protected",
+    "input": {
+      "description": "Add OAuth2 sign-in support",
+      "changedPaths": []
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "reauthenticate-intent-protected",
+    "input": {
+      "description": "Fix the reauthenticate flow after token expiry",
+      "changedPaths": [
+        "src/routes/telemetry.ts"
+      ]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "authn-shorthand-intent-protected",
+    "input": {
+      "description": "Tighten authn validation on telemetry ingest",
+      "changedPaths": []
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck"
+      ]
+    }
   }
 ]
