@@ -18,4 +18,8 @@
   flag (`missions_api`, `inventory_api`, `sim_stub`, `telemetry_ingest`,
   `config_api`, `pvp_api`) in Unleash before rollout; the DB row is an
   outage-only fallback, and reseeds preserve (never re-enable) its state.
+  Also define `inventory_grant_api` in Unleash and keep it **disabled**:
+  enabling trusted-service grants is done by turning it on in Unleash — a DB
+  row flip only takes effect on instances whose flag client never became
+  ready.
 
