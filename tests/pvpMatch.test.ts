@@ -340,7 +340,11 @@ describe('pvp match lifecycle', () => {
     // until completion (a live seed is a local outcome oracle).
     expect(match.seed).toBeNull();
     expect(typeof matchStore.get(match.id)!.seed).toBe('number');
-    expect(matchStore.get(match.id)!.modifiers).toEqual({ chainShot: true });
+    expect(matchStore.get(match.id)!.modifiers).toEqual({
+      chainShot: true,
+      ramming: true,
+      windMovement: true
+    });
   });
 
   it('joins by code, starts the match, and rejects third seats and double joins', async () => {

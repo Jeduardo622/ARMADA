@@ -1,13 +1,17 @@
 # PvP Demo: 2-Player "Skirmish 2v2"
 
 Two players fight the pinned symmetric 2v2 frigate skirmish
-(`pvp-skirmish-2v2`): identical fleets mirrored across the board, v1
-modifier set `{ chainShot: true }` only. Each turn both captains author
-orders (turn delta, speed delta, optional broadside target, round/chain
-ammo), the server resolves exactly one deterministic engine turn once both
-sides are in, and the resolved turn plays back through the spectator
-renderer. Win by sinking both enemy frigates; mutual annihilation or
-hitting the 20-turn limit is a draw.
+(`pvp-skirmish-2v2`, scenario v2): identical fleets mirrored across the
+board under a live cross-breeze, modifier set `{ chainShot, ramming,
+windMovement }`. Each turn both captains author orders (turn delta,
+speed delta, optional broadside target, round/chain ammo), the server
+resolves exactly one deterministic engine turn once both sides are in,
+and the resolved turn plays back through the spectator renderer. Ships
+really move: heading and speed buy position, closing raises everyone's
+hit chance and damage, sailing within 25 units rams (speed-scaled hull
+damage plus recoil on your own bow), and the wind arcs make some
+headings faster than others. Win by sinking both enemy frigates; mutual
+annihilation or hitting the 20-turn limit is a draw.
 
 Two ways to play:
 
@@ -88,6 +92,9 @@ Both clients default to `http://localhost:4500`
       clients within a poll interval (~2 s) of the second confirm.
 - [ ] Chain shot flashes cyan and shreds sail; round shot flashes orange
       and bites hull; bars track across turns without resetting to full.
+- [ ] Markers actually move each turn; two fleets that charge straight
+      ahead collide near midfield around turn 6–7 and rams flash white
+      with hull + recoil damage in the HUD narration.
 - [ ] Sunk ships stop being orderable/targetable on later turns.
 - [ ] Focus fire beats split fire comfortably inside 20 turns; two
       hold-fire fleets reach the turn-limit DRAW.

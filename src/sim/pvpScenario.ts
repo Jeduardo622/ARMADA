@@ -22,18 +22,25 @@ const FRIGATE_SAIL = 80;
 const FRIGATE_CREW = 50;
 const FRIGATE_SPEED = 3;
 
-// The lines face each other mirrored across x = LINE_SEPARATION / 2. Wind is
-// a cross-breeze at zero speed: v1 PvP runs without modifiers.windMovement,
-// so wind never touches resolution and the state field stays neutral.
+// The lines face each other mirrored across x = LINE_SEPARATION / 2. The
+// wind blows across the battle axis (direction 90), which keeps the mirror
+// perfectly fair: a maneuver and its mirrored counterpart sit at the same
+// point of sail. Speed 4 matches the mission convention (±2 effective
+// speed on the tailwind/headwind arcs; both fleets open at a neutral beam
+// reach).
 const LINE_SEPARATION = 220;
 const LINE_SPREAD = 30;
 const WIND_DIRECTION = 90;
-const WIND_SPEED = 0;
+const WIND_SPEED = 4;
 
-// v1 PvP modifier set (pinned): chain shot only, everything else off. A
-// fresh object per call so callers can never mutate a shared instance.
+// Scenario v2 modifier set (pinned; v1 was chain shot only): windMovement
+// turns heading and speed into real position, and ramming makes contact
+// dangerous — movement-phase contact within RAM_CONTACT_RANGE deals
+// speed-scaled hull damage plus recoil. Ramming is only meaningful with
+// windMovement, so the two flags travel together. A fresh object per call
+// so callers can never mutate a shared instance.
 export function createPvpModifiers(): SimModifiers {
-  return { chainShot: true };
+  return { chainShot: true, ramming: true, windMovement: true };
 }
 
 export function createPvpSkirmishState(): SimState {
@@ -98,7 +105,7 @@ export function pvpFingerprint(state: SimState = createPvpSkirmishState()): stri
   return [
     PVP_SCENARIO_CODE,
     `turnLimit=${PVP_TURN_LIMIT}`,
-    'modifiers=chainShot',
+    'modifiers=chainShot,ramming,windMovement',
     `wind=${state.wind.direction}:${state.wind.speed}`,
     ...ships
   ].join('|');

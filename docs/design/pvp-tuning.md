@@ -1,13 +1,12 @@
 # PvP Demo Design Tuning
 
-> **Status: Reviewed.** Design pass run 2026-07-21; applied values
-> approved by @Jeduardo622 via the human merge of the design-pass PR.
-> Originally drafted against the shipped implementation (PRs #53–#56,
-> corrected in #58), following the Mission 07 / spectator-tuning
-> precedent. The pass applied one change (in-progress idle TTL, below),
-> confirmed every other value as a deliberate keep, and recorded the v1
-> dominant-strategy analysis. Future value changes reopen review: update
-> the table and this status in the same PR.
+> **Status: Reviewed** (scenario v2). Design pass run 2026-07-21 (PR #60);
+> **scenario v2 — `windMovement` + `ramming` with a live cross-breeze —
+> explicitly signed off by @Jeduardo622 and applied via the human merge of
+> the v2 PR** on 2026-07-21. Originally drafted against the shipped
+> implementation (PRs #53–#56, corrected in #58), following the
+> Mission 07 / spectator-tuning precedent. Future value changes reopen
+> review: update the table and this status in the same PR.
 
 Consolidates every design-tunable knob and placeholder constant in the
 PvP demo — scenario stats, match lifecycle policy, order-entry surface,
@@ -32,33 +31,38 @@ deliberately not duplicated here.
 | `FRIGATE_HP` | 120 | keep | 4–5 round-shot hits to sink (25–30 hull per hit at opening stats: base 25 + 0–5 variance; 4 hits only at maximum variance); sets match length together with the hit chance below. |
 | `FRIGATE_SAIL` | 80 | keep | Feeds base damage (`18 + floor(sail/25)` = +3) and is the chain-shot target pool. |
 | `FRIGATE_CREW` | 50 | keep | Only cosmetic in v1 (boarding deferred); becomes live if boarding joins the modifier set. |
-| `FRIGATE_SPEED` | 3 | keep | +1 hit chance (`floor(v/2)`), +4 base damage (`floor(v·1.5)`); speedDelta orders swing damage ±3 without a movement phase. |
-| `LINE_SEPARATION` | 220 | keep | Opening range 220 → range penalty 4 → ~69% hit chance at start. The single biggest lethality lever: −50 range ≈ +1% hit per 50 units. |
+| `FRIGATE_SPEED` | 3 | keep | Under v2 this is real motion: 15 sim units per turn (`v × MOVEMENT_SCALE 5`), so head-on fleets close at 30/turn from 220 apart — contact band (`RAM_CONTACT_RANGE` 25) around turn 6–7. Still feeds hit chance (`floor(v/2)`) and base damage (`floor(v·1.5)`), now via wind-adjusted effective speed. |
+| `LINE_SEPARATION` | 220 | keep | Opening range 220 → range penalty 4 → ~69% hit chance at start; under v2 range collapses as the lines close, so hit chance and damage climb turn over turn. |
 | `LINE_SPREAD` | 30 | keep | ±30 y keeps the four markers visually separated at the shared 0.1 world-scale framing. |
-| `WIND_DIRECTION` / `WIND_SPEED` | 90 / 0 | keep | Cosmetic in v1 (no `windMovement`); speed 0 keeps it inert even if flags flip accidentally. |
+| `WIND_DIRECTION` / `WIND_SPEED` | 90 / 4 (**applied, v2**) | keep | Live cross-breeze: direction 90 is perpendicular to the battle axis, so the mirror stays perfectly fair (a maneuver and its mirrored counterpart sit at the same point of sail); speed 4 gives ±2 effective speed on the tailwind/headwind arcs (mission convention), and both fleets open at a neutral beam reach. |
 | `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). **Not in the fingerprint**; pinned by the seed-11 focus-fire-vs-split fixtures (vitest + server full-match test), the C# `DefaultSeed` mirror, AND the serialized `seed` baked into `PvPHotseatDemo.unity` (regenerate the scene when tuning). |
-| Modifier set | `{ chainShot: true }` | keep | **Product pin, not a tuning knob.** No movement phase by consequence; flipping `windMovement`/`ramming` in is scenario v2 and needs explicit sign-off. See the dominant-strategy note below for why v2 is the real balance lever. |
+| Modifier set | `{ chainShot, ramming, windMovement }` (**applied, v2**) | keep | **Product pin, not a tuning knob** — v2 signed off by @Jeduardo622 (this PR). `windMovement` makes heading and speed buy real position; `ramming` makes contact within 25 units dangerous (`10 + 4×effectiveSpeed` hull to the target, half to the rammer). The two flags travel together: ram contact happens in the movement phase. |
 
-### Design note: the v1 dominant strategy (accepted for the demo)
+### Design note: v1's dominant strategy and what v2 changed
 
-With no movement phase, range and bearing never change, which collapses
-the order surface. Heading matters only through your own broadside angle
-penalty (`floor(diff/15)` per 15° off the target bearing; nothing else
-reads heading), so the entire depth of maneuvering is **one free
-alignment press**: same-row targets sit at bearing 0° (already aligned),
-cross-row targets at ±15° rounded (one 15° press removes one penalty
-point, e.g. 68% → 69% hit), and any turn beyond alignment only hurts.
-Speed ramping strictly helps (+`floor(v/2)` hit chance and
-+`floor(v·1.5)` base damage, with no positional cost since nothing
-moves). Optimal v1 play is therefore **align to your target's bearing
-once (re-align one press when switching rows), speed +2 every turn,
-focus fire** — beyond that single alignment the maneuver buttons are
-trap options, and chain-vs-round plus target selection are the only
-live decisions. This is accepted for the demo: it keeps matches legible
-and short. It is also the headline motivation for scenario v2
-(`windMovement` + `ramming`), where heading and speed buy position
-instead of only modifying gunnery. Do not "fix" this by tuning the v1
-numbers — no constant in this spec changes the dominance structure.
+**v1 (historical, chain shot only):** with no movement phase, range and
+bearing never changed, collapsing maneuvering to one free alignment
+press (same-row targets at bearing 0°, cross-row at rounded ±15°; any
+turn beyond alignment only hurt) — optimal play was align once, speed +2
+every turn, focus fire, and the maneuver buttons were otherwise trap
+options. That analysis motivated v2 and no v1 constant could change it.
+
+**v2 (current):** heading and speed now buy position, which breaks the
+dominance: closing raises both sides' hit chance and damage and courts
+the ram band, holding range keeps the duel long, and the wind arcs make
+some headings faster than others. Empirically pinned properties
+(`tests/pvpScenario.test.ts`, seed 11): focus-fire-vs-split is a side A
+win at turn 7 (bloodier than v1's static duel — three ships sink);
+straight-ahead hold-fire fleets collide near midfield, exchange exactly
+4 rams, sail through, and never re-engage (draw at the limit); turning
+away on turn 1 avoids contact entirely. **Known asymmetry, accepted and
+pinned:** resolution order is by ship id, so alpha-side ships move first
+and strike first in the ram band — in the head-on fixture side A ends
+98/98 hull vs side B's 76/76. This first-mover ram initiative is
+inherent to sequential resolution (called out since slice 1) and is now
+the top open balance question for a future pass; candidate levers live
+in the engine (ram damage split, contact range), not in this scenario's
+constants.
 
 ## Match lifecycle policy (`src/routes/pvp.ts`)
 
@@ -109,8 +113,9 @@ conventions; values below are hard-coded in the builders.
   `PVP_DEFAULT_SEED` must update the fingerprint constant in
   `tests/pvpScenario.test.ts`, the same constant in the Unity EditMode
   suite, and `PvpScenario.cs` — and re-derive the empirical fixtures:
-  the seed-11 focus-fire win (vitest + the server full-match test) and
-  the hold-fire turn-limit draw. Tuning only the default seed skips both
+  the seed-11 focus-fire win at turn 7 (vitest + the server full-match
+  test), the head-on 4-ram exchange with its 98/76 hull split, and the
+  turn-1-turn-away clean stall. Tuning only the default seed skips both
   fingerprint constants but still re-derives the fixtures, updates the
   C# `DefaultSeed` mirror, **and regenerates `PvPHotseatDemo.unity`** —
   the scene stores the bootstrap's serialized `seed`, which does not

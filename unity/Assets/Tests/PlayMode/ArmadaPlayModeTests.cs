@@ -1939,6 +1939,8 @@ namespace Armada.Client.Tests.PlayMode
                 Assert.That(request.Seed, Is.EqualTo(PvpScenario.DefaultSeed));
                 Assert.That(request.Turn, Is.EqualTo(1));
                 Assert.That(request.Modifiers.ChainShot, Is.True);
+                Assert.That(request.Modifiers.WindMovement, Is.True);
+                Assert.That(request.Modifiers.Ramming, Is.True);
                 Assert.That(request.Modifiers.ShipUpgrades, Is.Null);
                 Assert.That(request.State.Ships, Has.Count.EqualTo(4));
                 Assert.That(request.Orders, Has.Count.EqualTo(4));
