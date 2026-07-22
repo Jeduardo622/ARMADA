@@ -773,5 +773,211 @@
         "harness_policy"
       ]
     }
+  },
+  {
+    "id": "author-docs-spec-not-auth-intent",
+    "input": {
+      "description": "Author a revision of the PvP tuning spec",
+      "changedPaths": [
+        "docs/design/pvp-tuning.md"
+      ]
+    },
+    "expected": {
+      "classification": "B",
+      "reasons": [
+        "standard delivery scope"
+      ],
+      "protectedAreas": [],
+      "allowedActions": [
+        "commit",
+        "edit",
+        "manage_pr",
+        "push",
+        "read",
+        "test"
+      ],
+      "requiredReviewers": [],
+      "requiredChecks": [
+        "harness_policy"
+      ]
+    }
+  },
+  {
+    "id": "authoritative-wording-not-auth-intent",
+    "input": {
+      "description": "Honor an authoritative flag service disable in ensureFlag",
+      "changedPaths": [
+        "src/routes/utils.ts"
+      ]
+    },
+    "expected": {
+      "classification": "B",
+      "reasons": [
+        "standard delivery scope"
+      ],
+      "protectedAreas": [],
+      "allowedActions": [
+        "commit",
+        "edit",
+        "manage_pr",
+        "push",
+        "read",
+        "test"
+      ],
+      "requiredReviewers": [],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "authorized-intent-protected",
+    "input": {
+      "description": "Require upgrade purchases to be authorized by the owning player",
+      "changedPaths": [
+        "src/routes/upgrades.ts"
+      ]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "authenticate-intent-protected",
+    "input": {
+      "description": "Authenticate spectator polling requests",
+      "changedPaths": [
+        "src/routes/pvp.ts"
+      ]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "authservice-intent-protected",
+    "input": {
+      "description": "Extend the AuthService shared in-flight token seam",
+      "changedPaths": [
+        "unity/Assets/Armada/Core/AuthService.cs"
+      ]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck",
+        "unity_compilation",
+        "unity_static",
+        "unity_tests"
+      ]
+    }
+  },
+  {
+    "id": "bare-auth-intent-protected",
+    "input": {
+      "description": "Fix auth token refresh race",
+      "changedPaths": []
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: authentication"
+      ],
+      "protectedAreas": [
+        "authentication"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "contracts",
+        "harness_policy",
+        "lint",
+        "secrets",
+        "test",
+        "typecheck"
+      ]
+    }
   }
 ]

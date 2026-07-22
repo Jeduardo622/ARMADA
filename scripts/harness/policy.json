@@ -18,7 +18,7 @@
     {
       "id": "authentication",
       "pathPatterns": ["^src/plugins/auth\\.ts$", "^src/routes/auth\\.ts$"],
-      "intentPatterns": ["auth(entication|orization)?", "bearer token", "jwt"],
+      "intentPatterns": ["\\b(o?auth|authenticat\\w*|authori[sz]\\w*|authservice)\\b", "bearer token", "jwt"],
       "reviewers": ["Security", "Backend"],
       "checks": ["lint", "typecheck", "test", "build", "contracts", "secrets", "harness_policy"]
     },
