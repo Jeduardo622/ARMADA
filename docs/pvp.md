@@ -95,6 +95,9 @@ Both clients default to `http://localhost:4500`
 - [ ] Markers actually move each turn; two fleets that charge straight
       ahead collide near midfield around turn 6–7 and rams flash white
       with hull + recoil damage in the HUD narration.
+- [ ] When ships sail beyond the opening frame the camera follows —
+      zooming out and re-centering so every ship (and its bars) stays in
+      view, and never zooming tighter than the opening framing.
 - [ ] Sunk ships stop being orderable/targetable on later turns.
 - [ ] Focus fire beats split fire comfortably inside 20 turns; two
       hold-fire fleets reach the turn-limit DRAW.

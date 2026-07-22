@@ -162,6 +162,12 @@ describe('both-sides order resolution (hot-seat contract)', () => {
   });
 });
 
+// The focus-fire fixture's resolved turn. tests/pvpMatch.test.ts pins the
+// SAME literal against server resolution with byte-identical order
+// generators; if either side drifts, one of the two exact-turn asserts
+// breaks and names the divergence.
+const PINNED_FOCUS_FIRE_TURN = 7;
+
 describe('pvp match loop (client-style state chaining)', () => {
   // Mirrors the hot-seat client loop: chain nextState back through
   // /sim/preview-style resolution until the match ends.
@@ -195,19 +201,36 @@ describe('pvp match loop (client-style state chaining)', () => {
   const firstAfloat = (state: SimState, ids: readonly string[]) =>
     ids.find((id) => (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0) ?? ids[0];
 
+  const isAfloat = (state: SimState, id: string) =>
+    (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0;
+
+  // Shared focus-vs-split strategy, legal under the server's fairness
+  // guard (living own ships, living targets only). tests/pvpMatch.test.ts
+  // uses byte-identical generators so the server full-match test pins the
+  // SAME engine inputs and the SAME resolved turn.
+  const focusFireSideA = (state: SimState): SimOrder[] =>
+    PVP_SIDE_A_SHIP_IDS.filter((id) => isAfloat(state, id)).map((id) =>
+      fire(id, firstAfloat(state, PVP_SIDE_B_SHIP_IDS))
+    );
+
+  const splitFireSideB = (state: SimState): SimOrder[] =>
+    PVP_SIDE_B_SHIP_IDS.map((id, index) => ({ id, index }))
+      .filter(({ id }) => isAfloat(state, id))
+      .map(({ id, index }) => {
+        const paired = PVP_SIDE_A_SHIP_IDS[index];
+        return fire(id, isAfloat(state, paired) ? paired : firstAfloat(state, PVP_SIDE_A_SHIP_IDS));
+      });
+
   it('a focus-fire side A beats a split-fire side B inside the turn limit (pinned fixture)', () => {
     const run = runMatch(PVP_DEFAULT_SEED, (_turn, state) => [
-      // Side A concentrates on the first bravo ship still afloat.
-      fire(PVP_SIDE_A_SHIP_IDS[0], firstAfloat(state, PVP_SIDE_B_SHIP_IDS)),
-      fire(PVP_SIDE_A_SHIP_IDS[1], firstAfloat(state, PVP_SIDE_B_SHIP_IDS)),
-      // Side B splits fire.
-      fire(PVP_SIDE_B_SHIP_IDS[0], PVP_SIDE_A_SHIP_IDS[0]),
-      fire(PVP_SIDE_B_SHIP_IDS[1], PVP_SIDE_A_SHIP_IDS[1])
+      ...focusFireSideA(state),
+      ...splitFireSideB(state)
     ]);
     // v2: the lines close under windMovement, so the exchange is bloodier
-    // and faster to decide than the static v1 duel.
+    // and faster to decide than the static v1 duel. The exact turn is also
+    // pinned by the server full-match test in tests/pvpMatch.test.ts.
     expect(run.result).toBe('side_a');
-    expect(run.turnCount).toBe(7);
+    expect(run.turnCount).toBe(PINNED_FOCUS_FIRE_TURN);
   });
 
   it('v2 showcase: a head-on hold-fire pass produces rams with the first-mover edge, then a draw', () => {

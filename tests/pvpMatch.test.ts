@@ -300,20 +300,33 @@ const fire = (shipId: string, target: string, ammo?: 'round' | 'chain'): SimOrde
   ...(ammo ? { ammo } : {})
 });
 
-const firstAfloat = (state: { ships: Array<{ id: string; hp: number }> }, ids: readonly string[]) =>
+type ShipStateLike = { ships: Array<{ id: string; hp: number }> };
+
+const firstAfloat = (state: ShipStateLike, ids: readonly string[]) =>
   ids.find((id) => (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0) ?? ids[0];
 
-const sideAOrders = (state: { ships: Array<{ id: string; hp: number }> }): SimOrder[] => {
-  const target = firstAfloat(state, PVP_SIDE_B_SHIP_IDS);
-  return PVP_SIDE_A_SHIP_IDS.filter(
-    (id) => (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0
-  ).map((id) => fire(id, target));
-};
+const isAfloat = (state: ShipStateLike, id: string) =>
+  (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0;
 
-const sideBOrders = (state: { ships: Array<{ id: string; hp: number }> }): SimOrder[] =>
-  PVP_SIDE_B_SHIP_IDS.filter(
-    (id) => (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0
-  ).map((id, index) => fire(id, PVP_SIDE_A_SHIP_IDS[index % PVP_SIDE_A_SHIP_IDS.length]));
+// Byte-identical to the focus-vs-split generators in
+// tests/pvpScenario.test.ts, so the server full-match test resolves the
+// SAME engine inputs and must land on the SAME pinned turn.
+const sideAOrders = (state: ShipStateLike): SimOrder[] =>
+  PVP_SIDE_A_SHIP_IDS.filter((id) => isAfloat(state, id)).map((id) =>
+    fire(id, firstAfloat(state, PVP_SIDE_B_SHIP_IDS))
+  );
+
+const sideBOrders = (state: ShipStateLike): SimOrder[] =>
+  PVP_SIDE_B_SHIP_IDS.map((id, index) => ({ id, index }))
+    .filter(({ id }) => isAfloat(state, id))
+    .map(({ id, index }) => {
+      const paired = PVP_SIDE_A_SHIP_IDS[index];
+      return fire(id, isAfloat(state, paired) ? paired : firstAfloat(state, PVP_SIDE_A_SHIP_IDS));
+    });
+
+// Must equal PINNED_FOCUS_FIRE_TURN in tests/pvpScenario.test.ts; a
+// mismatch means server resolution drifted from the engine fixture.
+const PINNED_FOCUS_FIRE_TURN = 7;
 
 describe('pvp match lifecycle', () => {
   it('creates a server-authoritative match: pinned scenario, server seed, waiting state', async () => {
@@ -528,9 +541,10 @@ describe('pvp match lifecycle', () => {
     }
 
     // Seed 11 focus-fire-vs-split is the pinned side A win fixture
-    // (tests/pvpScenario.test.ts) — the server-resolved match must agree.
+    // (tests/pvpScenario.test.ts) — the server-resolved match must agree
+    // on the exact turn, not just the result.
     expect(result).toBe('side_a');
-    expect(resolvedTurns).toBeLessThanOrEqual(PVP_TURN_LIMIT);
+    expect(resolvedTurns).toBe(PINNED_FOCUS_FIRE_TURN);
 
     // Both participants see the completed match; resolved turn records are
     // now revealed, including the once-hidden order effects.

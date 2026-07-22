@@ -98,8 +98,9 @@ conventions; values below are hard-coded in the builders.
 
 | Knob | Current | Proposed | Rationale |
 | --- | --- | --- | --- |
-| Camera `orthographicSize` / position | 8.5 @ (11, 20, 0) | keep | Battle midline sits at sim x = 110 → world x = 11 (vs 12.5 in the mission scene); same 8.5 zoom as the reviewed spectator framing. |
-| Board cube | 30×1×16 @ (11, −0.55, 0) | keep | Covers the mirrored sim space at 0.1 world units per sim unit. |
+| Camera `orthographicSize` / position | 8.5 @ (11, 20, 0) | keep | The *opening* frame only under v2: battle midline sits at sim x = 110 → world x = 11; the follow behavior below takes over once ships move. |
+| Follow camera (`SpectatorRenderer.followCamera`, wired by both PvP builders) | `followPadding` 2, `followMinSize` 8.5 | keep (**new, v2**) | Re-frames the orthographic camera every tick to keep all markers (and their bars, via the padding) in view; never zooms tighter than the authored 8.5. Mission scenes leave the field null and keep their fixed framing. |
+| Board cube | 140×1×120 @ (11, −0.55, 0) (**applied, v2**) | keep | Sea under any realistic 20-turn line once ships actually sail; extreme max-speed runs can still reach open void past the edge — cosmetic only, the follow camera keeps the ships themselves in view. |
 | Button size / spacing / margin | 130×40, 8 gap, 20 edge | keep | Eight order buttons fit one row at default game-view widths. |
 | Button fill color | (0.15, 0.25, 0.4, 0.9) | keep | Muted navy; readable TMP white labels without competing with the board. |
 | Order/HUD label layout | hud 60h @ −10; status 40h @ −75; order panel 140h @ 70 (hot-seat) / 116 (netplay) | keep | Netplay lifts the order panel above its second (menu) button row at y = 66. |
