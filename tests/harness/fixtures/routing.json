@@ -1158,5 +1158,167 @@
         "unity_tests"
       ]
     }
+  },
+  {
+    "id": "economy-path-protected",
+    "input": {
+      "description": "Retune the mission reward quantities per the balance spec",
+      "changedPaths": [
+        "src/economy/missionRewards.ts"
+      ]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected path: economy",
+        "protected intent: economy"
+      ],
+      "protectedAreas": [
+        "economy"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "harness_policy",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "economy-intent-protected",
+    "input": {
+      "description": "Adjust the cannon upgrade costs for the next balance pass",
+      "changedPaths": []
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: economy"
+      ],
+      "protectedAreas": [
+        "economy"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "harness_policy",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "reward-intent-docs-protected",
+    "input": {
+      "description": "Raise the mission 05 timber reward",
+      "changedPaths": [
+        "docs/design/mission-balance.md"
+      ]
+    },
+    "expected": {
+      "classification": "C",
+      "reasons": [
+        "protected intent: economy"
+      ],
+      "protectedAreas": [
+        "economy"
+      ],
+      "allowedActions": [
+        "plan",
+        "read",
+        "report_required_approval"
+      ],
+      "requiredReviewers": [
+        "Backend",
+        "Security"
+      ],
+      "requiredChecks": [
+        "build",
+        "harness_policy",
+        "lint",
+        "test",
+        "typecheck"
+      ]
+    }
+  },
+  {
+    "id": "rewarding-wording-not-economy-intent",
+    "input": {
+      "description": "Document the rewarding gameplay loop in the design overview",
+      "changedPaths": [
+        "docs/design/overview.md"
+      ]
+    },
+    "expected": {
+      "classification": "B",
+      "reasons": [
+        "standard delivery scope"
+      ],
+      "protectedAreas": [],
+      "allowedActions": [
+        "commit",
+        "edit",
+        "manage_pr",
+        "push",
+        "read",
+        "test"
+      ],
+      "requiredReviewers": [],
+      "requiredChecks": [
+        "harness_policy"
+      ]
+    }
+  },
+  {
+    "id": "upgrade-wording-not-economy-intent",
+    "input": {
+      "description": "Upgrade the spectator camera follow behavior",
+      "changedPaths": [
+        "unity/Assets/Armada/UI/SpectatorRenderer.cs"
+      ]
+    },
+    "expected": {
+      "classification": "B",
+      "reasons": [
+        "standard delivery scope",
+        "unity scope"
+      ],
+      "protectedAreas": [],
+      "allowedActions": [
+        "commit",
+        "edit",
+        "manage_pr",
+        "push",
+        "read",
+        "test"
+      ],
+      "requiredReviewers": [],
+      "requiredChecks": [
+        "contracts",
+        "harness_policy",
+        "unity_compilation",
+        "unity_static",
+        "unity_tests"
+      ]
+    }
   }
 ]

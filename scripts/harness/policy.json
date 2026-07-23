@@ -54,6 +54,13 @@
       "checks": ["lint", "typecheck", "test", "build", "secrets", "harness_policy"]
     },
     {
+      "id": "economy",
+      "pathPatterns": ["^src/economy/"],
+      "intentPatterns": ["\\beconomy\\b", "\\brewards?\\b", "\\bupgrade costs?\\b"],
+      "reviewers": ["Backend", "Security"],
+      "checks": ["lint", "typecheck", "test", "build", "harness_policy"]
+    },
+    {
       "id": "unity_tooling",
       "pathPatterns": ["^unity/Packages/(manifest|packages-lock)\\.json$", "^\\.codex/config\\.toml$", "^\\.mcp\\.json$"],
       "intentPatterns": ["unity mcp", "unity package", "mcp server"],

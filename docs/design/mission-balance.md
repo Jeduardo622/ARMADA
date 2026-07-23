@@ -247,14 +247,16 @@ these missions and a playtest with earned tiers exists to measure.
   flag is enabled; the campaign-total "hard cap" arithmetic above holds
   only under the shipped seeded-disabled state. Enabling the flag is a
   separate protected decision, not a tuning knob.
-- **Classifier divergence, documented deliberately:** `AGENTS.md` lists
-  economy as a Class C protected area, but the harness classifier
-  currently has no protected-area entry for `src/economy/`, so
-  `route-task` returns Class B for the reward-value slices above.
-  Until that gap is closed (tracked as its own follow-up), economy
-  slices from this spec apply Class C discipline anyway — named
-  reviewer, in-PR rollback, named risk — regardless of the mechanical
-  classification.
+- **Classifier alignment (gap closed):** the harness now carries an
+  `economy` protected area (`^src/economy/` by path; word-bounded
+  `economy` / `reward(s)` / `upgrade cost(s)` by intent), so
+  `route-task` routes the remaining value slices Class C mechanically —
+  matching the `AGENTS.md` prose and the Class C discipline the applied
+  timber slice already followed by convention. Reward-flow routes
+  (`src/routes/missions.ts` grant flow, `src/routes/inventory.ts`
+  minting, `src/routes/upgrades.ts` purchases) stay outside the path
+  set deliberately — they are guarded by their own review surface, and
+  widening is a separate policy decision.
 - **Mission docs stay in sync.** Each implementing PR updates the
   "Tuning knobs" line of its `docs/content/missions/mission-0X-*.md`
   alongside this spec's table.
