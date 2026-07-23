@@ -250,13 +250,17 @@ these missions and a playtest with earned tiers exists to measure.
 - **Classifier alignment (gap closed):** the harness now carries an
   `economy` protected area (`^src/economy/` by path; word-bounded
   `economy` / `reward(s)` / `upgrade cost(s)` by intent), so
-  `route-task` routes the remaining value slices Class C mechanically —
+  `route-task` routes the economy value slices Class C mechanically —
   matching the `AGENTS.md` prose and the Class C discipline the applied
-  timber slice already followed by convention. Reward-flow routes
-  (`src/routes/missions.ts` grant flow, `src/routes/inventory.ts`
-  minting, `src/routes/upgrades.ts` purchases) stay outside the path
-  set deliberately — they are guarded by their own review surface, and
-  widening is a separate policy decision.
+  timber slice already followed by convention. (Mission difficulty
+  slices 2–5 are outside `src/economy/` and still route B on path;
+  their protection remains the fingerprint-pin/review discipline
+  above.) Deliberately outside the economy path set: the reward-flow
+  routes (`src/routes/missions.ts` grant flow,
+  `src/routes/inventory.ts` minting, `src/routes/upgrades.ts`
+  purchases) and the upgrade power-curve constants in
+  `src/sim/upgradeEffects.ts` — each guarded by its own review
+  surface; widening is a separate policy decision.
 - **Mission docs stay in sync.** Each implementing PR updates the
   "Tuning knobs" line of its `docs/content/missions/mission-0X-*.md`
   alongside this spec's table.
