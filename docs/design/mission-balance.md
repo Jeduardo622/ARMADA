@@ -8,8 +8,9 @@
 > in the same PR; a design pass graduates it to Reviewed.
 
 Motivation (tracked as an open design knob since the mission arc shipped):
-in missions 03, 05, and 06 the enemy cannot end the mission — every loss
-is a timeout, and a fully passive player is never wiped. Mission 04 has
+in missions 03, 05, and 06 the enemy never ended a mission across the
+200-seed sweeps below — every observed loss is a timeout, and no passive
+run was ever wiped. Mission 04 has
 the opposite problem: the canonical boarding line wins only a third of
 its runs. Reward and upgrade constants are still their original
 placeholders, and the campaign's timber income cannot pay for the upgrade
@@ -28,9 +29,9 @@ against `runMissionLoop` re-wired with the proposed constants
 - a **passive baseline** — every player ship passes every turn — as the
   floor for enemy lethality.
 
-Caveats: the canonical strategies never maneuver (they fire from the
-opening line), so a real player's ceiling is higher than these win
-rates; and 200 seeds puts roughly ±3 percentage points of noise on any
+Caveats: the canonical strategies never turn (they advance and heave to
+on script, firing along the approach line), so a real player's ceiling
+is higher than these win rates; and 200 seeds puts roughly ±3 percentage points of noise on any
 rate, so differences that small are treated as flat. The probes are
 throwaway harness runs, not committed tests; each implementing PR
 re-derives its own pinned fixtures.
@@ -48,7 +49,8 @@ re-derives its own pinned fixtures.
    risk, not rare.)
 4. A full campaign clear (first-completion rewards only) funds the full
    three-component tier-3 upgrade tree with a small (≲10%) buffer in
-   each material; gold keeps a larger buffer as future sink budget.
+   the binding material (timber); gold and ore keep larger surpluses as
+   future sink budget.
 5. Targets are defined at upgrade tier 0. Earned tiers push win rates
    up; that is intended power progression, revisited after playtests
    with upgraded fleets.
@@ -115,7 +117,7 @@ three pins; re-search the fixture seeds in `tests/mission04.test.ts`.
 
 | Knob | Current | Proposed | Derivation / effect |
 | --- | --- | --- | --- |
-| Enemy line spawn: flagship `(260, 0)`, escorts `(240, ±60)` | as listed | **flagship `(220, 0)`, escorts `(200, ±60)`** | Root cause of the flat threat: the AI holds fire until `preferredRange` (100 for the flagship's line-advance) while a player broadside from spawn still lands ~70% (the engine's range penalty is only −1 hit chance per 50 units). Opening 40 units closer, the line's guns bear one-to-two turns sooner: canonical win rate 44% → 53%, and passive fleets go from one-third of runs losing a ship to 197/200 (1.3 of 3 ships lost on average). The escorts' station offsets (20 forward, ±60 lateral in the leader frame) are preserved exactly, so `mission05EnemyOrders` needs no change. Probed 40 units closer still (200/180): canonical drops to 42% — the fight then starts inside the rock choke band — so 220/200 is the chosen point. |
+| Enemy line spawn: flagship `(260, 0)`, escorts `(240, ±60)` | as listed | **flagship `(220, 0)`, escorts `(200, ±60)`** | Root cause of the flat threat: the AI holds fire until `preferredRange` (100 for the flagship's line-advance) while a player broadside from spawn still lands ~70% (the engine's range penalty is only −1 hit chance per 50 units). Opening 40 units closer, the line's guns bear one-to-two turns sooner: canonical win rate 44% → 53%, and passive fleets go from one-third of runs losing a ship to 197/200 (1.3 of 3 ships lost on average). The escorts' station offsets (20 forward, ±60 lateral in the leader frame) are preserved exactly, so `mission05EnemyOrders` needs no change. Probed a further 20 units closer (200/180): canonical drops to 42% — the fight then starts inside the rock choke band — so 220/200 is the chosen point. The proposed 53% sits just below design target 1's 55% floor, inside the sweep's ±3pp noise; accepted, since the scripted line never turns and real play clears the band. |
 | `MISSION_05_FLAGSHIP_HP_SCALE` | 1.1 | keep | Probed at 1.0 with the closer line: 52% vs 53% win rate — inside noise. Keep the flagship tanky; minimal diff. |
 | `MISSION_05_TURN_LIMIT` / `MISSION_05_BONUS_TURN_TARGET` | 11 / 9 | keep | Proposed canonical average win is turn ~8.5 with the ≤9 bonus reachable; the limit is not the binding constraint here. |
 | `MISSION_05_DEFAULT_SEED` | 505 | keep | Route default only. |
@@ -135,11 +137,11 @@ pins; re-search the fixture seeds in `tests/mission05.test.ts`
 | Knob | Current | Proposed | Derivation / effect |
 | --- | --- | --- | --- |
 | `MISSION_06_BOSS_DAMAGE_SCALE` | 1.1 | **1.5** | A boss that cannot end the fight is a pushover on a timer: passive fleets take 65% damage but are never wiped in 14 turns. At 1.5 the canonical siege is untouched (71.5% vs 72.0% — flat at this sample size, because a competent siege kills the boss before its output compounds) while sloppy play finally pays: passive wipes 0 → 12/200, passive ships lost average 1.89 of 3, and canonical runs losing at least one ship rise from ~17 to 58/200 — making `noShipLost` a real stake (still kept in 128 of 143 wins). |
-| `MISSION_06_ENRAGE_ACCURACY_BONUS` | 10 | **25** | Enrage opens below 30% of 468 hull (< ~140), which the canonical siege burns through in its final two-to-three turns — a +10 accuracy swing changes about one shot before the boss dies. +25 makes the last stand visibly land. Not part of the fingerprint or objectives payload; pinned by the `mission06Modifiers` vitest (and the C# mirror if it carries the constant — verify at implementation). |
+| `MISSION_06_ENRAGE_ACCURACY_BONUS` | 10 | **25** | Enrage opens below 30% of 468 hull (< ~140), which the canonical siege burns through in its final two-to-three turns — a +10 accuracy swing changes about one shot before the boss dies. +25 makes the last stand visibly land. Not part of the fingerprint or objectives payload, and `Mission06Scenario.cs` does not carry the constant (verified) — pinned only by the `mission06Modifiers` vitest, so this knob has no Unity ripple at all. |
 | `MISSION_06_BOSS_HP_SCALE` | 1.3 | keep | 468 hull already sets the right siege length (canonical wins average turn ~7.9). |
 | `MISSION_06_ENRAGE_HULL_FRACTION` | 0.3 | keep | Phase rhythm is fine; only the enrage's bite changes. |
 | `MISSION_06_REINFORCEMENT_TURN` / `MISSION_06_REINFORCEMENT_HP_SCALE` | 5 / 0.9 | keep | The swat-mid vs boss-only gap (72% vs 8%) shows the reinforcement already forces the intended target-switch decision. |
-| `MISSION_06_TURN_LIMIT` / `MISSION_06_BONUS_TURN_TARGET` | 14 / 12 | keep | — |
+| `MISSION_06_TURN_LIMIT` / `MISSION_06_BONUS_TURN_TARGET` | 14 / 12 | keep | Accepted deviation from target 3: with canonical wins averaging turn ~7.9 the ≤12 turn bonus is near-automatic. The boss mission's real stretch is `noShipLost`; tightening the turn target needs its own attainability probe and is deferred rather than guessed here. |
 | `MISSION_06_DEFAULT_SEED` | 606 | keep | Route default only. |
 | Shifting wind (0°→90° at turn 7), debris field | as shipped | keep | — |
 
@@ -161,8 +163,9 @@ upgrade cost:
 | ore | 400 | 190 (cannon) | **+210 (≈111% buffer)** |
 
 The timber deficit means no player can max sail and hull from campaign
-income — a dead end, not a choice, since there is no other timber
-source. Proposed fix on the reward side (mission-linked lever; cutting
+income — a dead end, not a choice, since there is no other
+player-reachable timber source (the `inventory_grant_api` minting route
+exists but is a trusted-service flag seeded disabled; see Constraints). Proposed fix on the reward side (mission-linked lever; cutting
 tier-3 costs would instead cheapen an unchanged power curve):
 
 | Knob | Current | Proposed | Derivation |
@@ -225,6 +228,19 @@ after a playtest with earned tiers, not before.
 - **Rewards stay fail-closed** (`missionRewardsForCode` returns `[]`
   for unknown codes) and server-authoritative; value changes never touch
   the grant flow or the win-proof re-simulation.
+- **Economy income math assumes `inventory_grant_api` stays disabled.**
+  The grant route can mint any item for the calling player once that
+  flag is enabled; the campaign-total "hard cap" arithmetic above holds
+  only under the shipped seeded-disabled state. Enabling the flag is a
+  separate protected decision, not a tuning knob.
+- **Classifier divergence, documented deliberately:** `AGENTS.md` lists
+  economy as a Class C protected area, but the harness classifier
+  currently has no protected-area entry for `src/economy/`, so
+  `route-task` returns Class B for the reward-value slices above.
+  Until that gap is closed (tracked as its own follow-up), economy
+  slices from this spec apply Class C discipline anyway — named
+  reviewer, in-PR rollback, named risk — regardless of the mechanical
+  classification.
 - **Mission docs stay in sync.** Each implementing PR updates the
   "Tuning knobs" line of its `docs/content/missions/mission-0X-*.md`
   alongside this spec's table.
