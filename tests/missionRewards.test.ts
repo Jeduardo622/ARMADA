@@ -5,6 +5,7 @@ import {
   missionRewardsForCode,
   type RewardGrant
 } from '../src/economy/missionRewards.js';
+import { UPGRADE_COST_TABLE } from '../src/economy/upgrades.js';
 import {
   MISSION_01_CODE,
   MISSION_01_ENEMY_SHIP_ID,
@@ -229,6 +230,36 @@ describe('mission reward table', () => {
 
   it('returns an empty grant list for unknown codes', () => {
     expect(missionRewardsForCode('mission-99-unknown')).toEqual([]);
+  });
+
+  // Campaign economy closure (docs/design/mission-balance.md, Economy):
+  // first-completion income across all ten missions must cover the full
+  // three-component tier-3 upgrade tree in every material. Totals are
+  // pinned exactly so any retune shows up here and in the spec together.
+  it('funds the full tier-3 upgrade tree from campaign income', () => {
+    const income = new Map<string, number>();
+    for (const code of ALL_MISSION_CODES) {
+      for (const reward of missionRewardsForCode(code)) {
+        income.set(reward.itemKey, (income.get(reward.itemKey) ?? 0) + reward.quantity);
+      }
+    }
+    const cost = new Map<string, number>();
+    for (const tiers of Object.values(UPGRADE_COST_TABLE)) {
+      for (const costs of Object.values(tiers)) {
+        for (const entry of costs) {
+          cost.set(entry.itemKey, (cost.get(entry.itemKey) ?? 0) + entry.quantity);
+        }
+      }
+    }
+    expect(income.get('timber')).toBe(585);
+    expect(cost.get('timber')).toBe(555);
+    expect(income.get('gold')).toBe(3500);
+    expect(cost.get('gold')).toBe(2850);
+    expect(income.get('ore')).toBe(400);
+    expect(cost.get('ore')).toBe(190);
+    for (const [itemKey, needed] of cost) {
+      expect(income.get(itemKey) ?? 0).toBeGreaterThanOrEqual(needed);
+    }
   });
 });
 
