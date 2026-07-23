@@ -141,7 +141,7 @@ pins; re-search the fixture seeds in `tests/mission05.test.ts`
 
 | Knob | Current | Proposed | Derivation / effect |
 | --- | --- | --- | --- |
-| `MISSION_06_BOSS_DAMAGE_SCALE` | 1.1 | **1.5** | A boss that cannot end the fight is a pushover on a timer: passive fleets take 65% damage but are never wiped in 14 turns. At 1.5 the canonical siege is untouched (71.5% vs 72.0% — flat at this sample size, because a competent siege kills the boss before its output compounds) while sloppy play finally pays: passive wipes 0 → 12/200, passive ships lost average 1.89 of 3, and canonical runs losing at least one ship rise from ~17 to 58/200 — making `noShipLost` a real stake (still kept in 128 of 143 wins). |
+| `MISSION_06_BOSS_DAMAGE_SCALE` | 1.1 | **1.5** | A boss that never ended a fight across the sweeps is a pushover on a timer: passive fleets take 65% damage but are never wiped in 14 turns. At 1.5 the canonical siege is untouched (71.5% vs 72.0% — flat at this sample size, because a competent siege kills the boss before its output compounds) while sloppy play finally pays: passive wipes 0 → 12/200, passive ships lost average 1.89 of 3, and canonical runs losing at least one ship rise from ~17 to 58/200 — making `noShipLost` a real stake (still kept in 128 of 143 wins). |
 | `MISSION_06_ENRAGE_ACCURACY_BONUS` | 10 | **25** | Enrage opens below 30% of 468 hull (< ~140), which the canonical siege burns through in its final two-to-three turns — a +10 accuracy swing changes about one shot before the boss dies. +25 makes the last stand visibly land. Not part of the fingerprint or objectives payload, and `Mission06Scenario.cs` does not carry the constant (verified) — pinned only by the `mission06Modifiers` vitest, so this knob has no Unity ripple at all. |
 | `MISSION_06_BOSS_HP_SCALE` | 1.3 | keep | 468 hull already sets the right siege length (canonical wins average turn ~7.9). |
 | `MISSION_06_ENRAGE_HULL_FRACTION` | 0.3 | keep | Phase rhythm is fine; only the enrage's bite changes. |
@@ -264,7 +264,10 @@ re-derivation + all three fingerprint pins + the spec table/status
 update, in this order:
 
 1. **Economy: timber rewards** — smallest slice, zero fingerprint/Unity
-   ripple; validates the process.
+   ripple; validates the process. Named risk for this slice: a
+   `/complete` in flight across the deploy grants the new quantities
+   for a pre-deploy win — benign (one-time, server-verified, small
+   delta) and accepted; there is no other behavioral surface.
 2. **Mission 04** — two constants, biggest player-facing pain.
 3. **Mission 03** — three constants including a turn-limit change.
 4. **Mission 06** — two constants, one outside the fingerprint.
@@ -272,8 +275,9 @@ update, in this order:
 
 Named deployment risk (applies to slices 2–5): a client that fetched
 `/start` before a deploy and resolves after it is re-simulated under
-the **new** constants with no signal — resolve requests carry only
-`seed` + `turns`, so the server cannot tell the orders were authored
+the **new** constants with no signal — resolve requests carry no
+scenario identifier (only `seed` + `turns`, plus a fixed
+`schemaVersion: 1`), so the server cannot tell the orders were authored
 against the old scenario. The client's local preview and the server
 outcome can silently diverge, and a previously valid win proof can be
 rejected. This is an **unsignaled compatibility window**, accepted
