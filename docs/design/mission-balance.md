@@ -275,6 +275,17 @@ update, in this order:
    `/complete` in flight across the deploy grants the new quantities
    for a pre-deploy win — benign (one-time, server-verified, small
    delta) and accepted; there is no other behavioral surface.
+   Named scope limit (Codex P1 on the applied PR): the closure holds
+   only for campaigns completed **after** this slice deploys. A player
+   who first-completed missions 05/07/10 before it stays capped at 475
+   lifetime timber (grants are first-completion-only; repeat
+   completions grant `[]` by design) and still cannot finish the tree.
+   Accepted pre-launch — there is no production player base to strand —
+   and revisited only if completed campaigns exist at rollout time: the
+   remedy would be an idempotent backfill grant (+30/+40/+40 for prior
+   05/07/10 completions), which is persisted-player data mutation and
+   therefore its own explicitly-authorized protected slice, never part
+   of a value retune.
 2. **Mission 04** — two constants, biggest player-facing pain.
 3. **Mission 03** — three constants including a turn-limit change.
 4. **Mission 06** — two constants, one outside the fingerprint.
