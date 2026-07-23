@@ -51,9 +51,14 @@ re-derives its own pinned fixtures.
    three-component tier-3 upgrade tree with a small (≲10%) buffer in
    the binding material (timber); gold and ore keep larger surpluses as
    future sink budget.
-5. Targets are defined at upgrade tier 0. Earned tiers push win rates
-   up; that is intended power progression, revisited after playtests
-   with upgraded fleets.
+5. Targets are tier-independent as shipped: upgrade tiers currently
+   affect only mission 07's simulation (the sole `supportsUpgrades`
+   win-proof config), while missions 03–06 accept no tiers and reject
+   upgrade proofs with `upgrades_not_supported` — an earned tier-3
+   fleet produces exactly tier-0 outcomes in every mission this spec
+   covers. Wiring `modifiers.shipUpgrades` into missions 03–06 is a
+   resolve-contract and proof-config change, a prerequisite slice for
+   any upgraded-fleet retune and out of scope here.
 
 ## Where these values live (Unity)
 
@@ -197,9 +202,11 @@ All keep — recorded here to complete the knob inventory of record:
 | `SAIL_SLOW_TURN_RECOVERY_PER_TIER` | 15 | keep | Only bites with `statusEffects` missions. |
 | `HULL_HP_BONUS_PCT_PER_TIER` | 10 | keep | Tier 3 = +30% hull at battle start. |
 
-Mission win-rate targets in this spec are defined at tier 0 (target 5).
-A tier-3 fleet will overperform them — revisit effect magnitudes only
-after a playtest with earned tiers, not before.
+Upgrade tiers do not enter missions 03–06 at all today (see target 5:
+only mission 07 is `supportsUpgrades`), so the win-rate targets in this
+spec are tier-independent facts, not tier-0 baselines. Revisit effect
+magnitudes only if and when a slice wires `modifiers.shipUpgrades` into
+these missions and a playtest with earned tiers exists to measure.
 
 ## Constraints (do not tune past these)
 
@@ -264,8 +271,15 @@ update, in this order:
 5. **Mission 05** — position changes, geometry-sensitive fixtures.
 
 Named deployment risk (applies to slices 2–5): a client that fetched
-`/start` before a deploy and resolves after it will disagree with the
-server's re-simulation; the scenario fingerprint exists to surface
-exactly this, and mission sessions live minutes, so the window is
-accepted. Rollback for every slice is a plain revert of the constants
-commit (no schema, no migration, no scene).
+`/start` before a deploy and resolves after it is re-simulated under
+the **new** constants with no signal — resolve requests carry only
+`seed` + `turns`, so the server cannot tell the orders were authored
+against the old scenario. The client's local preview and the server
+outcome can silently diverge, and a previously valid win proof can be
+rejected. This is an **unsignaled compatibility window**, accepted
+because deploys are atomic, mission sessions live minutes, and mission
+resolves are stateless single requests. Carrying a scenario
+fingerprint/version in resolve requests would close the window but is a
+mission-API contract change — an optional hardening follow-up, not
+proposed here. Rollback for every slice is a plain revert of the
+constants commit (no schema, no migration, no scene).
