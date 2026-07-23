@@ -5,7 +5,7 @@
 - Environment: Light headwind; debris field slows turns 3–5 area.
 - Player constraints: Boarding enabled; turn limit 10.
 - Rewards: Gold, ore, captain shard.
-- Tuning knobs: Enemy crew_hp 0.9x; hull 1.0x; boarding_bonus player +0.1; wind variance medium.
+- Tuning knobs: Enemy crew_hp 0.8x; hull 1.0x; boarding_bonus player +0.15; wind variance medium.
 - Telemetry: Boarding attempts/success; fail reasons; turn count.
 - QA notes: Boarding resolution clarity; debris slowdown pathing check.
 
