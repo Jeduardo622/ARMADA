@@ -1,11 +1,13 @@
 # Mission 03–06 Balance & Economy Tuning
 
-> **Status: Drafted** (pending design pass). Written 2026-07-22 against the
-> shipped implementation (missions 03–06 as of PR #64), following the
-> `pvp-tuning.md` precedent: this document is the knob inventory of record
-> for mission 03–06 scenario values and the reward/upgrade economy
-> constants. Value changes update the matching table **and this status**
-> in the same PR; a design pass graduates it to Reviewed.
+> **Status: Drafted** (pending design pass); **economy timber slice
+> (rollout slice 1) applied** — all other values remain proposals
+> pending their own slices. Written 2026-07-22 against the shipped
+> implementation (missions 03–06 as of PR #64), following the
+> `pvp-tuning.md` precedent: this document is the knob inventory of
+> record for mission 03–06 scenario values and the reward/upgrade
+> economy constants. Value changes update the matching table **and this
+> status** in the same PR; a design pass graduates it to Reviewed.
 
 Motivation (tracked as an open design knob since the mission arc shipped):
 in missions 03, 05, and 06 the enemy never ended a mission across the
@@ -13,8 +15,9 @@ in missions 03, 05, and 06 the enemy never ended a mission across the
 run was ever wiped. Mission 04 has
 the opposite problem: the canonical boarding line wins only a third of
 its runs. Reward and upgrade constants are still their original
-placeholders, and the campaign's timber income cannot pay for the upgrade
-tree it is supposed to fund.
+placeholders, and the campaign's timber income could not pay for the
+upgrade tree it is supposed to fund (closed by the applied economy
+slice below).
 
 ## Method
 
@@ -157,37 +160,41 @@ value is not fingerprinted); re-search the fixture seeds in
 ## Economy: mission rewards (`src/economy/missionRewards.ts`)
 
 Rewards are granted once per mission (first-completion win-proof claim;
-no repeat farming), so campaign totals are hard caps on income. Current
-totals across missions 01–10 against the full three-component tier-3
-upgrade cost:
+no repeat farming), so campaign totals are hard caps on income. Totals
+across missions 01–10 against the full three-component tier-3 upgrade
+cost, with the applied timber values:
 
 | Currency | Campaign income | Full-tree cost | Balance |
 | --- | --- | --- | --- |
 | gold | 3500 | 2850 (950 cannon + 780 sail + 1120 hull) | **+650 (≈23% buffer)** |
-| timber | 475 | 555 (225 sail + 330 hull) | **−80 (deficit — tree not completable)** |
+| timber | 585 (**applied**; was 475) | 555 (225 sail + 330 hull) | **+30 (≈5.4% buffer; was −80, tree not completable)** |
 | ore | 400 | 190 (cannon) | **+210 (≈111% buffer)** |
 
-The timber deficit means no player can max sail and hull from campaign
-income — a dead end, not a choice, since there is no other
+The former timber deficit meant no player could max sail and hull from
+campaign income — a dead end, not a choice, since there is no other
 player-reachable timber source (the `inventory_grant_api` minting route
-exists but is a trusted-service flag seeded disabled; see Constraints). Proposed fix on the reward side (mission-linked lever; cutting
-tier-3 costs would instead cheapen an unchanged power curve):
+exists but is a trusted-service flag seeded disabled; see Constraints).
+Fixed on the reward side (mission-linked lever; cutting tier-3 costs
+would instead cheapen an unchanged power curve):
 
 | Knob | Current | Proposed | Derivation |
 | --- | --- | --- | --- |
-| `MISSION_05_TIMBER` | 100 | **130** | Timber income must reach ≥555. Spreading +110 across the three later timber missions keeps the reward curve monotone with difficulty and lands total timber at 585 = cost 555 + ~5.4% buffer, inside the ≲10% target. |
-| `MISSION_07_TIMBER` | 120 | **160** | (as above) |
-| `MISSION_10_TIMBER` | 130 | **170** | (as above) |
+| `MISSION_05_TIMBER` | 130 (**applied**; was 100) | keep | Timber income must reach ≥555. Spreading +110 across the three later timber missions keeps the reward curve monotone with difficulty and lands total timber at 585 = cost 555 + ~5.4% buffer, inside the ≲10% target. |
+| `MISSION_07_TIMBER` | 160 (**applied**; was 120) | keep | (as above) |
+| `MISSION_10_TIMBER` | 170 (**applied**; was 130) | keep | (as above) |
 | All gold values (100…600) | as shipped | keep | Monotone with mission index; the ≈23% surplus is the intended budget for future sinks. |
 | All ore values | as shipped | keep | The ≈111% ore surplus is large but harmless with no other ore sink; reserved for future sinks (captain XP / repair costs) rather than churned now. |
 | `captain_shard` / `cosmetic_token` quantities | as shipped | keep | No sink exists for either yet; retune when one ships. |
 | Bonus objectives grant nothing extra | as shipped | keep (future knob) | Bonus-conditional rewards are a natural follow-up once base rates are signed off; out of scope here. |
 
-Ripple: `tests/missionRewards.test.ts` and `tests/upgrades.test.ts` are
-table-driven (no literal quantity pins), and the only Unity-side reward
-literal is mission 01's payload-parity pin (untouched). This section
-therefore has **no fingerprint, fixture, or Unity ripple** — the
-smallest slice in this spec.
+Ripple: `tests/upgrades.test.ts` is table-driven, and the only
+Unity-side reward literal is mission 01's payload-parity pin
+(untouched). This section has **no fingerprint or Unity ripple** — the
+smallest slice in this spec. The applied slice added one exact pin:
+the campaign-closure test in `tests/missionRewards.test.ts` asserts the
+per-currency income/cost totals (585/555, 3500/2850, 400/190) and the
+covers-the-tree invariant, so any future reward or cost retune updates
+that pin and this section together.
 
 ## Economy: upgrade costs & effects (`src/economy/upgrades.ts`, `src/sim/upgradeEffects.ts`)
 
@@ -263,11 +270,22 @@ Implement as one bounded PR per section, each with constants + fixture
 re-derivation + all three fingerprint pins + the spec table/status
 update, in this order:
 
-1. **Economy: timber rewards** — smallest slice, zero fingerprint/Unity
-   ripple; validates the process. Named risk for this slice: a
+1. **Economy: timber rewards** (**applied**) — smallest slice, zero
+   fingerprint/Unity ripple; validates the process. Named risk for this slice: a
    `/complete` in flight across the deploy grants the new quantities
    for a pre-deploy win — benign (one-time, server-verified, small
    delta) and accepted; there is no other behavioral surface.
+   Named scope limit (Codex P1 on the applied PR): the closure holds
+   only for campaigns completed **after** this slice deploys. A player
+   who first-completed missions 05/07/10 before it stays capped at 475
+   lifetime timber (grants are first-completion-only; repeat
+   completions grant `[]` by design) and still cannot finish the tree.
+   Accepted pre-launch — there is no production player base to strand —
+   and revisited only if completed campaigns exist at rollout time: the
+   remedy would be an idempotent backfill grant (+30/+40/+40 for prior
+   05/07/10 completions), which is persisted-player data mutation and
+   therefore its own explicitly-authorized protected slice, never part
+   of a value retune.
 2. **Mission 04** — two constants, biggest player-facing pain.
 3. **Mission 03** — three constants including a turn-limit change.
 4. **Mission 06** — two constants, one outside the fingerprint.
