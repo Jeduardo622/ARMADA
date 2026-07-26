@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -51,16 +51,17 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/minio": "^7.1.1",
     "@types/node": "^20.10.5",
-    "@typescript-eslint/eslint-plugin": "^8.63.0",
-    "@typescript-eslint/parser": "^8.63.0",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
     "prisma": "^5.10.2",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
   },
   "engines": {
