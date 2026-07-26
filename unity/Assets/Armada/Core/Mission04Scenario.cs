@@ -15,8 +15,8 @@ namespace Armada.Client.Core
     {
         public const string MissionCode = "mission-04-boarding-party";
         public const int TurnLimit = 10;
-        public const double EnemyCrewScale = 0.9;
-        public const double PlayerBoardingBonus = 0.1;
+        public const double EnemyCrewScale = 0.8;
+        public const double PlayerBoardingBonus = 0.15;
         public static readonly string[] PlayerShipIds = { "player-sloop-a", "player-sloop-b" };
         public static readonly string[] EnemyShipIds = { "enemy-frigate-a", "enemy-frigate-b" };
 
@@ -70,7 +70,7 @@ namespace Armada.Client.Core
                             Speed = 2,
                             Hp = 180,
                             Sail = 90,
-                            Crew = 54
+                            Crew = 48
                         },
                         new SimShip
                         {
@@ -81,7 +81,7 @@ namespace Armada.Client.Core
                             Speed = 2,
                             Hp = 180,
                             Sail = 90,
-                            Crew = 54
+                            Crew = 48
                         }
                     },
                     SlowZones = new List<SimSlowZone>

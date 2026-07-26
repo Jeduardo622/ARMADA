@@ -7,15 +7,15 @@ import { SimOrder, SimState, Wind } from './types.js';
 // Mission 04 "Boarding Party" — docs/content/missions/mission-04-boarding-party.md
 export const MISSION_04_CODE = 'mission-04-boarding-party';
 export const MISSION_04_TURN_LIMIT = 10;
-export const MISSION_04_ENEMY_CREW_SCALE = 0.9;
-export const MISSION_04_PLAYER_BOARDING_BONUS = 0.1;
+export const MISSION_04_ENEMY_CREW_SCALE = 0.8;
+export const MISSION_04_PLAYER_BOARDING_BONUS = 0.15;
 export const MISSION_04_DEFAULT_SEED = 404;
 
 export const MISSION_04_PLAYER_SHIP_IDS = ['player-sloop-a', 'player-sloop-b'] as const;
 export const MISSION_04_ENEMY_SHIP_IDS = ['enemy-frigate-a', 'enemy-frigate-b'] as const;
 
 const PLAYER_BASE_HULL_HP = 120;
-// Enemy hull is 1.0x; the crew tuning knob is 0.9x.
+// Enemy hull is 1.0x; the crew tuning knob is 0.8x.
 const FRIGATE_HULL_HP = 180;
 const FRIGATE_BASE_CREW = 60;
 const FRIGATE_CREW = Math.floor(FRIGATE_BASE_CREW * MISSION_04_ENEMY_CREW_SCALE);

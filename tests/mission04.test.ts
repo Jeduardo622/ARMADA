@@ -66,10 +66,10 @@ const gunneryOrders: SimOrder[][] = Array.from({ length: MISSION_04_TURN_LIMIT }
 // Canonical fingerprint pinned on both sides; the Unity EditMode test
 // (Mission04Scenario) asserts the identical string for scenario parity.
 const EXPECTED_FINGERPRINT =
-  'mission-04-boarding-party|turnLimit=10|crewScale=0.9|boardBonus=0.1|wind=180:3|' +
+  'mission-04-boarding-party|turnLimit=10|crewScale=0.8|boardBonus=0.15|wind=180:3|' +
   'debris=130,0:r45:p2|' +
-  'enemy-frigate-a:enemy:220,40:h180:v2:hp180:sl90:cw54|' +
-  'enemy-frigate-b:enemy:260,-40:h180:v2:hp180:sl90:cw54|' +
+  'enemy-frigate-a:enemy:220,40:h180:v2:hp180:sl90:cw48|' +
+  'enemy-frigate-b:enemy:260,-40:h180:v2:hp180:sl90:cw48|' +
   'player-sloop-a:player:0,30:h0:v3:hp120:sl80:cw50|' +
   'player-sloop-b:player:0,-30:h0:v3:hp120:sl80:cw50';
 
@@ -179,10 +179,10 @@ describe('mission 04 scenario', () => {
     expect(mission04Fingerprint(mission04StartResponse(404))).toBe(EXPECTED_FINGERPRINT);
   });
 
-  it('applies the 0.9x enemy crew tuning knob at full hull strength', () => {
+  it('applies the 0.8x enemy crew tuning knob at full hull strength', () => {
     const state = createMission04State();
     const frigates = state.ships.filter((ship) => ship.side === 'enemy');
-    expect(frigates.map((ship) => ship.crew)).toEqual([54, 54]);
+    expect(frigates.map((ship) => ship.crew)).toEqual([48, 48]);
     expect(frigates.map((ship) => ship.hp)).toEqual([180, 180]);
     expect(state.slowZones).toHaveLength(1);
   });
@@ -227,7 +227,7 @@ describe('mission 04 scenario', () => {
   });
 
   it('fails as sunk when boarding actions go wrong up close', () => {
-    const outcome = runMission04(3, parallelOrders);
+    const outcome = runMission04(41, parallelOrders);
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('sunk');
     expect(outcome.damageProfile.playerRemainingHp).toBe(0);
@@ -245,8 +245,8 @@ describe('mission 04 routes', () => {
     expect(body.missionCode).toBe(MISSION_04_CODE);
     expect(body.objectives).toEqual({
       turnLimit: 10,
-      enemyCrewScale: 0.9,
-      playerBoardingBonus: 0.1
+      enemyCrewScale: 0.8,
+      playerBoardingBonus: 0.15
     });
     expect(body.state.ships).toHaveLength(4);
     expect(body.state.slowZones).toHaveLength(1);

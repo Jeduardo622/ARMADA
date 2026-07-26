@@ -1,8 +1,8 @@
 # Mission 03–06 Balance & Economy Tuning
 
 > **Status: Drafted** (pending design pass); **economy timber slice
-> (rollout slice 1) applied** — all other values remain proposals
-> pending their own slices. Written 2026-07-22 against the shipped
+> (rollout slice 1) and mission 04 slice (rollout slice 2) applied** —
+> all other values remain proposals pending their own slices. Written 2026-07-22 against the shipped
 > implementation (missions 03–06 as of PR #64), following the
 > `pvp-tuning.md` precedent: this document is the knob inventory of
 > record for mission 03–06 scenario values and the reward/upgrade
@@ -12,9 +12,9 @@
 Motivation (tracked as an open design knob since the mission arc shipped):
 in missions 03, 05, and 06 the enemy never ended a mission across the
 200-seed sweeps below — every observed loss is a timeout, and no passive
-run was ever wiped. Mission 04 has
-the opposite problem: the canonical boarding line wins only a third of
-its runs. Reward and upgrade constants are still their original
+run was ever wiped. Mission 04 had
+the opposite problem: the canonical boarding line won only a third of
+its runs (closed by the applied mission 04 slice below). Reward and upgrade constants are still their original
 placeholders, and the campaign's timber income could not pay for the
 upgrade tree it is supposed to fund (closed by the applied economy
 slice below).
@@ -82,7 +82,7 @@ places that must move together:
 | Mission | Canonical win rate | Loss reasons observed | Passive wipes | Notes |
 | --- | --- | --- | --- | --- |
 | 03 | 67.0% | timeout only | 0 / 200 | Passive fleets never lose meaningfully more than one ship's worth of hull (max recorded fleet damage fraction 0.50). |
-| 04 | 33.5% (boarding), 16.5% (gunnery) | timeout, sunk, flanked | 86 / 200 | The only mission where enemies already finish fights — and it overshoots into frustration. |
+| 04 | 33.5% (boarding), 16.5% (gunnery) | timeout, sunk, flanked | 86 / 200 | The only mission where enemies already finish fights — and it overshot into frustration. Pre-slice baseline; the applied slice's re-derivation sweep confirmed the proposal exactly: canonical boarding 110/200 (55.0%), gunnery unchanged at 16.5%, passive wipes unchanged at 86/200. |
 | 05 | 44.0% | timeout only | 0 / 200 | Canonical runs take 6% average fleet damage — enemy guns effectively never bear. |
 | 06 | 72.0% (swat-mid), 8.0% (boss-only) | timeout only | 0 / 200 | Passive fleets take 65% average damage but are never wiped in 14 turns. |
 
@@ -107,8 +107,8 @@ distribution.
 
 | Knob | Current | Proposed | Derivation / effect |
 | --- | --- | --- | --- |
-| `MISSION_04_ENEMY_CREW_SCALE` | 0.9 | **0.8** | Frigate crew `floor(60×0.8)` = 48 (from 54). Crew only enters boarding defense, so this speeds the intended win path without touching enemy gunnery: defender attrition per successful boarding is ≈8–12 crew (`floor(power/6 + rng·4)` at ~50 boarding power), so 48 crew breaks about one boarding-turn sooner per frigate — across two frigates that recovers the runs that currently time out at 90%-boarded. Canonical boarding win rate: 33.5% → 55%. |
-| `MISSION_04_PLAYER_BOARDING_BONUS` | 0.1 | **0.15** | At hull-to-hull range the success chance is already capped (60 + 50 power − 27 half-defense + 10 bonus = 93, clamped to 90), so the bonus's effect is at mid range: each 10 range units beyond 30 cost 3 chance points (1 through boarding power, 2 through the penalty term), so +5 bonus points buy back roughly 17 units of grapple envelope. Boarding is the mission's teaching mechanic; it should start paying earlier in the approach. |
+| `MISSION_04_ENEMY_CREW_SCALE` | 0.8 (**applied**; was 0.9) | keep | Frigate crew `floor(60×0.8)` = 48 (from 54). Crew only enters boarding defense, so this speeds the intended win path without touching enemy gunnery: defender attrition per successful boarding is ≈8–12 crew (`floor(power/6 + rng·4)` at ~50 boarding power), so 48 crew breaks about one boarding-turn sooner per frigate — across two frigates that recovers the runs that currently time out at 90%-boarded. Canonical boarding win rate: 33.5% → 55%. |
+| `MISSION_04_PLAYER_BOARDING_BONUS` | 0.15 (**applied**; was 0.1) | keep | At hull-to-hull range the success chance is already capped (60 + 50 power − 27 half-defense + 10 bonus = 93, clamped to 90), so the bonus's effect is at mid range: each 10 range units beyond 30 cost 3 chance points (1 through boarding power, 2 through the penalty term), so +5 bonus points buy back roughly 17 units of grapple envelope. Boarding is the mission's teaching mechanic; it should start paying earlier in the approach. |
 | `MISSION_04_TURN_LIMIT` | 10 | keep | Probed at 12 with the knobs above: the win rate stays 55% while canonical-play wipes double (10 → 20/200) — the extra turns only feed the frigates' grind against stalled boarders. 10 is the right pressure. |
 | `MISSION_04_DEFAULT_SEED` | 404 | keep | Route default only. |
 | Debris field, headwind, spawns | as shipped | keep | — |
@@ -293,7 +293,11 @@ update, in this order:
    prior 05/07/10 completions), which is persisted-player data mutation
    and therefore its own explicitly-authorized protected slice, never
    part of a value retune.
-2. **Mission 04** — two constants, biggest player-facing pain.
+2. **Mission 04** (**applied**) — two constants, biggest player-facing
+   pain. The apply-time re-derivation reproduced the proposal's numbers
+   exactly (110/200 canonical wins, 86/200 passive wipes); the only
+   fixture that moved was the sunk-loss seed (3 → 41; the other pinned
+   seeds still land in their categories under the new distribution).
 3. **Mission 03** — three constants including a turn-limit change.
 4. **Mission 06** — two constants, one outside the fingerprint.
 5. **Mission 05** — position changes, geometry-sensitive fixtures.
