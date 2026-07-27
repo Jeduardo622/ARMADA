@@ -70,9 +70,13 @@ describe('agent worktree isolation', () => {
       .map((line) => line.trim())
       .filter((line) => line.length > 0 && !line.startsWith('#'));
 
-    expect(entries).toContain('.worktrees/');
-    expect(entries).toContain('.claude/worktrees/');
-    expect(entries.filter((entry) => entry.startsWith('!'))).toEqual([]);
+    // Scoped to the worktree rules on purpose: an unrelated negation elsewhere
+    // in the file (re-including a generated doc, say) is legitimate and must
+    // not fail this guard.
+    for (const rule of ['.worktrees/', '.claude/worktrees/']) {
+      expect(entries, rule).toContain(rule);
+      expect(entries, rule).not.toContain(`!${rule}`);
+    }
   });
 });
 
