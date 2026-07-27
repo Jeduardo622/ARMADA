@@ -413,22 +413,35 @@ these missions and a playtest with earned tiers exists to measure.
   anything farmable. **Decision (2026-07-27): accepted, unbound.** There
   is no monetization and no PvP stake on mission rewards, and the
   canonical scripted strategy wins a majority of seeds throughout, so
-  the offline search is one or two tries. Difficulty retunes barely move
-  that payoff, which is why this never gated the rollout: the arc's
-  hardest applied point is mission 05 at 53.0% canonical wins, worth
-  ~1.9 expected attempts against ~1.2 at mission 03's 81.5% — a
-  distinction without an attacker-facing difference. Apply the same test
-  to any future retune rather than assuming a harder mission is a
-  materially better target. Binding a server-issued seed would mean issuing and
-  persisting one across all ten `/start` routes — which carry no player
-  identity today — and breaking the echo assertion in all ten client
+  the offline search is one or two tries. **The retunes moved that
+  payoff slightly the other way**, which corrects the premise this was
+  raised under (that difficulty retunes raise the value of
+  seed-shopping): expected attempts to find a winning line go as `1/p`,
+  and every applied slice raised the canonical win rate or left it flat
+  — 03 `67.0→81.5%`, 04 `33.5→55.0%`, 05 `44.0→53.0%`, 06
+  `72.0→71.5%` — so attacker cost *fell*, from an arc worst case of
+  ~3.0 expected attempts (mission 04 baseline) to ~1.8, with the
+  current worst mission 05's ~1.9 against mission 03's ~1.2. Difficulty
+  is therefore a real but very weak lever in either direction, and
+  nothing in this arc's range is an attacker-facing difference. Run
+  that arithmetic on a future retune rather than assuming the sign.
+  Binding a server-issued seed would mean issuing and persisting one
+  across all ten `/start` routes — which carry no player identity
+  today — and breaking the echo assertion in all ten client
   flows: a route + schema + Unity change (PlayMode evidence, migration,
   Database review) whose cost the exposure does not justify, and which
   still would not prove play while `/start` re-rolls are free. Revisit
   if mission rewards gain monetary or PvP value, if grants become
   repeatable rather than first-completion, or if a real player base
-  exists at rollout; the remedy then is server-authoritative resolution
-  (server runs the mission from per-turn orders), not seed binding.
+  exists at rollout. The remedy then is a **live server-held run**: the
+  server generates and retains the seed, keeps the run state, and
+  advances it one turn at a time from orders submitted against RNG it
+  has not yet revealed, so there is no offline oracle to search. Note
+  what does *not* qualify — "re-simulate it server-side" is already
+  what `/complete` does (`proofConfig.run(seed, turns, upgrades)`) and
+  is the very thing being bypassed, so any future slice must be
+  specified as server-held state and server-controlled RNG rather than
+  server-side replay of a caller-supplied `(seed, turns)` pair.
   Distinct from the unsignaled compatibility window under Rollout, which
   is about *which* constants a run was authored against.
 - **Economy income math assumes `inventory_grant_api` stays disabled.**
