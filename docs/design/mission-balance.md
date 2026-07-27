@@ -112,13 +112,23 @@ first waved off as hull-only — see the first bullet):
   (468) is a separate, pre-existing inaccuracy: the server reports 576 for
   a cleared field once the reinforcement has spawned. No assertion reads
   any of it, which is exactly why it drifts unnoticed. **Whether this
-  surface moves is per-mission and must be measured, not assumed:** the
-  mission 05 slice searched seeds 1–600 under both the old and the new
-  spawn geometry and found that mission 05's fake triple (110/0.31/250)
-  matches **no** real run under either, so that payload is invented rather
-  than copied and correctly needed no edit — while its `EnemyHullDamage`
-  (438) *is* the true fleet total. Diff the fixture against a live resolve
-  log for the seed it claims to represent;
+  surface moves is per-mission and must be measured, not assumed:** mission
+  05's fake needed no edit, but the reason has to be stated precisely (local
+  review corrected a looser first draft). Its damage triple 110/0.31/250 does
+  occur in real runs — old-geometry escorts-first seed 24 and new-geometry
+  escorts-first seed 185 both produce it — so "matches no real run" is wrong.
+  What is true, and a stronger reason for leaving it alone, is that **no run
+  under any of four geometries × nine strategies × seeds 1–600 matches the
+  fake's full payload**: it claims a turn-8 flagship-first win *and*
+  110/0.31/250, while every turn-8 flagship-first line-break win takes
+  exactly 0/0/360 at every spawn distance. The payload is internally
+  impossible, so it is invented and tracks nothing. Its `TurnCount` 8 and
+  `ChokeBlockedMoves` 2 *are* real seed-1 line-break values (identical old and
+  new, hence no edit), and `EnemyHullDamage` 438 is the true fleet total —
+  though the flow actually runs seed **505**, whose real blocked count is 0,
+  so even the plausible fields do not match the seed the fixture claims. Diff
+  the fixture against a live resolve log for the seed it claims to represent,
+  and match the whole payload rather than one field group;
 - **the documented resolve bound** — `Mission0XResolveRequest.turns.maxItems`
   in `docs/api/openapi.yaml` equals that mission's turn limit, because the
   route derives its Zod cap from the constant. `verify-contracts` compares
@@ -185,7 +195,7 @@ three pins; re-search the fixture seeds in `tests/mission04.test.ts`.
 
 | Knob | Current | Proposed | Derivation / effect |
 | --- | --- | --- | --- |
-| Enemy line spawn: flagship `(220, 0)`, escorts `(200, ±60)` (**applied**; was `(260, 0)` / `(240, ±60)`) | keep | Root cause of the flat threat: the AI holds fire until `preferredRange` (100 for the flagship's line-advance) while a player broadside from spawn still lands ~70% (the engine's range penalty is only −1 hit chance per 50 units). Opening 40 units closer, the line's guns bear one-to-two turns sooner: canonical win rate 44% → 53%, and passive fleets go from **106/200** runs losing a ship (**correction from the applied slice's re-derivation: this row drafted "one-third"; measured 106/200 = 53%**) to 197/200 (1.3 of 3 ships lost on average, and average passive fleet damage 33% → 59%). The escorts' station offsets (20 forward, ±60 lateral in the leader frame) are preserved exactly, so `mission05EnemyOrders` needs no change — verified at apply time: because the whole line translates by −40 on x, the escort-to-leader offsets are byte-identical and only the module's explanatory comment (which quoted the old coordinates) had to move. Probed a further 20 units closer (200/180): canonical drops to 42% — the fight then starts inside the rock choke band — so 220/200 is the chosen point; both figures reproduced exactly at apply time. The applied 53% sits just below design target 1's 55% floor, inside the sweep's ±3pp noise; accepted, since the scripted line never turns and real play clears the band. |
+| Enemy line spawn | flagship `(220, 0)`, escorts `(200, ±60)` (**applied**; was `(260, 0)` / `(240, ±60)`) | keep | Root cause of the flat threat: the AI holds fire until `preferredRange` (100 for the flagship's line-advance) while a player broadside from spawn still lands ~70% (the engine's range penalty is only −1 hit chance per 50 units). Opening 40 units closer, the line's guns bear one-to-two turns sooner: canonical win rate 44% → 53%, and passive fleets go from **106/200** runs losing a ship (**correction from the applied slice's re-derivation: this row drafted "one-third"; measured 106/200 = 53%**) to 197/200 (1.3 of 3 ships lost on average, and average passive fleet damage 33% → 59%). The escorts' station offsets (20 forward, ±60 lateral in the leader frame) are preserved exactly, so `mission05EnemyOrders` needs no change — verified at apply time: because the whole line translates by −40 on x, the escort-to-leader offsets are byte-identical and only the module's explanatory comment (which quoted the old coordinates) had to move. Probed a further 20 units closer (200/180): canonical drops to 42% — the fight then starts inside the rock choke band — so 220/200 is the chosen point; both figures reproduced exactly at apply time. The applied 53% sits just below design target 1's 55% floor, inside the sweep's ±3pp noise; accepted, since the scripted line never turns and real play clears the band. |
 | `MISSION_05_FLAGSHIP_HP_SCALE` | 1.1 | keep | Probed at 1.0 with the closer line: 52% vs 53% win rate — inside noise. Keep the flagship tanky; minimal diff. (Reproduced exactly at apply time: 104/200 at 1.0 vs 106/200 at 1.1.) |
 | `MISSION_05_TURN_LIMIT` / `MISSION_05_BONUS_TURN_TARGET` | 11 / 9 | keep | Applied canonical average win is turn **8.52**; the limit is not the binding constraint here. Finding from the apply-time re-derivation, unchanged by this slice: the ≤9 bonus is hit in **100 of 106 wins (94%)** — near-automatic, the same deviation from design target 3 that mission 06's row records, and equally pre-existing (83 of 88 wins, also 94%, before the closer line). Mission 05's real stretch is `sankFlagshipFirst`, which the canonical line-break strategy earns in every win it gets but escorts-first play forfeits. Tightening the turn target needs its own attainability probe and is deferred rather than guessed, exactly as for mission 06. |
 | `MISSION_05_DEFAULT_SEED` | 505 | keep | Route default only. |
@@ -213,22 +223,46 @@ enemy fleet total 438 in the PlayMode fake client. The kept turn limit leaves
 constant, completing the pattern across missions 03, 05 and 06) and the
 `mission_05_obj_bonus_*` strings untouched.
 
-**All four seed-pinned fixtures held their categories** — the first slice in
-this arc where none moved, despite the "geometry-sensitive" warning this
-section originally carried. The reason is that the change is a uniform
-translation: the whole line shifts −40 on x, so relative geometry, the
-strategies' target order, and rng consumption are all preserved. Both-bonus
-seed 1 still wins on turn 8 with the flagship sunk first, slow-flagship seed
-1 still wins on turn 10 outside the bonus, escorts-first seed 14 still wins
-on turn 10 with escort-a first, and slow-flagship seed 9 still times out at
-11 turns. Two masks were replaced with exact pins in the process
-(`turnCount` ≤ 9 → 8, and a `chokeBlockedMoves >= 0` tautology → exact 2).
-Because the canonical fixtures turn out to be geometry-**insensitive** (seed
-1 takes zero hull damage at either spawn distance), the slice adds a
-**passive-baseline fixture** — seed 1, all ships passing: 297 hull damage
-(83% of the fleet), 63 hp left, a player sloop as the first sink, the enemy
-line untouched, 19 blocked moves — so the threat change this slice exists to
-make is pinned by something other than the fingerprint.
+**All four seed-pinned fixtures kept the seed and the category their test
+asserts, and no fixture had to be re-searched** — but "nothing moved" would
+overstate it, and local review caught this document doing exactly that. The
+change is a uniform translation (the whole line shifts −40 on x), so relative
+geometry, the escort station offsets and the strategies' target order are all
+preserved, and the order arrays are not reshaped the way a turn-limit change
+reshapes them. Outcomes still move, though: closer spawns change hit chances
+from turn 1, so the draw stream diverges in effect even at identical array
+length. Measured, old → applied:
+
+- both-bonus **seed 1** (line-break): turn 8, flagship first, zero hull damage
+  — **byte-identical** at both spawn distances;
+- slow-flagship **seed 1**: turn 10, flagship first, outside the ≤9 bonus,
+  zero hull damage — also identical;
+- timeout **seed 9** (slow-flagship): still a turn-11 timeout, but player hull
+  damage **30 → 107** — same category, different fight (now pinned: it is the
+  strongest canonical-strategy geometry guard in the suite);
+- escorts-first **seed 14**: win with escort-a sunk first either way, but
+  turn **9 → 10**, so `withinTurnTarget` flips **true → false**, and the fleet
+  now pays a sloop (`[120, 24, 120]` → `[120, 0, 120]`). The pre-slice test
+  pinned neither the turn count nor that flag, which is why the fixture still
+  "held" — the run underneath it changed. This slice pins both.
+
+So the retune is visible in a canonical fixture after all, in the one case
+where the line gets to shoot for an extra turn. The line-break fixtures are
+the geometry-insensitive ones (zero hull damage at either distance), so the
+slice also adds a **passive-baseline fixture** — seed 1, all ships passing:
+297 hull damage (83% of the fleet), 63 hp left, a player sloop as the first
+sink, the enemy line untouched, 19 blocked moves — so the threat change this
+slice exists to make is pinned by behaviour rather than only by a position
+string. That fixture fails under the old geometry (which gave 141/0.39/219 and
+16 blocked), so it is a real guard; note seed 1's 83% fleet damage is a harsh
+sample against the 59% sweep mean, chosen because it is the low seed, not the
+typical one. Four masks became exact pins in the process (`turnCount` ≤ 9 → 8;
+a `chokeBlockedMoves >= 0` + `typeof` tautology → exact 2 and 19;
+`firstSinkTarget not.toBe(flagship)` → the named escort; and a route-level
+`toHaveProperty('chokeBlockedMoves')` → exact 2). One caution for future
+slices: `chokeBlockedMoves` counts **both** sides' blocked moves, so it is a
+navigation-pressure metric, not a player-difficulty one — the passive 16 → 19
+is +4 enemy against −1 player.
 
 ## Mission 06 "Dreadnought Siege" (`src/sim/mission06.ts`)
 
@@ -442,13 +476,17 @@ update, in this order:
    runs losing a ship at 1.3 of 3) plus both rejected-alternative probes
    (42% at 200/180, 52% at flagship HP 1.0), and corrected the baseline it
    was measured against (106/200 passive runs losing a ship, not
-   "one-third"). Contrary to this item's original warning, the
-   geometry-sensitive fixtures did **not** move: a uniform −40 x
-   translation preserves relative geometry and rng consumption, so all
-   four pinned seeds held their categories. The slice added a
-   passive-baseline fixture because the canonical ones proved
-   geometry-insensitive, and corrected this section's claim that mission
-   values had reached their threat ceiling (see the Known residual note).
+   "one-third"). No pinned seed had to be re-searched — a uniform −40 x
+   translation preserves relative geometry and the strategies' target
+   order, so this item's geometry-sensitivity warning did not bite the way
+   a turn-limit change does. It is not true that nothing moved, though
+   (local review corrected an earlier draft of this line): escorts-first
+   seed 14 slipped turn 9 → 10, forfeiting `withinTurnTarget` and one
+   sloop, and the seed-9 timeout's player damage went 30 → 107. Both are
+   now pinned. The slice also added a passive-baseline fixture because the
+   line-break fixtures proved geometry-insensitive, and corrected this
+   section's claim that mission values had reached their threat ceiling
+   (see the Known residual note).
 
 Named deployment risk (applies to slices 2–5): a client that fetched
 `/start` before a deploy and resolves after it is re-simulated under

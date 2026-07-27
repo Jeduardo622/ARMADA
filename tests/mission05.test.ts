@@ -128,19 +128,28 @@ describe('mission 05 scenario', () => {
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(false);
   });
 
+  // The closer line costs this fixture a turn and a sloop: pre-slice it won on
+  // turn 9 inside the bonus with the fleet intact, so the exact turn count, the
+  // missed turn bonus and the 120 hull damage are all pinned as the retune's
+  // one visible effect on a canonical fixture.
   it('reports a win without the flagship bonus when escorts die first', () => {
     const outcome = runMission05(14, escortsFirstOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.turnCount).toBe(10);
-    expect(outcome.bonusObjectives.sankFlagshipFirst).toBe(false);
+    expect(outcome.bonusObjectives).toEqual({
+      sankFlagshipFirst: false,
+      withinTurnTarget: false
+    });
     expect(outcome.telemetry.firstSinkTarget).toBe(MISSION_05_ESCORT_SHIP_IDS[0]);
+    expect(outcome.damageProfile.playerHullDamage).toBe(120);
   });
 
-  // The closer enemy line is a threat change, not a win-rate change: the
-  // canonical fixtures above are geometry-insensitive (seed 1 takes zero hull
-  // damage at either spawn distance), so the retune is pinned here instead.
-  // Across 200 seeds the closer line takes passive fleets from 106 to 197 runs
-  // losing at least one ship, and average fleet damage from 33% to 59%.
+  // The closer enemy line is mostly a threat change, not a win-rate change, and
+  // the two seed-1 fixtures above are geometry-insensitive (zero hull damage at
+  // either spawn distance — only the escorts-first fixture moves). So the retune
+  // is pinned here too: across 200 seeds the closer line takes passive fleets
+  // from 106 to 197 runs losing at least one ship, and average fleet damage from
+  // 33% to 59%. This fixture fails under the old geometry, which gave 141/0.39.
   it('mauls a passive fleet under the closer enemy line for seed 1', () => {
     const outcome = runMission05(1, passiveOrders);
     expect(outcome.result).toBe('loss');
@@ -154,16 +163,22 @@ describe('mission 05 scenario', () => {
     expect(outcome.damageProfile.enemyHullDamage).toBe(0);
   });
 
+  // The strongest canonical-strategy geometry guard available: the category is
+  // unchanged (still a turn-11 timeout) but the closer line more than triples
+  // what the stalled fleet pays, 30 -> 107 hull.
   it('fails with timeout when the line holds', () => {
     const outcome = runMission05(9, slowFlagshipOrders);
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('timeout');
     expect(outcome.turns).toHaveLength(MISSION_05_TURN_LIMIT);
+    expect(outcome.damageProfile.playerHullDamage).toBe(107);
   });
 
-  // Exact counts, not a >= 0 tautology: the closer line starts nearer the rock
-  // band, so canonical blocked moves average 1.65 -> 2.27 across 200 seeds and
-  // a passive fleet drifts into the rocks all game.
+  // Exact counts, not a >= 0 tautology. The counter is side-agnostic: it counts
+  // any blocked move, enemy included. Canonical blocked moves average 1.65 ->
+  // 2.27 across 200 seeds under the closer line, but seed 1 is 2 either way, so
+  // only the passive count below is a geometry guard (16 -> 19, and the +3 is
+  // really +4 enemy moves against -1 player).
   it('records choke navigation telemetry', () => {
     expect(runMission05(1, lineBreakOrders).telemetry.chokeBlockedMoves).toBe(2);
     expect(runMission05(1, passiveOrders).telemetry.chokeBlockedMoves).toBe(19);
@@ -246,7 +261,7 @@ describe('mission 05 routes', () => {
     const outcome = res.json().outcome;
     expect(outcome.result).toBe('win');
     expect(outcome.telemetry.firstSinkTarget).toBe(MISSION_05_FLAGSHIP_ID);
-    expect(outcome.telemetry).toHaveProperty('chokeBlockedMoves');
+    expect(outcome.telemetry.chokeBlockedMoves).toBe(2);
   });
 
   it('rejects orders for ships the player does not control', async () => {
