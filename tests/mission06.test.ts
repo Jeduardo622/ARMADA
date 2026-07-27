@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { buildServer } from '../src/app.js';
 import {
   MISSION_06_BOSS_ID,
@@ -56,7 +57,7 @@ const bossOnlyOrders = siegeOrders(99, 99);
 // Canonical fingerprint pinned on both sides; the Unity EditMode test
 // (Mission06Scenario) asserts the identical string for scenario parity.
 const EXPECTED_FINGERPRINT =
-  'mission-06-dreadnought-siege|turnLimit=14|bonusTurns=12|bossScale=1.3|bossDmg=1.1|' +
+  'mission-06-dreadnought-siege|turnLimit=14|bonusTurns=12|bossScale=1.3|bossDmg=1.5|' +
   'enrage=0.3|reinforce=5:0.9|wind=0:5|debris=150,0:r50:p2|' +
   'enemy-dreadnought:enemy:280,0:h180:v2:hp468:sl100:cw80|' +
   'player-sloop-a:player:0,50:h0:v3:hp120:sl80:cw50|' +
@@ -96,7 +97,7 @@ describe('mission 06 scenario', () => {
     if (!boss) throw new Error('boss missing');
     boss.hp = 100;
     expect(mission06Modifiers(wounded).accuracyBonus).toEqual({
-      [MISSION_06_BOSS_ID]: 10
+      [MISSION_06_BOSS_ID]: 25
     });
   });
 
@@ -115,7 +116,7 @@ describe('mission 06 scenario', () => {
     const outcome = runMission06(1, swatMidOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
-    expect(outcome.turnCount).toBeLessThanOrEqual(12);
+    expect(outcome.turnCount).toBe(9);
     expect(outcome.bonusObjectives).toEqual({ noShipLost: true, withinTurnTarget: true });
     expect(outcome.telemetry.phaseTransitions).toEqual([
       { turn: 1, phase: 1 },
@@ -124,18 +125,42 @@ describe('mission 06 scenario', () => {
     expect(outcome.telemetry.enragedOnTurn).toBe(6);
     expect(outcome.telemetry.reinforcementTurn).toBe(MISSION_06_REINFORCEMENT_TURN);
     expect(outcome.damageProfile.bossRemainingHp).toBe(0);
+    // The boss damage scale's most direct signature: what the siege pays for the
+    // win. Pinned so a change to the scale cannot pass silently, and so the
+    // PlayMode fake client's synthetic copy of this run has a source of truth.
+    expect(outcome.damageProfile.playerHullDamage).toBe(94);
+    expect(outcome.damageProfile.playerHullDamageFraction).toBe(0.26);
+    expect(outcome.damageProfile.playerRemainingHp).toBe(266);
   });
 
   it('reports a win that loses a ship for seed 106', () => {
     const outcome = runMission06(106, swatMidOrders);
     expect(outcome.result).toBe('win');
+    expect(outcome.turnCount).toBe(12);
     expect(outcome.bonusObjectives.noShipLost).toBe(false);
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(true);
   });
 
+  // Under the retuned constants a no-ship-lost slow win no longer exists on this
+  // line (0 of 3000 searched seeds), so this fixture pins the surviving
+  // late-swat failure mode: the siege drags to the limit and pays a ship for it.
+  // The enrage accuracy bonus alone is what flips this seed; the boss damage
+  // scale deepens the damage but does not by itself cost the ship.
   it('reports a slow win that misses the turn bonus for seed 68', () => {
     const outcome = runMission06(68, swatLateOrders);
     expect(outcome.result).toBe('win');
+    expect(outcome.turnCount).toBe(14);
+    expect(outcome.bonusObjectives.noShipLost).toBe(false);
+    expect(outcome.bonusObjectives.withinTurnTarget).toBe(false);
+  });
+
+  // The fourth bonus-flag combination: the siege stays clean but overruns the
+  // turn target. Rare under the 1.5x boss damage (2 of 3000 seeds), so it takes
+  // a far seed rather than the swat-late line, which no longer produces it.
+  it('reports a clean win that still misses the turn bonus for seed 2706', () => {
+    const outcome = runMission06(2706, swatMidOrders);
+    expect(outcome.result).toBe('win');
+    expect(outcome.turnCount).toBe(13);
     expect(outcome.bonusObjectives.noShipLost).toBe(true);
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(false);
   });
@@ -145,7 +170,7 @@ describe('mission 06 scenario', () => {
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('timeout');
     expect(outcome.turns).toHaveLength(MISSION_06_TURN_LIMIT);
-    expect(outcome.telemetry.reinforcementDamageDealt).toBeGreaterThan(0);
+    expect(outcome.telemetry.reinforcementDamageDealt).toBe(101);
   });
 });
 
@@ -162,12 +187,23 @@ describe('mission 06 routes', () => {
       turnLimit: 14,
       bonusTurnTarget: 12,
       bossHpScale: 1.3,
-      bossDamageScale: 1.1,
+      bossDamageScale: 1.5,
       enrageHullFraction: 0.3,
       reinforcementTurn: 5,
       reinforcementHpScale: 0.9
     });
     expect(body.state.ships).toHaveLength(4);
+  });
+
+  // The route caps turns at MISSION_06_TURN_LIMIT, so the published bound has to
+  // stay equal to it (this slice keeps the limit at 14; the pin is what makes a
+  // future change to it fail loudly). verify-contracts compares operations and
+  // schemaVersion only, so nothing else catches this drift.
+  it('documents the same resolve turn cap that the route enforces', () => {
+    const spec = readFileSync(new URL('../docs/api/openapi.yaml', import.meta.url), 'utf8');
+    const block = spec.split('Mission06ResolveRequest:')[1]?.split('Mission06BonusObjectives:')[0];
+    const documented = block?.match(/turns:\s*\n\s*type: array\s*\n\s*maxItems: (\d+)/)?.[1];
+    expect(documented).toBe(String(MISSION_06_TURN_LIMIT));
   });
 
   it('resolves a winning run with boss telemetry', async () => {

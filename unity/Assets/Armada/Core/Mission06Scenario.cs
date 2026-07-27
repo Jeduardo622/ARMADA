@@ -17,7 +17,7 @@ namespace Armada.Client.Core
         public const int TurnLimit = 14;
         public const int BonusTurnTarget = 12;
         public const double BossHpScale = 1.3;
-        public const double BossDamageScale = 1.1;
+        public const double BossDamageScale = 1.5;
         public const double EnrageHullFraction = 0.3;
         public const int ReinforcementTurn = 5;
         public const double ReinforcementHpScale = 0.9;
