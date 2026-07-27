@@ -77,7 +77,7 @@ namespace Armada.Client.Core
                         {
                             Id = FlagshipId,
                             Side = "enemy",
-                            Position = new SimVector2 { X = 260, Y = 0 },
+                            Position = new SimVector2 { X = 220, Y = 0 },
                             Heading = 180,
                             Speed = 2,
                             Hp = 198,
@@ -88,7 +88,7 @@ namespace Armada.Client.Core
                         {
                             Id = EnemyShipIds[1],
                             Side = "enemy",
-                            Position = new SimVector2 { X = 240, Y = 60 },
+                            Position = new SimVector2 { X = 200, Y = 60 },
                             Heading = 180,
                             Speed = 2,
                             Hp = 120,
@@ -99,7 +99,7 @@ namespace Armada.Client.Core
                         {
                             Id = EnemyShipIds[2],
                             Side = "enemy",
-                            Position = new SimVector2 { X = 240, Y = -60 },
+                            Position = new SimVector2 { X = 200, Y = -60 },
                             Heading = 180,
                             Speed = 2,
                             Hp = 120,
