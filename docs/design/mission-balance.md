@@ -1,8 +1,9 @@
 # Mission 03–06 Balance & Economy Tuning
 
 > **Status: Drafted** (pending design pass); **economy timber slice
-> (rollout slice 1), mission 04 slice (rollout slice 2) and mission 03
-> slice (rollout slice 3) applied** —
+> (rollout slice 1), mission 04 slice (rollout slice 2), mission 03
+> slice (rollout slice 3) and mission 06 slice (rollout slice 4)
+> applied** —
 > all other values remain proposals pending their own slices. Written 2026-07-22 against the shipped
 > implementation (missions 03–06 as of PR #64), following the
 > `pvp-tuning.md` precedent: this document is the knob inventory of
@@ -13,9 +14,11 @@
 Motivation (tracked as an open design knob since the mission arc shipped):
 in missions 03, 05, and 06 the enemy never ended a mission across the
 baseline 200-seed sweeps below — every observed loss is a timeout, and no
-passive run was ever wiped. (Mission 03's half of that is closed by the
-applied mission 03 slice below: its post-slice sweep records 3 canonical
-losses to sinking and 71/200 passive wipes; 05 and 06 still stand.)
+passive run was ever wiped. (Missions 03 and 06 are closed by their
+applied slices below: mission 03's post-slice sweep records 3 canonical
+losses to sinking and 71/200 passive wipes, and mission 06's records
+12/200 passive wipes with the passive loss mix no longer timeout-only;
+only 05 still stands.)
 Mission 04 had
 the opposite problem: the canonical boarding line won only a third of
 its runs (closed by the applied mission 04 slice below). Reward and upgrade constants are still their original
@@ -83,7 +86,9 @@ places that must move together:
 
 Four further surfaces are not part of the fingerprint but still carry
 copies of these values, and the applied mission 03 slice had to move all
-four (two of them found only in review — check them in slices 4 and 5):
+four (two of them found only in review — check them in every slice; the
+applied mission 06 slice checked all four and needed none of them, since
+it moves no hull total and no turn limit):
 
 - **derived hull totals in synthetic test payloads** — the PlayMode fake
   client's `EnemyHullDamage` is the enemy fleet's hull sum
@@ -108,7 +113,7 @@ four (two of them found only in review — check them in slices 4 and 5):
 | 03 | 67.0% | timeout only | 0 / 200 | Passive fleets never lose meaningfully more than one ship's worth of hull (max recorded fleet damage fraction 0.50). Pre-slice baseline; the applied slice's re-derivation sweep confirmed the proposal exactly: canonical 163/200 (81.5%), average win turn 10.0, loss mix timeout 34 + sunk 3, passive wipes 71/200 with 199/200 passive runs losing at least one ship. |
 | 04 | 33.5% (boarding), 16.5% (gunnery) | timeout, sunk, flanked | 86 / 200 | The only mission where enemies already finish fights — and it overshot into frustration. Pre-slice baseline; the applied slice's re-derivation sweep confirmed the proposal exactly: canonical boarding 110/200 (55.0%), gunnery unchanged at 16.5%, passive wipes unchanged at 86/200. |
 | 05 | 44.0% | timeout only | 0 / 200 | Canonical runs take 6% average fleet damage — enemy guns effectively never bear. |
-| 06 | 72.0% (swat-mid), 8.0% (boss-only) | timeout only | 0 / 200 | Passive fleets take 65% average damage but are never wiped in 14 turns. |
+| 06 | 72.0% (swat-mid), 8.0% (boss-only) | timeout only | 0 / 200 | Passive fleets take 65% average damage but are never wiped in 14 turns. Pre-slice baseline; the applied slice's re-derivation sweep confirmed every proposal number that gates a design target (canonical 143/200 (71.5%), average win turn 7.93, `noShipLost` kept in 128/143 wins, passive wipes 12/200 with average 1.89 of 3 ships lost) and corrected one that gates nothing (the baseline count of canonical runs losing at least one ship is 35/200, not the ~17 drafted — see the boss-damage row). |
 
 ## Mission 03 "Raking Shot" (`src/sim/mission03.ts`)
 
@@ -173,8 +178,8 @@ pins; re-search the fixture seeds in `tests/mission05.test.ts`
 
 | Knob | Current | Proposed | Derivation / effect |
 | --- | --- | --- | --- |
-| `MISSION_06_BOSS_DAMAGE_SCALE` | 1.1 | **1.5** | A boss that never ended a fight across the sweeps is a pushover on a timer: passive fleets take 65% damage but are never wiped in 14 turns. At 1.5 the canonical siege is untouched (71.5% vs 72.0% — flat at this sample size, because a competent siege kills the boss before its output compounds) while sloppy play finally pays: passive wipes 0 → 12/200, passive ships lost average 1.89 of 3, and canonical runs losing at least one ship rise from ~17 to 58/200 — making `noShipLost` a real stake (still kept in 128 of 143 wins). |
-| `MISSION_06_ENRAGE_ACCURACY_BONUS` | 10 | **25** | Enrage opens below 30% of 468 hull (< ~140), which the canonical siege burns through in its final two-to-three turns — a +10 accuracy swing changes about one shot before the boss dies. +25 makes the last stand visibly land. Not part of the fingerprint or objectives payload, and `Mission06Scenario.cs` does not carry the constant (verified) — pinned only by the `mission06Modifiers` vitest, so this knob has no Unity ripple at all. |
+| `MISSION_06_BOSS_DAMAGE_SCALE` | 1.5 (**applied**; was 1.1) | keep | A boss that never ended a fight across the sweeps is a pushover on a timer: passive fleets take 65% damage but are never wiped in 14 turns. At 1.5 the canonical siege is untouched (71.5% vs 72.0% — flat at this sample size, because a competent siege kills the boss before its output compounds) while sloppy play finally pays: passive wipes 0 → 12/200, passive ships lost average 1.89 of 3 (average fleet damage 65% → 78%), and canonical runs losing at least one ship rise to 58/200 — making `noShipLost` a real stake (still kept in 128 of 143 wins). Correction from the applied slice's re-derivation: the pre-slice count of canonical runs losing at least one ship is **35/200**, not the ~17 this row drafted; the post-slice 58/200 reproduced exactly, so the rise is 35 → 58 (+66%) rather than the drafted tripling. The conclusion is unchanged — every other number in this row reproduced exactly. |
+| `MISSION_06_ENRAGE_ACCURACY_BONUS` | 25 (**applied**; was 10) | keep | Enrage opens below 30% of 468 hull (< ~140), which the canonical siege burns through in its final two-to-three turns — a +10 accuracy swing changes about one shot before the boss dies. +25 makes the last stand visibly land. Not part of the fingerprint or objectives payload, and `Mission06Scenario.cs` does not carry the constant (verified again at apply time) — pinned only by the `mission06Modifiers` vitest, so this knob has no Unity ripple at all. |
 | `MISSION_06_BOSS_HP_SCALE` | 1.3 | keep | 468 hull already sets the right siege length (canonical wins average turn ~7.9). |
 | `MISSION_06_ENRAGE_HULL_FRACTION` | 0.3 | keep | Phase rhythm is fine; only the enrage's bite changes. |
 | `MISSION_06_REINFORCEMENT_TURN` / `MISSION_06_REINFORCEMENT_HP_SCALE` | 5 / 0.9 | keep | The swat-mid vs boss-only gap (72% vs 8%) shows the reinforcement already forces the intended target-switch decision. |
@@ -182,9 +187,30 @@ pins; re-search the fixture seeds in `tests/mission05.test.ts`
 | `MISSION_06_DEFAULT_SEED` | 606 | keep | Route default only. |
 | Shifting wind (0°→90° at turn 7), debris field | as shipped | keep | — |
 
-Fingerprint ripple: `bossDmg=1.5` in all three pins (the enrage accuracy
-value is not fingerprinted); re-search the fixture seeds in
-`tests/mission06.test.ts` (both-bonus, ship-lost, slow-win, timeout).
+Fingerprint ripple (**applied**): `bossDmg=1.5` in all three pins (the
+enrage accuracy value is not fingerprinted). No hull literal moved —
+`MISSION_06_BOSS_HP_SCALE` is kept, so the boss's 468 hull is byte-identical
+in every pin and in the PlayMode fake client's derived enemy-hull total; the
+kept turn limit also leaves `Mission06ResolveRequest.turns.maxItems` at 14
+(now pinned against the constant in `tests/mission06.test.ts`, following the
+mission 03 precedent) and the `mission_06_obj_bonus_*` strings untouched.
+
+Because the turn limit is unchanged the canonical order arrays keep their
+shape and rng consumption, so three of the four seed-pinned fixtures held
+their category outright: both-bonus **seed 1** (still turn 9, phases
+1→2 at turn 5, enrage turn 6, boss at 0 hull), ship-lost **seed 106**
+(turn 12), timeout **seed 1 / boss-only** (14 turns, 101 reinforcement
+damage). The exception is the slow-win fixture: under 1.5x boss damage a
+**no-ship-lost** win that misses the ≤12 bonus no longer exists on the
+swat-late line at all (0 of 3000 searched seeds; 2 of 3000 on swat-mid),
+so rather than chase a distant seed the fixture keeps **seed 68** and its
+strategy and now pins the surviving late-swat failure mode — a turn-14 win
+that pays a ship (`noShipLost` false, `withinTurnTarget` false). That
+extinction is itself the retune landing. Fixture coverage of the bonus
+flags is unchanged in breadth — three of the four flag combinations, with
+each flag still exercised in both states; the swap is (`noShipLost` true,
+bonus missed) out for (both false) in. All four fixtures pin exact turn
+counts and telemetry values rather than `<=` bounds.
 
 ## Economy: mission rewards (`src/economy/missionRewards.ts`)
 
@@ -335,7 +361,14 @@ update, in this order:
    8 of 163, not 9 — see the bonus-target row);
    three of the four pinned fixtures moved because the turn limit resizes
    the canonical order arrays (see the ripple note above).
-4. **Mission 06** — two constants, one outside the fingerprint.
+4. **Mission 06** (**applied**) — two constants, one outside the
+   fingerprint. The apply-time re-derivation reproduced every proposal
+   number that gates a design target (71.5% canonical wins, 12/200
+   passive wipes, 1.89 average passive ships lost, 58/200 canonical runs
+   losing a ship, `noShipLost` kept in 128/143 wins) and corrected the
+   baseline it was measured against (35/200, not ~17); one of the four
+   pinned fixtures moved a category rather than a seed (see the ripple
+   note above).
 5. **Mission 05** — position changes, geometry-sensitive fixtures.
 
 Named deployment risk (applies to slices 2–5): a client that fetched

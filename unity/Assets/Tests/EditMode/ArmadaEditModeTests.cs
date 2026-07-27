@@ -340,7 +340,7 @@ namespace Armada.Client.Tests.EditMode
             // Must equal EXPECTED_FINGERPRINT in tests/mission06.test.ts so the
             // client and server pin the identical deterministic scenario.
             const string expected =
-                "mission-06-dreadnought-siege|turnLimit=14|bonusTurns=12|bossScale=1.3|bossDmg=1.1|" +
+                "mission-06-dreadnought-siege|turnLimit=14|bonusTurns=12|bossScale=1.3|bossDmg=1.5|" +
                 "enrage=0.3|reinforce=5:0.9|wind=0:5|debris=150,0:r50:p2|" +
                 "enemy-dreadnought:enemy:280,0:h180:v2:hp468:sl100:cw80|" +
                 "player-sloop-a:player:0,50:h0:v3:hp120:sl80:cw50|" +
