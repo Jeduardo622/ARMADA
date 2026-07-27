@@ -21,9 +21,14 @@ namespace Armada.Client.Services
     }
 
     /// <summary>
-    /// Order-authoring model for one side of the hot-seat loop. Plain C# so
-    /// tests (and any view) drive it without touching TMP or uGUI; the
-    /// MonoBehaviour controller renders it and forwards button presses.
+    /// Order-authoring model for one side of a turn. Plain C# so tests (and
+    /// any view) drive it without touching TMP or uGUI; the MonoBehaviour
+    /// controller renders it and forwards button presses.
+    ///
+    /// Shared by the PvP hot-seat loop (a session per side per turn) and the
+    /// playable Mission 10 loop (one session per turn for the player's
+    /// sloops): both author the same v1 order surface, and mission 10's
+    /// ammo toggle is the same chain/round selection.
     /// </summary>
     public sealed class PvpOrderSession
     {
@@ -38,9 +43,19 @@ namespace Armada.Client.Services
         public string SideLabel { get; }
         public int ShipIndex { get; private set; }
 
-        public PvpOrderSession(string sideLabel, IReadOnlyList<SimShip> ownShips, IReadOnlyList<SimShip> enemyShips)
+        /// <summary>First line of <see cref="Describe"/>. Defaults to the
+        /// hot-seat wording; mission play overrides it so the HUD does not
+        /// talk about "sides".</summary>
+        public string Headline { get; }
+
+        public PvpOrderSession(
+            string sideLabel,
+            IReadOnlyList<SimShip> ownShips,
+            IReadOnlyList<SimShip> enemyShips,
+            string headline = null)
         {
             SideLabel = sideLabel;
+            Headline = headline ?? $"Side {sideLabel} orders:";
             _enemyShips = enemyShips != null ? new List<SimShip>(enemyShips) : new List<SimShip>();
             if (ownShips == null)
             {
@@ -158,7 +173,7 @@ namespace Armada.Client.Services
         public string Describe()
         {
             var builder = new StringBuilder();
-            builder.Append("Side ").Append(SideLabel).Append(" orders:");
+            builder.Append(Headline);
             for (var i = 0; i < _drafts.Count; i++)
             {
                 var draft = _drafts[i];

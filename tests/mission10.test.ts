@@ -232,6 +232,63 @@ describe('mission 10 scenario', () => {
   });
 });
 
+// The playable client (Mission10PlayController) authors one turn at a time and
+// re-resolves the growing order prefix after every turn, rendering only the
+// newest turn record. That is only sound if resolving a prefix produces
+// byte-identical records for the turns it covers — runMissionLoop feeds each
+// turn the previous turn's nextState and playerTurnOrders[turn - 1] only, so no
+// later turn can reach backwards. These tests pin that property; if they fail,
+// the per-turn re-resolve loop is unsound and must not ship.
+describe('mission 10 prefix stability', () => {
+  it('resolves every prefix to the same turn records as the full run', () => {
+    const full = runMission10(2, mixedOrders);
+
+    for (let length = 1; length <= MISSION_10_TURN_LIMIT; length++) {
+      const prefix = runMission10(2, mixedOrders.slice(0, length));
+      // The full run ends at turn 8 (the win), so prefixes past it cannot
+      // produce more records than the full run did.
+      const covered = Math.min(length, full.turns.length);
+      expect(prefix.turns.slice(0, covered)).toEqual(full.turns.slice(0, covered));
+      expect(prefix.turns.map((turn) => turn.hash).slice(0, covered)).toEqual(
+        full.turns.map((turn) => turn.hash).slice(0, covered)
+      );
+    }
+  });
+
+  it('holds when later turns change, so the player may author turn by turn', () => {
+    // Turn 1 is identical; turns 2+ diverge. The shared prefix must not move.
+    const divergent = mixedOrders.map((orders, i) =>
+      i === 0 ? orders : [fire(MISSION_10_PLAYER_SHIP_IDS[0], MISSION_10_ENEMY_SHIP_IDS[1])]
+    );
+    const full = runMission10(2, mixedOrders);
+    const rewritten = runMission10(2, divergent);
+
+    expect(rewritten.turns[0]).toEqual(full.turns[0]);
+    // Sanity: the fixtures really do diverge after the shared prefix, so the
+    // assertion above is not vacuously comparing two identical runs.
+    expect(rewritten.turns[1]).not.toEqual(full.turns[1]);
+  });
+
+  it('serves prefix re-resolves over the route the client actually calls', async () => {
+    const resolveTurns = async (turns: SimOrder[][]) => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/missions/${MISSION_10_CODE}/resolve`,
+        payload: { schemaVersion: 1, seed: 2, turns }
+      });
+      expect(res.statusCode).toBe(200);
+      return res.json().outcome;
+    };
+
+    const full = await resolveTurns(mixedOrders);
+    for (let length = 1; length <= MISSION_10_TURN_LIMIT; length++) {
+      const prefix = await resolveTurns(mixedOrders.slice(0, length));
+      const covered = Math.min(length, full.turns.length);
+      expect(prefix.turns.slice(0, covered)).toEqual(full.turns.slice(0, covered));
+    }
+  });
+});
+
 describe('mission 10 routes', () => {
   it('starts deterministically with the scenario payload', async () => {
     const res1 = await app.inject({ method: 'POST', url: `/missions/${MISSION_10_CODE}/start` });
