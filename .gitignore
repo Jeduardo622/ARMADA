@@ -7,6 +7,7 @@ docs/.env
 .data/
 .tools/
 .worktrees/
+.claude/worktrees/
 
 # Node/JS common
 node_modules/
