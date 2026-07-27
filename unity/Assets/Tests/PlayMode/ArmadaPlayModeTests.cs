@@ -1006,9 +1006,9 @@ namespace Armada.Client.Tests.PlayMode
                         },
                         DamageProfile = new Mission06DamageProfile
                         {
-                            PlayerHullDamage = 69,
-                            PlayerHullDamageFraction = 0.19,
-                            PlayerRemainingHp = 291,
+                            PlayerHullDamage = 94,
+                            PlayerHullDamageFraction = 0.26,
+                            PlayerRemainingHp = 266,
                             EnemyHullDamage = 468,
                             EnemyRemainingHp = 0,
                             BossHullDamage = 468,

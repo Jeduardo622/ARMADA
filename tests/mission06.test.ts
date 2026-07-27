@@ -125,6 +125,12 @@ describe('mission 06 scenario', () => {
     expect(outcome.telemetry.enragedOnTurn).toBe(6);
     expect(outcome.telemetry.reinforcementTurn).toBe(MISSION_06_REINFORCEMENT_TURN);
     expect(outcome.damageProfile.bossRemainingHp).toBe(0);
+    // The boss damage scale's most direct signature: what the siege pays for the
+    // win. Pinned so a change to the scale cannot pass silently, and so the
+    // PlayMode fake client's synthetic copy of this run has a source of truth.
+    expect(outcome.damageProfile.playerHullDamage).toBe(94);
+    expect(outcome.damageProfile.playerHullDamageFraction).toBe(0.26);
+    expect(outcome.damageProfile.playerRemainingHp).toBe(266);
   });
 
   it('reports a win that loses a ship for seed 106', () => {
@@ -135,14 +141,27 @@ describe('mission 06 scenario', () => {
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(true);
   });
 
-  // Under the 1.5x boss damage a no-ship-lost slow win no longer exists on this
+  // Under the retuned constants a no-ship-lost slow win no longer exists on this
   // line (0 of 3000 searched seeds), so this fixture pins the surviving
   // late-swat failure mode: the siege drags to the limit and pays a ship for it.
+  // The enrage accuracy bonus alone is what flips this seed; the boss damage
+  // scale deepens the damage but does not by itself cost the ship.
   it('reports a slow win that misses the turn bonus for seed 68', () => {
     const outcome = runMission06(68, swatLateOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.turnCount).toBe(14);
     expect(outcome.bonusObjectives.noShipLost).toBe(false);
+    expect(outcome.bonusObjectives.withinTurnTarget).toBe(false);
+  });
+
+  // The fourth bonus-flag combination: the siege stays clean but overruns the
+  // turn target. Rare under the 1.5x boss damage (2 of 3000 seeds), so it takes
+  // a far seed rather than the swat-late line, which no longer produces it.
+  it('reports a clean win that still misses the turn bonus for seed 2706', () => {
+    const outcome = runMission06(2706, swatMidOrders);
+    expect(outcome.result).toBe('win');
+    expect(outcome.turnCount).toBe(13);
+    expect(outcome.bonusObjectives.noShipLost).toBe(true);
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(false);
   });
 
