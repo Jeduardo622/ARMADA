@@ -81,6 +81,26 @@ places that must move together:
   `unity/Assets/Tests/EditMode/ArmadaEditModeTests.cs`;
 - the vitest fingerprint pin in `tests/mission0X.test.ts`.
 
+Four further surfaces are not part of the fingerprint but still carry
+copies of these values, and the applied mission 03 slice had to move all
+four (two of them found only in review — check them in slices 4 and 5):
+
+- **derived hull totals in synthetic test payloads** — the PlayMode fake
+  client's `EnemyHullDamage` is the enemy fleet's hull sum
+  (`unity/Assets/Tests/PlayMode/ArmadaPlayModeTests.cs`);
+- **the documented resolve bound** — `Mission0XResolveRequest.turns.maxItems`
+  in `docs/api/openapi.yaml` equals that mission's turn limit, because the
+  route derives its Zod cap from the constant. `verify-contracts` compares
+  operation lists and `schemaVersion` only, so nothing in CI catches this
+  drift; any turn-limit change owes this edit (mission 03 pins it in
+  `tests/mission03.test.ts`);
+- **player-facing objective strings** —
+  `docs/content/strings/missions.json` (`mission_0X_obj_bonus_*` spell out
+  turn targets); and
+- **the mission content doc** — `docs/content/missions/mission-0X-*.md`
+  repeats the values in its objectives, player-constraints, and
+  "Tuning knobs" lines.
+
 ## Baseline (current values, 200-seed sweeps)
 
 | Mission | Canonical win rate | Loss reasons observed | Passive wipes | Notes |
@@ -95,7 +115,7 @@ places that must move together:
 | Knob | Current | Proposed | Derivation / effect |
 | --- | --- | --- | --- |
 | `MISSION_03_TURN_LIMIT` | 12 (**applied**; was 10) | keep | The clock, not the enemy, is the dominant loss: 33% of canonical runs time out with the last enemy at ~36 average hull. Two more turns convert most near-misses (canonical win rate 67% → 81.5%) and give the meaner enemies (below) time to actually finish passive fleets: passive wipes go 0 → 71/200 (35.5%), and 199/200 passive runs lose at least one ship. |
-| `MISSION_03_BONUS_TURN_TARGET` | 9 (**applied**; was 8) | keep | Under the applied values the canonical average win lands on turn ~10.0. A ≤8 target would be hit in only 9 of 163 winning sweeps (≈6%) — effectively unobtainable; ≤9 is hit in 62/163 (≈38%), matching the one-third stretch target. |
+| `MISSION_03_BONUS_TURN_TARGET` | 9 (**applied**; was 8) | keep | Under the applied values the canonical average win lands on turn ~10.0. A ≤8 target would be hit in only 8 of 163 winning sweeps (≈5%) — effectively unobtainable; ≤9 is hit in 62/163 (≈38%), matching the one-third stretch target. (The drafted proposal put the ≤8 count at 9 of 163 (≈6%); the applied slice's re-derivation measured 8 — win-turn histogram 8:8, 9:54, 10:52, 11:26, 12:23. The ≤9 figure reproduced exactly and the conclusion is unchanged.) |
 | `MISSION_03_RAKE_HIT_TARGET` | 2 | keep | The rake bonus is the mission's teaching objective and already lands in canonical wins. |
 | `MISSION_03_ENEMY_DAMAGE_SCALE` | 1.15 (**applied**; was 1.05) | keep | One knob deliberately scales BOTH enemy hull (frigate 180 → 207, sloop 120 → 138, decimal `floor(base×1.15)`) and enemy outgoing damage (engine `damageScale`). +10% each way makes the pincer dangerous without a knob split. Implementation note from the applied slice: `1.15` has no exact binary representation, so `Math.floor(180 * 1.15)` evaluates to **206** — the module rounds the product to whole units of 1e-6 before flooring (`scaleHull`) so the derived hull is the decimal 207 this table specifies, and the test pins are literal 207/138 rather than recomputed expressions. The sweep numbers in this section are unaffected: 206 and 207 produce identical win rates, loss mixes, bonus rates and fixture categories. Splitting hull from damage would add an objectives field — an API-contract and fingerprint-shape change — and is deliberately out of scope here. |
 | `MISSION_03_DEFAULT_SEED` | 303 | keep | Route default only; not part of the fingerprint payload (it is the pin test's argument, not its content). |
@@ -308,9 +328,11 @@ update, in this order:
    fixture that moved was the sunk-loss seed (3 → 41; the other pinned
    seeds still land in their categories under the new distribution).
 3. **Mission 03** (**applied**) — three constants including a turn-limit
-   change. The apply-time re-derivation reproduced the proposal's numbers
-   exactly (163/200 canonical wins, average win turn 10.0, 62/163 turn
-   bonuses, 71/200 passive wipes, 199/200 passive runs losing a ship);
+   change. The apply-time re-derivation reproduced every proposal number
+   that gates a design target (163/200 canonical wins, average win turn
+   10.0, 62/163 turn bonuses, 71/200 passive wipes, 199/200 passive runs
+   losing a ship) and corrected one that gates nothing (the ≤8 count was
+   8 of 163, not 9 — see the bonus-target row);
    three of the four pinned fixtures moved because the turn limit resizes
    the canonical order arrays (see the ripple note above).
 4. **Mission 06** — two constants, one outside the fingerprint.

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildServer } from '../src/app.js';
 import { classifyLoss, countRakes } from '../src/sim/missionMetrics.js';
@@ -218,6 +219,18 @@ describe('mission 03 scenario', () => {
     expect(outcome.damageProfile.enemyRemainingHp).toBe(47);
   });
 
+  // The retune's headline behavioural claim: enemies can now finish the fight,
+  // so the non-timeout branch of classifyLoss is reachable here for the first
+  // time (3 of 200 canonical seeds; sibling precedent in mission04.test.ts).
+  it('fails with a sunk loss when the pincer finishes the fleet', () => {
+    const outcome = runMission03(106, sloopFirstOrders);
+    expect(outcome.result).toBe('loss');
+    expect(outcome.failReason).toBe('sunk');
+    expect(outcome.turnCount).toBe(MISSION_03_TURN_LIMIT);
+    expect(outcome.damageProfile.playerRemainingHp).toBe(0);
+    expect(outcome.damageProfile.enemyRemainingHp).toBe(59);
+  });
+
   it('supports boarding as an optional path to victory', () => {
     const outcome = runMission03(BOARDING_WIN_SEED, boardingOrders);
     expect(outcome.result).toBe('win');
@@ -253,6 +266,17 @@ describe('mission 03 routes', () => {
       enemyDamageScale: 1.15
     });
     expect(body.state.ships).toHaveLength(4);
+  });
+
+  // The route caps turns at MISSION_03_TURN_LIMIT, so the published bound has
+  // to move with it or spec-generated clients reject valid 11- and 12-turn
+  // plans. verify-contracts compares operations and schemaVersion only, so
+  // nothing else catches this drift (Codex P1 on the tuning PR).
+  it('documents the same resolve turn cap that the route enforces', () => {
+    const spec = readFileSync(new URL('../docs/api/openapi.yaml', import.meta.url), 'utf8');
+    const block = spec.split('Mission03ResolveRequest:')[1]?.split('Mission03BonusObjectives:')[0];
+    const documented = block?.match(/turns:\s*\n\s*type: array\s*\n\s*maxItems: (\d+)/)?.[1];
+    expect(documented).toBe(String(MISSION_03_TURN_LIMIT));
   });
 
   it('resolves a winning run with rake telemetry', async () => {
