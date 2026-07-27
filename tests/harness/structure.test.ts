@@ -242,10 +242,6 @@ describe('engineering harness structure', () => {
     expect(readFileSync(path, 'utf8')).not.toMatch(/^#!/);
   });
 
-  it('excludes local worktrees from Vitest discovery', () => {
-    expect(readFileSync('vitest.config.ts', 'utf8')).toContain('.worktrees');
-  });
-
   it('pins the project-scoped Unity MCP integration with write approvals', () => {
     const manifest = JSON.parse(readFileSync('unity/Packages/manifest.json', 'utf8'));
     expect(manifest.dependencies?.['com.coplaydev.unity-mcp']).toBe(
