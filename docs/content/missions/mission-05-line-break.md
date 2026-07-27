@@ -5,7 +5,7 @@
 - Environment: Steady wind; rocks forming a choke.
 - Player constraints: Standard fleet; turn limit 11.
 - Rewards: Gold, timber, cosmetic token.
-- Tuning knobs: Flagship HP 1.1x; escorts 1.0x; AI formation_keep high.
+- Tuning knobs: Flagship HP 1.1x; escorts 1.0x; AI formation_keep high; enemy line spawns close (flagship 220 out, escorts 200) so its guns bear early.
 - Telemetry: First sink target; choke navigation; fail reasons.
 - QA notes: Formation behavior consistency; choke pathing/perf.
 

@@ -72,7 +72,7 @@ export function createMission05State(): SimState {
       {
         id: MISSION_05_FLAGSHIP_ID,
         side: 'enemy',
-        position: { x: 260, y: 0 },
+        position: { x: 220, y: 0 },
         heading: 180,
         speed: 2,
         hp: FLAGSHIP_HULL_HP,
@@ -82,7 +82,7 @@ export function createMission05State(): SimState {
       {
         id: MISSION_05_ESCORT_SHIP_IDS[0],
         side: 'enemy',
-        position: { x: 240, y: 60 },
+        position: { x: 200, y: 60 },
         heading: 180,
         speed: 2,
         hp: ESCORT_HULL_HP,
@@ -92,7 +92,7 @@ export function createMission05State(): SimState {
       {
         id: MISSION_05_ESCORT_SHIP_IDS[1],
         side: 'enemy',
-        position: { x: 240, y: -60 },
+        position: { x: 200, y: -60 },
         heading: 180,
         speed: 2,
         hp: ESCORT_HULL_HP,
@@ -176,8 +176,9 @@ export function mission05EnemyOrders(state: SimState): SimOrder[] {
     const escort = state.ships.find((ship) => ship.id === escortId);
     if (escort) {
       // Stations match the seeded flank positions in the leader's frame: the
-      // west-heading flagship at (260,0) has escort-a at (240,60), which is
-      // 20 forward and 60 to starboard (negative lateral).
+      // west-heading flagship at (220,0) has escort-a at (200,60), which is
+      // 20 forward and 60 to starboard (negative lateral). The offsets are
+      // spawn-relative, so moving the whole line closer leaves them unchanged.
       const lateral = escortId === MISSION_05_ESCORT_SHIP_IDS[0] ? -60 : 60;
       orders.push(
         escortOrderFor(escort, state, MISSION_05_FLAGSHIP_ID, {

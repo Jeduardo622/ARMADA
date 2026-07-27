@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { buildServer } from '../src/app.js';
 import {
   MISSION_05_CODE,
@@ -57,6 +58,12 @@ const slowFlagshipOrders: SimOrder[][] = Array.from({ length: MISSION_05_TURN_LI
   return MISSION_05_PLAYER_SHIP_IDS.map((id) => fire(id, target, slow));
 });
 
+// Every ship passes every turn: the floor for enemy lethality, and the surface
+// the closer spawn line actually moves.
+const passiveOrders: SimOrder[][] = Array.from({ length: MISSION_05_TURN_LIMIT }, () =>
+  MISSION_05_PLAYER_SHIP_IDS.map((id) => ({ shipId: id, action: 'pass' }) as SimOrder)
+);
+
 // Escorts first: wins without the flagship-first bonus.
 const escortsFirstOrders: SimOrder[][] = Array.from({ length: MISSION_05_TURN_LIMIT }, (_, i) => {
   const slow = i >= 3 ? -2 : 0;
@@ -74,9 +81,9 @@ const escortsFirstOrders: SimOrder[][] = Array.from({ length: MISSION_05_TURN_LI
 const EXPECTED_FINGERPRINT =
   'mission-05-line-break|turnLimit=11|bonusTurns=9|flagshipScale=1.1|wind=0:5|' +
   'rock=120,70:r35|rock=120,-70:r35|' +
-  'enemy-escort-a:enemy:240,60:h180:v2:hp120:sl70:cw40|' +
-  'enemy-escort-b:enemy:240,-60:h180:v2:hp120:sl70:cw40|' +
-  'enemy-flagship:enemy:260,0:h180:v2:hp198:sl90:cw60|' +
+  'enemy-escort-a:enemy:200,60:h180:v2:hp120:sl70:cw40|' +
+  'enemy-escort-b:enemy:200,-60:h180:v2:hp120:sl70:cw40|' +
+  'enemy-flagship:enemy:220,0:h180:v2:hp198:sl90:cw60|' +
   'player-sloop-a:player:0,50:h0:v3:hp120:sl80:cw50|' +
   'player-sloop-b:player:0,0:h0:v3:hp120:sl80:cw50|' +
   'player-sloop-c:player:0,-50:h0:v3:hp120:sl80:cw50';
@@ -107,7 +114,7 @@ describe('mission 05 scenario', () => {
     const outcome = runMission05(1, lineBreakOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
-    expect(outcome.turnCount).toBeLessThanOrEqual(9);
+    expect(outcome.turnCount).toBe(8);
     expect(outcome.bonusObjectives).toEqual({ sankFlagshipFirst: true, withinTurnTarget: true });
     expect(outcome.telemetry.firstSinkTarget).toBe(MISSION_05_FLAGSHIP_ID);
     expect(outcome.damageProfile.enemyRemainingHp).toBe(0);
@@ -116,6 +123,7 @@ describe('mission 05 scenario', () => {
   it('reports a flagship-first win that misses the turn bonus for seed 1 slow play', () => {
     const outcome = runMission05(1, slowFlagshipOrders);
     expect(outcome.result).toBe('win');
+    expect(outcome.turnCount).toBe(10);
     expect(outcome.bonusObjectives.sankFlagshipFirst).toBe(true);
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(false);
   });
@@ -123,8 +131,27 @@ describe('mission 05 scenario', () => {
   it('reports a win without the flagship bonus when escorts die first', () => {
     const outcome = runMission05(14, escortsFirstOrders);
     expect(outcome.result).toBe('win');
+    expect(outcome.turnCount).toBe(10);
     expect(outcome.bonusObjectives.sankFlagshipFirst).toBe(false);
-    expect(outcome.telemetry.firstSinkTarget).not.toBe(MISSION_05_FLAGSHIP_ID);
+    expect(outcome.telemetry.firstSinkTarget).toBe(MISSION_05_ESCORT_SHIP_IDS[0]);
+  });
+
+  // The closer enemy line is a threat change, not a win-rate change: the
+  // canonical fixtures above are geometry-insensitive (seed 1 takes zero hull
+  // damage at either spawn distance), so the retune is pinned here instead.
+  // Across 200 seeds the closer line takes passive fleets from 106 to 197 runs
+  // losing at least one ship, and average fleet damage from 33% to 59%.
+  it('mauls a passive fleet under the closer enemy line for seed 1', () => {
+    const outcome = runMission05(1, passiveOrders);
+    expect(outcome.result).toBe('loss');
+    expect(outcome.failReason).toBe('timeout');
+    expect(outcome.turns).toHaveLength(MISSION_05_TURN_LIMIT);
+    expect(outcome.damageProfile.playerHullDamage).toBe(297);
+    expect(outcome.damageProfile.playerHullDamageFraction).toBe(0.83);
+    expect(outcome.damageProfile.playerRemainingHp).toBe(63);
+    // A player ship is the first thing to sink, and the enemy line is untouched.
+    expect(outcome.telemetry.firstSinkTarget).toBe(MISSION_05_PLAYER_SHIP_IDS[1]);
+    expect(outcome.damageProfile.enemyHullDamage).toBe(0);
   });
 
   it('fails with timeout when the line holds', () => {
@@ -134,10 +161,12 @@ describe('mission 05 scenario', () => {
     expect(outcome.turns).toHaveLength(MISSION_05_TURN_LIMIT);
   });
 
+  // Exact counts, not a >= 0 tautology: the closer line starts nearer the rock
+  // band, so canonical blocked moves average 1.65 -> 2.27 across 200 seeds and
+  // a passive fleet drifts into the rocks all game.
   it('records choke navigation telemetry', () => {
-    const outcome = runMission05(1, lineBreakOrders);
-    expect(outcome.telemetry.chokeBlockedMoves).toBeGreaterThanOrEqual(0);
-    expect(typeof outcome.telemetry.chokeBlockedMoves).toBe('number');
+    expect(runMission05(1, lineBreakOrders).telemetry.chokeBlockedMoves).toBe(2);
+    expect(runMission05(1, passiveOrders).telemetry.chokeBlockedMoves).toBe(19);
   });
 
   it('extracts the first kill in resolution order, not state order', () => {
@@ -193,6 +222,17 @@ describe('mission 05 routes', () => {
     expect(body.objectives).toEqual({ turnLimit: 11, bonusTurnTarget: 9, flagshipHpScale: 1.1 });
     expect(body.state.ships).toHaveLength(6);
     expect(body.state.obstacles).toHaveLength(2);
+  });
+
+  // The route caps turns at MISSION_05_TURN_LIMIT, so the published bound has to
+  // stay equal to it (this slice keeps the limit at 11; the pin is what makes a
+  // future change to it fail loudly). verify-contracts compares operations and
+  // schemaVersion only, so nothing else catches this drift.
+  it('documents the same resolve turn cap that the route enforces', () => {
+    const spec = readFileSync(new URL('../docs/api/openapi.yaml', import.meta.url), 'utf8');
+    const block = spec.split('Mission05ResolveRequest:')[1]?.split('Mission05BonusObjectives:')[0];
+    const documented = block?.match(/turns:\s*\n\s*type: array\s*\n\s*maxItems: (\d+)/)?.[1];
+    expect(documented).toBe(String(MISSION_05_TURN_LIMIT));
   });
 
   it('resolves a winning run with first-sink telemetry', async () => {
