@@ -48,6 +48,10 @@ const sloopFirstOrders: SimOrder[][] = Array.from({ length: MISSION_03_TURN_LIMI
   ];
 });
 
+// Boarding-path fixture seed, shared by the engine and route suites so both
+// resolve the identical run (re-searched for the 12-turn distribution).
+const BOARDING_WIN_SEED = 2;
+
 // Gunnery early, boarding the frigate once ranges have closed.
 const boardingOrders: SimOrder[][] = Array.from({ length: MISSION_03_TURN_LIMIT }, (_, i) => {
   if (i < 4) {
@@ -65,9 +69,9 @@ const boardingOrders: SimOrder[][] = Array.from({ length: MISSION_03_TURN_LIMIT 
 // Canonical fingerprint pinned on both sides; the Unity EditMode test
 // (Mission03Scenario) asserts the identical string for scenario parity.
 const EXPECTED_FINGERPRINT =
-  'mission-03-raking-shot|turnLimit=10|bonusTurns=8|rakeTarget=2|enemyScale=1.05|wind=90:3|' +
-  'enemy-frigate:enemy:200,90:h205:v2:hp189:sl90:cw60|' +
-  'enemy-sloop:enemy:200,-90:h155:v3:hp126:sl70:cw40|' +
+  'mission-03-raking-shot|turnLimit=12|bonusTurns=9|rakeTarget=2|enemyScale=1.15|wind=90:3|' +
+  'enemy-frigate:enemy:200,90:h205:v2:hp207:sl90:cw60|' +
+  'enemy-sloop:enemy:200,-90:h155:v3:hp138:sl70:cw40|' +
   'player-sloop-a:player:0,30:h0:v3:hp120:sl80:cw50|' +
   'player-sloop-b:player:0,-30:h0:v3:hp120:sl80:cw50';
 
@@ -170,12 +174,15 @@ describe('mission 03 scenario', () => {
     expect(mission03Fingerprint(mission03StartResponse(303))).toBe(EXPECTED_FINGERPRINT);
   });
 
-  it('applies the 1.05x enemy hull tuning knob to both enemy classes', () => {
+  // Literal hulls, not `Math.floor(180 * 1.15)`: the scale is decimal, and the
+  // binary product 206.99999999999997 would floor to 206 (see scaleHull in
+  // src/sim/mission03.ts).
+  it('applies the 1.15x enemy hull tuning knob to both enemy classes', () => {
     const state = createMission03State();
     const frigate = state.ships.find((ship) => ship.id === MISSION_03_ENEMY_SHIP_IDS[0]);
     const sloop = state.ships.find((ship) => ship.id === MISSION_03_ENEMY_SHIP_IDS[1]);
-    expect(frigate?.hp).toBe(Math.floor(180 * 1.05));
-    expect(sloop?.hp).toBe(Math.floor(120 * 1.05));
+    expect(frigate?.hp).toBe(207);
+    expect(sloop?.hp).toBe(138);
   });
 
   it('is deterministic for the same seed and orders', () => {
@@ -188,34 +195,35 @@ describe('mission 03 scenario', () => {
     const outcome = runMission03(1, sloopFirstOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
-    expect(outcome.turnCount).toBeLessThanOrEqual(8);
+    expect(outcome.turnCount).toBe(9);
     expect(outcome.bonusObjectives).toEqual({ landedRakingHits: true, withinTurnTarget: true });
-    expect(outcome.telemetry.rakeHits).toBeGreaterThanOrEqual(2);
+    expect(outcome.telemetry.rakeHits).toBe(5);
     expect(outcome.damageProfile.enemyRemainingHp).toBe(0);
   });
 
-  it('reports a win that misses the turn bonus for seed 2', () => {
-    const outcome = runMission03(2, sloopFirstOrders);
+  it('reports a win that misses the turn bonus for seed 8', () => {
+    const outcome = runMission03(8, sloopFirstOrders);
     expect(outcome.result).toBe('win');
+    expect(outcome.turnCount).toBe(10);
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(false);
     expect(outcome.bonusObjectives.landedRakingHits).toBe(true);
   });
 
   it('fails with timeout when the enemies survive the turn limit', () => {
-    const outcome = runMission03(21, sloopFirstOrders);
+    const outcome = runMission03(39, sloopFirstOrders);
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('timeout');
+    expect(outcome.turnCount).toBe(MISSION_03_TURN_LIMIT);
     expect(outcome.turns).toHaveLength(MISSION_03_TURN_LIMIT);
+    expect(outcome.damageProfile.enemyRemainingHp).toBe(47);
   });
 
   it('supports boarding as an optional path to victory', () => {
-    const outcome = runMission03(5, boardingOrders);
+    const outcome = runMission03(BOARDING_WIN_SEED, boardingOrders);
     expect(outcome.result).toBe('win');
-    expect(outcome.telemetry.boardingAttempts).toBeGreaterThan(0);
-    expect(outcome.telemetry.boardingSuccesses).toBeGreaterThan(0);
-    expect(outcome.telemetry.boardingSuccesses).toBeLessThanOrEqual(
-      outcome.telemetry.boardingAttempts
-    );
+    expect(outcome.turnCount).toBe(9);
+    expect(outcome.telemetry.boardingAttempts).toBe(10);
+    expect(outcome.telemetry.boardingSuccesses).toBe(9);
   });
 
   it('reports the per-ship damage distribution', () => {
@@ -225,7 +233,7 @@ describe('mission 03 scenario', () => {
       (entry) => entry.shipId === MISSION_03_ENEMY_SHIP_IDS[0]
     );
     expect(frigate?.remainingHp).toBe(0);
-    expect(frigate?.hullDamage).toBe(Math.floor(180 * 1.05));
+    expect(frigate?.hullDamage).toBe(207);
   });
 });
 
@@ -239,10 +247,10 @@ describe('mission 03 routes', () => {
     const body = res1.json();
     expect(body.missionCode).toBe(MISSION_03_CODE);
     expect(body.objectives).toEqual({
-      turnLimit: 10,
-      bonusTurnTarget: 8,
+      turnLimit: 12,
+      bonusTurnTarget: 9,
       rakeHitTarget: 2,
-      enemyDamageScale: 1.05
+      enemyDamageScale: 1.15
     });
     expect(body.state.ships).toHaveLength(4);
   });
@@ -257,7 +265,8 @@ describe('mission 03 routes', () => {
 
     const outcome = res.json().outcome;
     expect(outcome.result).toBe('win');
-    expect(outcome.telemetry.rakeHits).toBeGreaterThanOrEqual(2);
+    expect(outcome.turnCount).toBe(9);
+    expect(outcome.telemetry.rakeHits).toBe(5);
     expect(outcome.damageProfile.perShip).toHaveLength(4);
   });
 
@@ -265,10 +274,10 @@ describe('mission 03 routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/missions/${MISSION_03_CODE}/resolve`,
-      payload: { schemaVersion: 1, seed: 5, turns: boardingOrders }
+      payload: { schemaVersion: 1, seed: BOARDING_WIN_SEED, turns: boardingOrders }
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().outcome.telemetry.boardingAttempts).toBeGreaterThan(0);
+    expect(res.json().outcome.telemetry.boardingAttempts).toBe(10);
   });
 
   it('rejects orders for ships the player does not control', async () => {

@@ -1,7 +1,8 @@
 # Mission 03–06 Balance & Economy Tuning
 
 > **Status: Drafted** (pending design pass); **economy timber slice
-> (rollout slice 1) and mission 04 slice (rollout slice 2) applied** —
+> (rollout slice 1), mission 04 slice (rollout slice 2) and mission 03
+> slice (rollout slice 3) applied** —
 > all other values remain proposals pending their own slices. Written 2026-07-22 against the shipped
 > implementation (missions 03–06 as of PR #64), following the
 > `pvp-tuning.md` precedent: this document is the knob inventory of
@@ -11,8 +12,11 @@
 
 Motivation (tracked as an open design knob since the mission arc shipped):
 in missions 03, 05, and 06 the enemy never ended a mission across the
-200-seed sweeps below — every observed loss is a timeout, and no passive
-run was ever wiped. Mission 04 had
+baseline 200-seed sweeps below — every observed loss is a timeout, and no
+passive run was ever wiped. (Mission 03's half of that is closed by the
+applied mission 03 slice below: its post-slice sweep records 3 canonical
+losses to sinking and 71/200 passive wipes; 05 and 06 still stand.)
+Mission 04 had
 the opposite problem: the canonical boarding line won only a third of
 its runs (closed by the applied mission 04 slice below). Reward and upgrade constants are still their original
 placeholders, and the campaign's timber income could not pay for the
@@ -81,7 +85,7 @@ places that must move together:
 
 | Mission | Canonical win rate | Loss reasons observed | Passive wipes | Notes |
 | --- | --- | --- | --- | --- |
-| 03 | 67.0% | timeout only | 0 / 200 | Passive fleets never lose meaningfully more than one ship's worth of hull (max recorded fleet damage fraction 0.50). |
+| 03 | 67.0% | timeout only | 0 / 200 | Passive fleets never lose meaningfully more than one ship's worth of hull (max recorded fleet damage fraction 0.50). Pre-slice baseline; the applied slice's re-derivation sweep confirmed the proposal exactly: canonical 163/200 (81.5%), average win turn 10.0, loss mix timeout 34 + sunk 3, passive wipes 71/200 with 199/200 passive runs losing at least one ship. |
 | 04 | 33.5% (boarding), 16.5% (gunnery) | timeout, sunk, flanked | 86 / 200 | The only mission where enemies already finish fights — and it overshot into frustration. Pre-slice baseline; the applied slice's re-derivation sweep confirmed the proposal exactly: canonical boarding 110/200 (55.0%), gunnery unchanged at 16.5%, passive wipes unchanged at 86/200. |
 | 05 | 44.0% | timeout only | 0 / 200 | Canonical runs take 6% average fleet damage — enemy guns effectively never bear. |
 | 06 | 72.0% (swat-mid), 8.0% (boss-only) | timeout only | 0 / 200 | Passive fleets take 65% average damage but are never wiped in 14 turns. |
@@ -90,18 +94,23 @@ places that must move together:
 
 | Knob | Current | Proposed | Derivation / effect |
 | --- | --- | --- | --- |
-| `MISSION_03_TURN_LIMIT` | 10 | **12** | The clock, not the enemy, is the dominant loss: 33% of canonical runs time out with the last enemy at ~36 average hull. Two more turns convert most near-misses (canonical win rate 67% → 81.5%) and give the meaner enemies (below) time to actually finish passive fleets: passive wipes go 0 → 71/200 (35.5%), and 199/200 passive runs lose at least one ship. |
-| `MISSION_03_BONUS_TURN_TARGET` | 8 | **9** | Under the proposed values the canonical average win lands on turn ~10.0. A ≤8 target would be hit in only 9 of 163 winning sweeps (≈6%) — effectively unobtainable; ≤9 is hit in 62/163 (≈38%), matching the one-third stretch target. |
+| `MISSION_03_TURN_LIMIT` | 12 (**applied**; was 10) | keep | The clock, not the enemy, is the dominant loss: 33% of canonical runs time out with the last enemy at ~36 average hull. Two more turns convert most near-misses (canonical win rate 67% → 81.5%) and give the meaner enemies (below) time to actually finish passive fleets: passive wipes go 0 → 71/200 (35.5%), and 199/200 passive runs lose at least one ship. |
+| `MISSION_03_BONUS_TURN_TARGET` | 9 (**applied**; was 8) | keep | Under the applied values the canonical average win lands on turn ~10.0. A ≤8 target would be hit in only 9 of 163 winning sweeps (≈6%) — effectively unobtainable; ≤9 is hit in 62/163 (≈38%), matching the one-third stretch target. |
 | `MISSION_03_RAKE_HIT_TARGET` | 2 | keep | The rake bonus is the mission's teaching objective and already lands in canonical wins. |
-| `MISSION_03_ENEMY_DAMAGE_SCALE` | 1.05 | **1.15** | One knob deliberately scales BOTH enemy hull (frigate 180 → `floor(180×1.15)` = 207, sloop 120 → `floor(120×1.15)` = 138) and enemy outgoing damage (engine `damageScale`). +10% each way makes the pincer dangerous without a knob split. Splitting hull from damage would add an objectives field — an API-contract and fingerprint-shape change — and is deliberately out of scope here. |
+| `MISSION_03_ENEMY_DAMAGE_SCALE` | 1.15 (**applied**; was 1.05) | keep | One knob deliberately scales BOTH enemy hull (frigate 180 → 207, sloop 120 → 138, decimal `floor(base×1.15)`) and enemy outgoing damage (engine `damageScale`). +10% each way makes the pincer dangerous without a knob split. Implementation note from the applied slice: `1.15` has no exact binary representation, so `Math.floor(180 * 1.15)` evaluates to **206** — the module rounds the product to whole units of 1e-6 before flooring (`scaleHull`) so the derived hull is the decimal 207 this table specifies, and the test pins are literal 207/138 rather than recomputed expressions. The sweep numbers in this section are unaffected: 206 and 207 produce identical win rates, loss mixes, bonus rates and fixture categories. Splitting hull from damage would add an objectives field — an API-contract and fingerprint-shape change — and is deliberately out of scope here. |
 | `MISSION_03_DEFAULT_SEED` | 303 | keep | Route default only; not part of the fingerprint payload (it is the pin test's argument, not its content). |
 | Wind (90° at 2–4), spawn positions | as shipped | keep | The cross-breeze and pincer geometry are the mission's identity; the sweeps show no need to touch them. |
 
-Fingerprint ripple: `turnLimit=12`, `bonusTurns=9`, `enemyScale=1.15`,
-`hp207`, `hp138` in all three pins; seed-searched fixtures in
-`tests/mission03.test.ts` (win-with-both-bonuses, win-missing-turn-bonus,
-timeout, boarding-win seeds) must be re-searched against the new
-distribution.
+Fingerprint ripple (**applied**): `turnLimit=12`, `bonusTurns=9`,
+`enemyScale=1.15`, `hp207`, `hp138` in all three pins. Because the
+canonical order arrays are sized by `MISSION_03_TURN_LIMIT`, the longer
+clock changed both strategies' shape and their rng consumption, so every
+seed-pinned fixture in `tests/mission03.test.ts` was re-searched from
+scratch: win-with-both-bonuses stayed on seed 1 (now turn 9),
+win-missing-turn-bonus moved 2 → 8 (turn 10 — seed 2 now wins inside the
+≤9 bonus), timeout moved 21 → 39 (seed 21 now wins on turn 11), and
+boarding-win moved 5 → 2 (seed 5 now times out); the boarding seed is
+shared by the engine and route suites.
 
 ## Mission 04 "Boarding Party" (`src/sim/mission04.ts`)
 
@@ -298,7 +307,12 @@ update, in this order:
    exactly (110/200 canonical wins, 86/200 passive wipes); the only
    fixture that moved was the sunk-loss seed (3 → 41; the other pinned
    seeds still land in their categories under the new distribution).
-3. **Mission 03** — three constants including a turn-limit change.
+3. **Mission 03** (**applied**) — three constants including a turn-limit
+   change. The apply-time re-derivation reproduced the proposal's numbers
+   exactly (163/200 canonical wins, average win turn 10.0, 62/163 turn
+   bonuses, 71/200 passive wipes, 199/200 passive runs losing a ship);
+   three of the four pinned fixtures moved because the turn limit resizes
+   the canonical order arrays (see the ripple note above).
 4. **Mission 06** — two constants, one outside the fingerprint.
 5. **Mission 05** — position changes, geometry-sensitive fixtures.
 

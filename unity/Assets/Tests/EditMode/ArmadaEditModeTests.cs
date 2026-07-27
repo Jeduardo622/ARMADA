@@ -282,9 +282,9 @@ namespace Armada.Client.Tests.EditMode
             // Must equal EXPECTED_FINGERPRINT in tests/mission03.test.ts so the
             // client and server pin the identical deterministic scenario.
             const string expected =
-                "mission-03-raking-shot|turnLimit=10|bonusTurns=8|rakeTarget=2|enemyScale=1.05|wind=90:3|" +
-                "enemy-frigate:enemy:200,90:h205:v2:hp189:sl90:cw60|" +
-                "enemy-sloop:enemy:200,-90:h155:v3:hp126:sl70:cw40|" +
+                "mission-03-raking-shot|turnLimit=12|bonusTurns=9|rakeTarget=2|enemyScale=1.15|wind=90:3|" +
+                "enemy-frigate:enemy:200,90:h205:v2:hp207:sl90:cw60|" +
+                "enemy-sloop:enemy:200,-90:h155:v3:hp138:sl70:cw40|" +
                 "player-sloop-a:player:0,30:h0:v3:hp120:sl80:cw50|" +
                 "player-sloop-b:player:0,-30:h0:v3:hp120:sl80:cw50";
 

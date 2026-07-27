@@ -6,10 +6,10 @@ import { SimOrder, SimState, Wind } from './types.js';
 
 // Mission 03 "Raking Shot" — docs/content/missions/mission-03-raking-shot.md
 export const MISSION_03_CODE = 'mission-03-raking-shot';
-export const MISSION_03_TURN_LIMIT = 10;
-export const MISSION_03_BONUS_TURN_TARGET = 8;
+export const MISSION_03_TURN_LIMIT = 12;
+export const MISSION_03_BONUS_TURN_TARGET = 9;
 export const MISSION_03_RAKE_HIT_TARGET = 2;
-export const MISSION_03_ENEMY_DAMAGE_SCALE = 1.05;
+export const MISSION_03_ENEMY_DAMAGE_SCALE = 1.15;
 export const MISSION_03_DEFAULT_SEED = 303;
 
 export const MISSION_03_PLAYER_SHIP_IDS = ['player-sloop-a', 'player-sloop-b'] as const;
@@ -18,8 +18,15 @@ export const MISSION_03_ENEMY_SHIP_IDS = ['enemy-frigate', 'enemy-sloop'] as con
 const PLAYER_BASE_HULL_HP = 120;
 const FRIGATE_BASE_HULL_HP = 180;
 const SLOOP_BASE_HULL_HP = 120;
-const FRIGATE_HULL_HP = Math.floor(FRIGATE_BASE_HULL_HP * MISSION_03_ENEMY_DAMAGE_SCALE);
-const SLOOP_HULL_HP = Math.floor(SLOOP_BASE_HULL_HP * MISSION_03_ENEMY_DAMAGE_SCALE);
+// The scale is a decimal quantity: 1.15 has no exact binary form, so
+// `180 * 1.15` evaluates to 206.99999999999997 and a bare floor would shed a
+// hull point (206 instead of the intended 207). Round the product to whole
+// units of 1e-6 first so the derived hull matches the spec's decimal
+// arithmetic; the pinned literals in tests/mission03.test.ts guard this.
+const scaleHull = (baseHp: number): number =>
+  Math.floor(Math.round(baseHp * MISSION_03_ENEMY_DAMAGE_SCALE * 1e6) / 1e6);
+const FRIGATE_HULL_HP = scaleHull(FRIGATE_BASE_HULL_HP);
+const SLOOP_HULL_HP = scaleHull(SLOOP_BASE_HULL_HP);
 
 // Gentle side wind across the west-east engagement axis: fixed direction,
 // low speed variance (2..4).

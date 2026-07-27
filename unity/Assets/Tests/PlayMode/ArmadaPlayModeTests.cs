@@ -1167,7 +1167,7 @@ namespace Armada.Client.Tests.PlayMode
                             PlayerHullDamage = 95,
                             PlayerHullDamageFraction = 0.4,
                             PlayerRemainingHp = 145,
-                            EnemyHullDamage = 315,
+                            EnemyHullDamage = 345,
                             EnemyRemainingHp = 0,
                             PerShip = new List<Mission03ShipDamage>()
                         },
