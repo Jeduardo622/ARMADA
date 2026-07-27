@@ -398,6 +398,52 @@ these missions and a playtest with earned tiers exists to measure.
 - **Rewards stay fail-closed** (`missionRewardsForCode` returns `[]`
   for unknown codes) and server-authoritative; value changes never touch
   the grant flow or the win-proof re-simulation.
+- **Win proofs prove an achievable line, not that it was played.**
+  `/missions/:code/start` does not issue a seed — it accepts one from
+  the caller (`seed` defaulted to `MISSION_0X_DEFAULT_SEED` under a
+  `.strict()` body, no `playerId`) and echoes it back; all ten Unity
+  flows assert that echo (`seed_mismatch`). Nothing binds the `seed` in
+  a `/complete` win proof to any server-dealt run, so a caller can
+  search `(seed, turns)` offline and submit a favourable RNG line. The
+  re-simulation still enforces real mission rules — valid player ships,
+  valid targets, `allowBoarding`, schema turn caps, and owned upgrade
+  tiers (`upgrade_tiers_exceed_owned`) — so a forged proof must be a
+  line the player *could* have played, and first-completion-only grants
+  cap the take at one campaign's reward table per player rather than
+  anything farmable. **Decision (2026-07-27): accepted, unbound.** There
+  is no monetization and no PvP stake on mission rewards, and the
+  canonical scripted strategy wins a majority of seeds throughout, so
+  the offline search is one or two tries. **The retunes moved that
+  payoff slightly the other way**, which corrects the premise this was
+  raised under (that difficulty retunes raise the value of
+  seed-shopping): expected attempts to find a winning line go as `1/p`,
+  and every applied slice raised the canonical win rate or left it flat
+  — 03 `67.0→81.5%`, 04 `33.5→55.0%`, 05 `44.0→53.0%`, 06
+  `72.0→71.5%` — so attacker cost *fell*, from an arc worst case of
+  ~3.0 expected attempts (mission 04 baseline) to ~1.8, with the
+  current worst mission 05's ~1.9 against mission 03's ~1.2. Difficulty
+  is therefore a real but very weak lever in either direction, and
+  nothing in this arc's range is an attacker-facing difference. Run
+  that arithmetic on a future retune rather than assuming the sign.
+  Binding a server-issued seed would mean issuing and persisting one
+  across all ten `/start` routes — which carry no player identity
+  today — and breaking the echo assertion in all ten client
+  flows: a route + schema + Unity change (PlayMode evidence, migration,
+  Database review) whose cost the exposure does not justify, and which
+  still would not prove play while `/start` re-rolls are free. Revisit
+  if mission rewards gain monetary or PvP value, if grants become
+  repeatable rather than first-completion, or if a real player base
+  exists at rollout. The remedy then is a **live server-held run**: the
+  server generates and retains the seed, keeps the run state, and
+  advances it one turn at a time from orders submitted against RNG it
+  has not yet revealed, so there is no offline oracle to search. Note
+  what does *not* qualify — "re-simulate it server-side" is already
+  what `/complete` does (`proofConfig.run(seed, turns, upgrades)`) and
+  is the very thing being bypassed, so any future slice must be
+  specified as server-held state and server-controlled RNG rather than
+  server-side replay of a caller-supplied `(seed, turns)` pair.
+  Distinct from the unsignaled compatibility window under Rollout, which
+  is about *which* constants a run was authored against.
 - **Economy income math assumes `inventory_grant_api` stays disabled.**
   The grant route can mint any item for the calling player once that
   flag is enabled; the campaign-total "hard cap" arithmetic above holds
