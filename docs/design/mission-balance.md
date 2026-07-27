@@ -398,6 +398,39 @@ these missions and a playtest with earned tiers exists to measure.
 - **Rewards stay fail-closed** (`missionRewardsForCode` returns `[]`
   for unknown codes) and server-authoritative; value changes never touch
   the grant flow or the win-proof re-simulation.
+- **Win proofs prove an achievable line, not that it was played.**
+  `/missions/:code/start` does not issue a seed — it accepts one from
+  the caller (`seed` defaulted to `MISSION_0X_DEFAULT_SEED` under a
+  `.strict()` body, no `playerId`) and echoes it back; all ten Unity
+  flows assert that echo (`seed_mismatch`). Nothing binds the `seed` in
+  a `/complete` win proof to any server-dealt run, so a caller can
+  search `(seed, turns)` offline and submit a favourable RNG line. The
+  re-simulation still enforces real mission rules — valid player ships,
+  valid targets, `allowBoarding`, schema turn caps, and owned upgrade
+  tiers (`upgrade_tiers_exceed_owned`) — so a forged proof must be a
+  line the player *could* have played, and first-completion-only grants
+  cap the take at one campaign's reward table per player rather than
+  anything farmable. **Decision (2026-07-27): accepted, unbound.** There
+  is no monetization and no PvP stake on mission rewards, and the
+  canonical scripted strategy wins a majority of seeds throughout, so
+  the offline search is one or two tries. Difficulty retunes barely move
+  that payoff, which is why this never gated the rollout: the arc's
+  hardest applied point is mission 05 at 53.0% canonical wins, worth
+  ~1.9 expected attempts against ~1.2 at mission 03's 81.5% — a
+  distinction without an attacker-facing difference. Apply the same test
+  to any future retune rather than assuming a harder mission is a
+  materially better target. Binding a server-issued seed would mean issuing and
+  persisting one across all ten `/start` routes — which carry no player
+  identity today — and breaking the echo assertion in all ten client
+  flows: a route + schema + Unity change (PlayMode evidence, migration,
+  Database review) whose cost the exposure does not justify, and which
+  still would not prove play while `/start` re-rolls are free. Revisit
+  if mission rewards gain monetary or PvP value, if grants become
+  repeatable rather than first-completion, or if a real player base
+  exists at rollout; the remedy then is server-authoritative resolution
+  (server runs the mission from per-turn orders), not seed binding.
+  Distinct from the unsignaled compatibility window under Rollout, which
+  is about *which* constants a run was authored against.
 - **Economy income math assumes `inventory_grant_api` stays disabled.**
   The grant route can mint any item for the calling player once that
   flag is enabled; the campaign-total "hard cap" arithmetic above holds
