@@ -14,10 +14,10 @@ namespace Armada.Client.Core
     public static class Mission03Scenario
     {
         public const string MissionCode = "mission-03-raking-shot";
-        public const int TurnLimit = 10;
-        public const int BonusTurnTarget = 8;
+        public const int TurnLimit = 12;
+        public const int BonusTurnTarget = 9;
         public const int RakeHitTarget = 2;
-        public const double EnemyDamageScale = 1.05;
+        public const double EnemyDamageScale = 1.15;
         public static readonly string[] PlayerShipIds = { "player-sloop-a", "player-sloop-b" };
         public static readonly string[] EnemyShipIds = { "enemy-frigate", "enemy-sloop" };
 
@@ -70,7 +70,7 @@ namespace Armada.Client.Core
                             Position = new SimVector2 { X = 200, Y = 90 },
                             Heading = 205,
                             Speed = 2,
-                            Hp = 189,
+                            Hp = 207,
                             Sail = 90,
                             Crew = 60
                         },
@@ -81,7 +81,7 @@ namespace Armada.Client.Core
                             Position = new SimVector2 { X = 200, Y = -90 },
                             Heading = 155,
                             Speed = 3,
-                            Hp = 126,
+                            Hp = 138,
                             Sail = 70,
                             Crew = 40
                         }
