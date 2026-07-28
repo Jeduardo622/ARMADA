@@ -85,7 +85,7 @@ public static class PvPNetplayDemoSceneBuilder
         hudLabel.text = "PvP netplay: waiting for sign-in...";
         var statusLabel = CreateLabel(safeArea, "PhaseStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
-        var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 244f);
+        var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 340f);
         orderLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
@@ -100,10 +100,12 @@ public static class PvPNetplayDemoSceneBuilder
         SetReference(netplayUI, "orderLabel", orderLabel);
         SetReference(netplayUI, "statusLabel", statusLabel);
 
-        // Menu row: Create, code input, Join.
-        CreateButton(safeArea, "Create Match", 0, netplayUI.OnCreateMatch, rowY: 132f);
-        CreateJoinCodeInput(safeArea, netplayUI, rowY: 132f, slot: 1);
-        CreateButton(safeArea, "Join Match", 2, netplayUI.OnJoinMatch, rowY: 132f);
+        // Menu strip (Create, code input, Join) wraps independently above
+        // the order strip.
+        var menuGrid = CreateButtonGrid(safeArea, "MenuButtons", bottomOffset: 176f);
+        CreateButton(menuGrid, "Create Match", netplayUI.OnCreateMatch);
+        CreateJoinCodeInput(menuGrid, netplayUI);
+        CreateButton(menuGrid, "Join Match", netplayUI.OnJoinMatch);
 
         // Order-entry row (own side only).
         var orderButtons = new (string label, UnityAction handler)[]
@@ -117,9 +119,10 @@ public static class PvPNetplayDemoSceneBuilder
             ("Ammo", netplayUI.OnToggleAmmo),
             ("Confirm Orders", netplayUI.OnConfirmOrders)
         };
+        var orderGrid = CreateButtonGrid(safeArea, "OrderButtons", bottomOffset: 24f);
         for (var i = 0; i < orderButtons.Length; i++)
         {
-            CreateButton(safeArea, orderButtons[i].label, i, orderButtons[i].handler, rowY: 24f);
+            CreateButton(orderGrid, orderButtons[i].label, orderButtons[i].handler);
         }
 
         var bootstrapObject = new GameObject("PvpNetplayBootstrap", typeof(DeterministicSimHooks), typeof(PvpNetplayBootstrap), typeof(MobilePresentation));
@@ -203,20 +206,38 @@ public static class PvPNetplayDemoSceneBuilder
         return label;
     }
 
-    private static void CreateButton(Transform parent, string label, int slot, UnityAction handler, float rowY)
+    // Wrapping button strip (Codex P1 on PR #83): a fixed row overflows any
+    // screen narrower than its total width — a 4:3 tablet in landscape, or
+    // portrait phones — leaving confirm actions unreachable. The grid wraps
+    // into extra rows upward from the bottom edge instead, at any aspect.
+    // Cell height 140 keeps the minimum supported device honest (Codex P2):
+    // iPhone 8 landscape matches 750 px against the 1080 reference (scale
+    // 0.694), so 140 units render at ~97 px = ~48.6 pt on its 2x display —
+    // above the 44 pt floor; 96 units would land at 33 pt.
+    private static Transform CreateButtonGrid(Transform parent, string name, float bottomOffset)
+    {
+        var gridObject = new GameObject(name, typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        gridObject.transform.SetParent(parent, worldPositionStays: false);
+        var rect = gridObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.anchoredPosition = new Vector2(0f, bottomOffset);
+        rect.sizeDelta = new Vector2(-48f, 0f);
+        var grid = gridObject.GetComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(190f, 140f);
+        grid.spacing = new Vector2(12f, 12f);
+        grid.startCorner = GridLayoutGroup.Corner.LowerLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = TextAnchor.LowerLeft;
+        gridObject.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        return gridObject.transform;
+    }
+
+    private static void CreateButton(Transform parent, string label, UnityAction handler)
     {
         var buttonObject = new GameObject($"Button-{label}", typeof(RectTransform), typeof(Image), typeof(Button));
         buttonObject.transform.SetParent(parent, worldPositionStays: false);
-
-        var rect = buttonObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 0f);
-        rect.pivot = new Vector2(0f, 0f);
-        // 190×96 at the 1080p reference ≈ 9 mm tall on a 6" phone — clears
-        // the 44 pt touch-target floor (D2-B mobile-first constraint set).
-        var width = 190f;
-        rect.anchoredPosition = new Vector2(24f + slot * (width + 12f), rowY);
-        rect.sizeDelta = new Vector2(width, 96f);
 
         buttonObject.GetComponent<Image>().color = new Color(0.15f, 0.25f, 0.4f, 0.9f);
         UnityEventTools.AddVoidPersistentListener(buttonObject.GetComponent<Button>().onClick, handler);
@@ -237,19 +258,12 @@ public static class PvPNetplayDemoSceneBuilder
     // Join-code entry uses the legacy uGUI InputField (not TMP_InputField)
     // so the interactive path has no dependency on the TMP Essentials
     // import; the built-in LegacyRuntime font renders it.
-    private static void CreateJoinCodeInput(Transform parent, PvpNetplayUIController netplayUI, float rowY, int slot)
+    private static void CreateJoinCodeInput(Transform parent, PvpNetplayUIController netplayUI)
     {
+        // Lives inside the menu grid; the grid cell supplies the touch-size
+        // geometry (D2-B).
         var inputObject = new GameObject("JoinCodeInput", typeof(RectTransform), typeof(Image), typeof(InputField));
         inputObject.transform.SetParent(parent, worldPositionStays: false);
-
-        var rect = inputObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 0f);
-        rect.pivot = new Vector2(0f, 0f);
-        // Mirrors the touch-size button geometry (D2-B).
-        var width = 190f;
-        rect.anchoredPosition = new Vector2(24f + slot * (width + 12f), rowY);
-        rect.sizeDelta = new Vector2(width, 96f);
         inputObject.GetComponent<Image>().color = new Color(0.9f, 0.9f, 0.9f, 0.95f);
 
         var textObject = new GameObject("Text", typeof(RectTransform), typeof(Text));

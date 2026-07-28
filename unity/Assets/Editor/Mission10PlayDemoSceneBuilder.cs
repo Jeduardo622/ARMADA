@@ -99,7 +99,7 @@ public static class Mission10PlayDemoSceneBuilder
         hudLabel.text = "Mission 10 Sail-Cutter: authenticating...";
         var statusLabel = CreateLabel(safeArea, "MissionStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
-        var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 136f);
+        var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 180f);
         orderLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
@@ -137,9 +137,10 @@ public static class Mission10PlayDemoSceneBuilder
             ("Confirm Turn", playUI.OnConfirmTurn),
             ("Undo Turn", playUI.OnUndoTurn)
         };
+        var buttonGrid = CreateButtonGrid(safeArea, "OrderButtons", bottomOffset: 24f);
         for (var i = 0; i < buttons.Length; i++)
         {
-            CreateButton(safeArea, buttons[i].label, i, buttons[i].handler);
+            CreateButton(buttonGrid, buttons[i].label, buttons[i].handler);
         }
 
         var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap), typeof(MobilePresentation));
@@ -227,27 +228,41 @@ public static class Mission10PlayDemoSceneBuilder
         return label;
     }
 
-    private static void CreateButton(Transform parent, string label, int index, UnityAction handler)
+    // Wrapping button strip (Codex P1 on PR #83): a fixed row overflows any
+    // screen narrower than its total width — a 4:3 tablet in landscape, or
+    // portrait phones — leaving confirm actions unreachable. The grid wraps
+    // into extra rows upward from the bottom edge instead, at any aspect.
+    // Cell height 140 keeps the minimum supported device honest (Codex P2):
+    // iPhone 8 landscape matches 750 px against the 1080 reference (scale
+    // 0.694), so 140 units render at ~97 px = ~48.6 pt on its 2x display —
+    // above the 44 pt floor; 96 units would land at 33 pt.
+    private static Transform CreateButtonGrid(Transform parent, string name, float bottomOffset)
+    {
+        var gridObject = new GameObject(name, typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        gridObject.transform.SetParent(parent, worldPositionStays: false);
+        var rect = gridObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.anchoredPosition = new Vector2(0f, bottomOffset);
+        rect.sizeDelta = new Vector2(-48f, 0f);
+        var grid = gridObject.GetComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(190f, 140f);
+        grid.spacing = new Vector2(12f, 12f);
+        grid.startCorner = GridLayoutGroup.Corner.LowerLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = TextAnchor.LowerLeft;
+        gridObject.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        return gridObject.transform;
+    }
+
+    private static void CreateButton(Transform parent, string label, UnityAction handler)
     {
         var buttonObject = new GameObject($"Button-{label}", typeof(RectTransform), typeof(Image), typeof(Button));
         buttonObject.transform.SetParent(parent, worldPositionStays: false);
 
-        var rect = buttonObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 0f);
-        rect.pivot = new Vector2(0f, 0f);
-        // Nine buttons at 190×96 + 12 gaps + 24 margins = 1866 of the
-        // 1920 reference width; ≈ 9 mm tall on a 6" phone, clearing the
-        // 44 pt touch floor (D2-B mobile-first constraint set).
-        var width = 190f;
-        rect.anchoredPosition = new Vector2(24f + index * (width + 12f), 24f);
-        rect.sizeDelta = new Vector2(width, 96f);
-
-        var image = buttonObject.GetComponent<Image>();
-        image.color = new Color(0.15f, 0.25f, 0.4f, 0.9f);
-
-        var button = buttonObject.GetComponent<Button>();
-        UnityEventTools.AddVoidPersistentListener(button.onClick, handler);
+        buttonObject.GetComponent<Image>().color = new Color(0.15f, 0.25f, 0.4f, 0.9f);
+        UnityEventTools.AddVoidPersistentListener(buttonObject.GetComponent<Button>().onClick, handler);
 
         var labelObject = new GameObject("Label", typeof(TextMeshProUGUI));
         labelObject.transform.SetParent(buttonObject.transform, worldPositionStays: false);
