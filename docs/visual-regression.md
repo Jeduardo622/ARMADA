@@ -14,7 +14,7 @@ layer, capture, look at the PNGs, diff against the last known-good frames.
    server-wire-shaped JSON to
    `unity/Assets/Editor/VisualCapture/Fixtures/pvp-seed11-focus-fire.json`
    (committed). A drift guard fails the script if the sim no longer
-   produces the pinned side-A-wins-at-turn-7 outcome.
+   produces the pinned side-A-wins-at-turn-6 outcome.
 2. **Capture** — `unity/Assets/Editor/VisualCapture/SpectatorVisualCapture.cs`
    builds the PvP-scene stage (same camera/light/board as
    `PvPNetplayDemoSceneBuilder`, ambient pinned, aspect pinned), feeds the
@@ -79,7 +79,7 @@ npx tsx scripts/visual/generate-capture-fixture.ts
 - `frame-<tick>-turnNN` — the first tick of each turn banner.
 - `frame-<tick>-complete` — after `RunComplete`.
 
-Nine frames for the seed-11 fixture (opening + 7 turns + complete). The
+Eight frames for the seed-11 fixture (opening + 6 turns + complete). The
 tick index is embedded in the filename, so a timing change (step
 durations, tick cadence) shows up as a rename — loudly — rather than a
 silent re-capture at different moments.

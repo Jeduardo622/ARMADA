@@ -501,7 +501,7 @@ namespace Armada.Client.Tests.EditMode
             // Seed 2 and the mixed-battery orders are the deterministic win
             // fixture pinned in tests/mission10.test.ts; the bootstrap must
             // mirror them exactly or the runtime run stops winning.
-            Assert.That(Armada.Client.Bootstrap.Mission10Bootstrap.DefaultSeed, Is.EqualTo(2));
+            Assert.That(Armada.Client.Bootstrap.Mission10Bootstrap.DefaultSeed, Is.EqualTo(5));
 
             var turns = Armada.Client.Bootstrap.Mission10Bootstrap.BuildMixedBatteryOrders();
             Assert.That(turns, Has.Count.EqualTo(Mission10Scenario.TurnLimit));

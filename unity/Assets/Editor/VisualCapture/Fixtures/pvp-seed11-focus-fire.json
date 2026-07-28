@@ -2,7 +2,7 @@
   "scenario": "pvp-skirmish-2v2",
   "seed": 11,
   "turnLimit": 20,
-  "description": "Pinned focus-fire-vs-split fixture battle (tests/pvpScenario.test.ts): side A win at turn 7.",
+  "description": "Pinned focus-fire-vs-split fixture battle (tests/pvpScenario.test.ts): side A win at turn 6.",
   "shipsAtStart": [
     {
       "id": "alpha-frigate-a",
@@ -60,7 +60,7 @@
   "turns": [
     {
       "turn": 1,
-      "hash": "d3c8774525dd6d7157273b95673f3929c88ebe9443b5ad8b27b0ec76acb0af53",
+      "hash": "61d2fc1a36c1be0dd44c5ccdbf0c8085485f77869dd32801cc71707f0db0061f",
       "summary": {
         "playerRemaining": 2,
         "enemyRemaining": 2,
@@ -142,7 +142,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 28,
-          "hitChance": 70,
+          "hitChance": 58,
           "damage": {
             "hull": 25,
             "sail": 15,
@@ -161,7 +161,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 58,
-          "hitChance": 69,
+          "hitChance": 61,
           "damage": {
             "hull": 30,
             "sail": 18,
@@ -180,7 +180,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 15,
-          "hitChance": 70,
+          "hitChance": 58,
           "damage": {
             "hull": 23,
             "sail": 13,
@@ -197,25 +197,25 @@
           "shipId": "bravo-frigate-b",
           "targetShipId": "alpha-frigate-b",
           "side": "starboard",
-          "hit": true,
+          "hit": false,
           "roll": 69,
-          "hitChance": 70,
+          "hitChance": 58,
           "damage": {
-            "hull": 28,
-            "sail": 16,
-            "crew": 9
+            "hull": 0,
+            "sail": 0,
+            "crew": 0
           },
           "targetRemaining": {
-            "hp": 92,
-            "sail": 64,
-            "crew": 41
+            "hp": 120,
+            "sail": 80,
+            "crew": 50
           }
         }
       ]
     },
     {
       "turn": 2,
-      "hash": "39dbdd252042fadbed76711460c3e2ab3c2d896e416b4b4a612c7ff88fc5c10e",
+      "hash": "8013ac97ddb8735753ab8b58b2c3cf9ba845a3289101de20020482ce74a054db",
       "summary": {
         "playerRemaining": 2,
         "enemyRemaining": 2,
@@ -297,7 +297,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 56,
-          "hitChance": 70,
+          "hitChance": 58,
           "damage": {
             "hull": 26,
             "sail": 15,
@@ -316,15 +316,15 @@
           "side": "starboard",
           "hit": true,
           "roll": 7,
-          "hitChance": 69,
+          "hitChance": 61,
           "damage": {
-            "hull": 24,
-            "sail": 14,
+            "hull": 25,
+            "sail": 15,
             "crew": 8
           },
           "targetRemaining": {
-            "hp": 15,
-            "sail": 18,
+            "hp": 14,
+            "sail": 17,
             "crew": 15
           }
         },
@@ -335,7 +335,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 3,
-          "hitChance": 70,
+          "hitChance": 58,
           "damage": {
             "hull": 22,
             "sail": 13,
@@ -354,23 +354,23 @@
           "side": "starboard",
           "hit": true,
           "roll": 9,
-          "hitChance": 70,
+          "hitChance": 58,
           "damage": {
             "hull": 27,
             "sail": 16,
             "crew": 9
           },
           "targetRemaining": {
-            "hp": 65,
-            "sail": 48,
-            "crew": 32
+            "hp": 93,
+            "sail": 64,
+            "crew": 41
           }
         }
       ]
     },
     {
       "turn": 3,
-      "hash": "5ede9732aec64b2456bfc16e573ee163623bdb5b3cef5b086fc3af22c7be32cf",
+      "hash": "f0427f6652c4b96652ce1e109488d04653502d57069bf6e2f3fa887d82336444",
       "summary": {
         "playerRemaining": 2,
         "enemyRemaining": 1,
@@ -454,7 +454,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 44,
-          "hitChance": 71,
+          "hitChance": 59,
           "damage": {
             "hull": 26,
             "sail": 15,
@@ -462,7 +462,7 @@
           },
           "targetRemaining": {
             "hp": 0,
-            "sail": 3,
+            "sail": 2,
             "crew": 6
           }
         },
@@ -473,23 +473,23 @@
           "side": "starboard",
           "hit": true,
           "roll": 51,
-          "hitChance": 71,
+          "hitChance": 59,
           "damage": {
             "hull": 27,
             "sail": 16,
             "crew": 9
           },
           "targetRemaining": {
-            "hp": 38,
-            "sail": 32,
-            "crew": 23
+            "hp": 66,
+            "sail": 48,
+            "crew": 32
           }
         }
       ]
     },
     {
       "turn": 4,
-      "hash": "0b5ecd05071c58d4cda3d4e706947569da675823c58708fd0632e651a24882bd",
+      "hash": "f5774b449e47663e51617c8b42513c8eaec253d33f860f46c803f7089266dbcd",
       "summary": {
         "playerRemaining": 2,
         "enemyRemaining": 1,
@@ -556,7 +556,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 23,
-          "hitChance": 69,
+          "hitChance": 64,
           "damage": {
             "hull": 26,
             "sail": 15,
@@ -575,7 +575,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 40,
-          "hitChance": 71,
+          "hitChance": 59,
           "damage": {
             "hull": 25,
             "sail": 15,
@@ -594,28 +594,27 @@
           "side": "starboard",
           "hit": true,
           "roll": 22,
-          "hitChance": 71,
+          "hitChance": 59,
           "damage": {
             "hull": 27,
             "sail": 16,
             "crew": 9
           },
           "targetRemaining": {
-            "hp": 11,
-            "sail": 16,
-            "crew": 14
+            "hp": 39,
+            "sail": 32,
+            "crew": 23
           }
         }
       ]
     },
     {
       "turn": 5,
-      "hash": "5c1cfdf19fb75df0a646924f5a4bfb72a4ed129b22d49cb01e8d37cbf987b7ed",
+      "hash": "242058d977da24d7c11a52e7d7584f80aa9dda7e9c3adc79ee782c2f8abbe485",
       "summary": {
-        "playerRemaining": 1,
+        "playerRemaining": 2,
         "enemyRemaining": 1,
         "sunk": [
-          "alpha-frigate-b",
           "bravo-frigate-a"
         ]
       },
@@ -678,7 +677,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 63,
-          "hitChance": 70,
+          "hitChance": 66,
           "damage": {
             "hull": 24,
             "sail": 14,
@@ -697,7 +696,7 @@
           "side": "starboard",
           "hit": false,
           "roll": 75,
-          "hitChance": 72,
+          "hitChance": 60,
           "damage": {
             "hull": 0,
             "sail": 0,
@@ -716,35 +715,43 @@
           "side": "starboard",
           "hit": true,
           "roll": 33,
-          "hitChance": 72,
+          "hitChance": 60,
           "damage": {
             "hull": 23,
             "sail": 13,
             "crew": 8
           },
           "targetRemaining": {
-            "hp": 0,
-            "sail": 3,
-            "crew": 6
+            "hp": 16,
+            "sail": 19,
+            "crew": 15
           }
         }
       ]
     },
     {
       "turn": 6,
-      "hash": "5ef8b767002bc0373dbdb3eb8d18eeb96891fba379ae1f2526f4f919f6222027",
+      "hash": "42bf33410d96ce5033bb19db16c2217a4811f2fdc40bbbfebbe84192f91e74e6",
       "summary": {
-        "playerRemaining": 1,
-        "enemyRemaining": 1,
+        "playerRemaining": 2,
+        "enemyRemaining": 0,
         "sunk": [
-          "alpha-frigate-b",
-          "bravo-frigate-a"
+          "bravo-frigate-a",
+          "bravo-frigate-b"
         ]
       },
       "events": [
         {
           "type": "maneuver",
           "shipId": "alpha-frigate-a",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-b",
           "heading": 0,
           "speed": 3,
           "turnDelta": 0,
@@ -769,6 +776,15 @@
         },
         {
           "type": "movement",
+          "shipId": "alpha-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 90,
+            "y": -30
+          }
+        },
+        {
+          "type": "movement",
           "shipId": "bravo-frigate-b",
           "effectiveSpeed": 3,
           "position": {
@@ -783,7 +799,7 @@
           "side": "starboard",
           "hit": true,
           "roll": 67,
-          "hitChance": 69,
+          "hitChance": 68,
           "damage": {
             "hull": 25,
             "sail": 15,
@@ -797,89 +813,21 @@
         },
         {
           "type": "broadside",
-          "shipId": "bravo-frigate-b",
-          "targetShipId": "alpha-frigate-a",
+          "shipId": "alpha-frigate-b",
+          "targetShipId": "bravo-frigate-b",
           "side": "starboard",
           "hit": true,
           "roll": 53,
-          "hitChance": 69,
+          "hitChance": 61,
           "damage": {
             "hull": 22,
             "sail": 13,
             "crew": 7
           },
           "targetRemaining": {
-            "hp": 53,
-            "sail": 41,
-            "crew": 28
-          }
-        }
-      ]
-    },
-    {
-      "turn": 7,
-      "hash": "9d5771dd46262078b30837346c4818dc3d3f2270591de0ea2d186149c9bbf9c0",
-      "summary": {
-        "playerRemaining": 1,
-        "enemyRemaining": 0,
-        "sunk": [
-          "alpha-frigate-b",
-          "bravo-frigate-a",
-          "bravo-frigate-b"
-        ]
-      },
-      "events": [
-        {
-          "type": "maneuver",
-          "shipId": "alpha-frigate-a",
-          "heading": 0,
-          "speed": 3,
-          "turnDelta": 0,
-          "speedDelta": 0
-        },
-        {
-          "type": "maneuver",
-          "shipId": "bravo-frigate-b",
-          "heading": 180,
-          "speed": 3,
-          "turnDelta": 0,
-          "speedDelta": 0
-        },
-        {
-          "type": "movement",
-          "shipId": "alpha-frigate-a",
-          "effectiveSpeed": 3,
-          "position": {
-            "x": 105,
-            "y": 30
-          }
-        },
-        {
-          "type": "movement",
-          "shipId": "bravo-frigate-b",
-          "effectiveSpeed": 3,
-          "position": {
-            "x": 115,
-            "y": -30
-          }
-        },
-        {
-          "type": "broadside",
-          "shipId": "alpha-frigate-a",
-          "targetShipId": "bravo-frigate-b",
-          "side": "starboard",
-          "hit": true,
-          "roll": 39,
-          "hitChance": 67,
-          "damage": {
-            "hull": 26,
-            "sail": 15,
-            "crew": 9
-          },
-          "targetRemaining": {
             "hp": 0,
-            "sail": 6,
-            "crew": 8
+            "sail": 8,
+            "crew": 10
           }
         }
       ]

@@ -2,7 +2,7 @@
  * Generates the committed visual-capture fixture: a fully resolved
  * pvp-skirmish-2v2 battle replayed with the same seed and order strategy as
  * the pinned focus-fire-vs-split fixture in tests/pvpScenario.test.ts
- * (seed 11, side A focus fire, side B split fire — a side A win at turn 7).
+ * (seed 11, side A focus fire, side B split fire — a side A win at turn 6).
  * The output is server-wire-shaped JSON (camelCase) that the Unity capture
  * tool (unity/Assets/Editor/VisualCapture/SpectatorVisualCapture.cs)
  * deserializes straight into the client DTOs and feeds to the real
@@ -39,7 +39,8 @@ const outputPath = resolve(
 
 // Mirrors the fixture pin in tests/pvpScenario.test.ts; if the sim moves,
 // this guard breaks before a drifted fixture can be written.
-const PINNED_FOCUS_FIRE_TURN = 7;
+// Re-derived for the D1-A broadside-arc curve (was 7).
+const PINNED_FOCUS_FIRE_TURN = 6;
 
 const isAfloat = (state: SimState, id: string) =>
   (state.ships.find((ship) => ship.id === id)?.hp ?? 0) > 0;
@@ -110,7 +111,7 @@ const fixture = {
   seed: PVP_DEFAULT_SEED,
   turnLimit: PVP_TURN_LIMIT,
   description:
-    'Pinned focus-fire-vs-split fixture battle (tests/pvpScenario.test.ts): side A win at turn 7.',
+    'Pinned focus-fire-vs-split fixture battle (tests/pvpScenario.test.ts): side A win at turn 6.',
   shipsAtStart,
   turns
 };

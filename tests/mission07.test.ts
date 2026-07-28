@@ -77,7 +77,8 @@ describe('mission 07 scenario', () => {
     expect(outcome.turnCount).toBe(9);
     expect(outcome.bonusObjectives).toEqual({ enemyIgnited: true, unscorched: true });
     expect(outcome.telemetry).toEqual({
-      ignitionsInflicted: 6,
+      // Re-derived for the D1-A broadside-arc curve (was 6).
+      ignitionsInflicted: 5,
       ignitionsSuffered: 0,
       slowsInflicted: 4
     });

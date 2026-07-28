@@ -110,8 +110,10 @@ describe('mission 05 scenario', () => {
     expect(second).toEqual(first);
   });
 
-  it('reports a win with both bonuses for seed 1 line-breaking play', () => {
-    const outcome = runMission05(1, lineBreakOrders);
+  it('reports a win with both bonuses for seed 2 line-breaking play', () => {
+    // D1-A re-derivation: seed 1's line break now times out; seed 2 keeps the
+    // identical turn-8 both-bonus shape (and the same choke count of 2).
+    const outcome = runMission05(2, lineBreakOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
     expect(outcome.turnCount).toBe(8);
@@ -120,8 +122,9 @@ describe('mission 05 scenario', () => {
     expect(outcome.damageProfile.enemyRemainingHp).toBe(0);
   });
 
-  it('reports a flagship-first win that misses the turn bonus for seed 1 slow play', () => {
-    const outcome = runMission05(1, slowFlagshipOrders);
+  it('reports a flagship-first win that misses the turn bonus for seed 2 slow play', () => {
+    // D1-A re-derivation: seed 2 keeps the exact turn-10 slow-win shape.
+    const outcome = runMission05(2, slowFlagshipOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.turnCount).toBe(10);
     expect(outcome.bonusObjectives.sankFlagshipFirst).toBe(true);
@@ -163,15 +166,15 @@ describe('mission 05 scenario', () => {
     expect(outcome.damageProfile.enemyHullDamage).toBe(0);
   });
 
-  // The strongest canonical-strategy geometry guard available: the category is
-  // unchanged (still a turn-11 timeout) but the closer line more than triples
-  // what the stalled fleet pays, 30 -> 107 hull.
+  // Re-derived under the D1-A broadside-arc curve: seed 9 now wins, so the
+  // stalled-line timeout moved to seed 66, which still pays meaningful hull
+  // (109) to the closer line while the enemies survive the limit.
   it('fails with timeout when the line holds', () => {
-    const outcome = runMission05(9, slowFlagshipOrders);
+    const outcome = runMission05(66, slowFlagshipOrders);
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('timeout');
     expect(outcome.turns).toHaveLength(MISSION_05_TURN_LIMIT);
-    expect(outcome.damageProfile.playerHullDamage).toBe(107);
+    expect(outcome.damageProfile.playerHullDamage).toBe(109);
   });
 
   // Exact counts, not a >= 0 tautology. The counter is side-agnostic: it counts
@@ -254,7 +257,7 @@ describe('mission 05 routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/missions/${MISSION_05_CODE}/resolve`,
-      payload: { schemaVersion: 1, seed: 1, turns: lineBreakOrders }
+      payload: { schemaVersion: 1, seed: 2, turns: lineBreakOrders }
     });
     expect(res.statusCode).toBe(200);
 

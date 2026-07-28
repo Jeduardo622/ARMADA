@@ -193,8 +193,10 @@ describe('mission 04 scenario', () => {
     expect(second).toEqual(first);
   });
 
-  it('reports a boarding win with both bonuses for seed 4 parallel boarding', () => {
-    const outcome = runMission04(4, parallelOrders);
+  it('reports a boarding win with both bonuses for seed 6 parallel boarding', () => {
+    // D1-A re-derivation: seed 4's parallel boarding now ends sunk (see the
+    // sunk fixture below); seed 6 lands the clean turn-6 both-bonus win.
+    const outcome = runMission04(6, parallelOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
     expect(outcome.bonusObjectives).toEqual({ successfulBoarding: true, noShipLost: true });
@@ -227,7 +229,9 @@ describe('mission 04 scenario', () => {
   });
 
   it('fails as sunk when boarding actions go wrong up close', () => {
-    const outcome = runMission04(41, parallelOrders);
+    // D1-A re-derivation: seed 4 — the old win seed — is now the boarding
+    // disaster (8/8 boardings still lose the gun duel up close).
+    const outcome = runMission04(4, parallelOrders);
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('sunk');
     expect(outcome.damageProfile.playerRemainingHp).toBe(0);
@@ -256,7 +260,7 @@ describe('mission 04 routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/missions/${MISSION_04_CODE}/resolve`,
-      payload: { schemaVersion: 1, seed: 4, turns: parallelOrders }
+      payload: { schemaVersion: 1, seed: 6, turns: parallelOrders }
     });
     expect(res.statusCode).toBe(200);
 

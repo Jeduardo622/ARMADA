@@ -1,12 +1,15 @@
 # PvP Demo Design Tuning
 
-> **Status: Reviewed** (scenario v2). Design pass run 2026-07-21 (PR #60);
-> **scenario v2 — `windMovement` + `ramming` with a live cross-breeze —
-> explicitly signed off by @Jeduardo622 and applied via the human merge of
-> the v2 PR** on 2026-07-21. Originally drafted against the shipped
-> implementation (PRs #53–#56, corrected in #58), following the
-> Mission 07 / spectator-tuning precedent. Future value changes reopen
-> review: update the table and this status in the same PR.
+> **Status: Review REOPENED** (scenario v2 under the D1-A broadside-arc
+> accuracy curve). The engine-side accuracy inversion decided by
+> @Jeduardo622 on 2026-07-28 (docs/design/art-direction.md, decision D1-A)
+> changes no scenario constant, but it reshapes the hit-chance curve every
+> empirical fixture and the v2 design analysis stand on, so this spec's
+> analysis and fixture pins are re-derived in the same PR and need
+> re-sign-off. Prior status: Reviewed (scenario v2, signed off by
+> @Jeduardo622 2026-07-21 via PR #60; drafted against PRs #53–#56,
+> corrected in #58). Future value changes reopen review again: update the
+> table and this status in the same PR.
 
 Consolidates every design-tunable knob and placeholder constant in the
 PvP demo — scenario stats, match lifecycle policy, order-entry surface,
@@ -32,7 +35,7 @@ deliberately not duplicated here.
 | `FRIGATE_SAIL` | 80 | keep | Feeds base damage (`18 + floor(sail/25)` = +3) and is the chain-shot target pool. |
 | `FRIGATE_CREW` | 50 | keep | Only cosmetic in v1 (boarding deferred); becomes live if boarding joins the modifier set. |
 | `FRIGATE_SPEED` | 3 | keep | Under v2 this is real motion: 15 sim units per turn (`v × MOVEMENT_SCALE 5`), so head-on fleets close at 30/turn from 220 apart — contact band (`RAM_CONTACT_RANGE` 25) around turn 6–7. Still feeds hit chance (`floor(v/2)`) and base damage (`floor(v·1.5)`), now via wind-adjusted effective speed. |
-| `LINE_SEPARATION` | 220 | keep | Opening range 220 → range penalty 4 → ~69% hit chance at start; under v2 range collapses as the lines close, so hit chance and damage climb turn over turn. |
+| `LINE_SEPARATION` | 220 | keep | Opening range 220 → range penalty 4; under the D1-A arc curve a bow-on opening shot also pays the full 12-point angle penalty (~57% hit chance), so closing *and* swinging to the beam both buy accuracy turn over turn. |
 | `LINE_SPREAD` | 30 | keep | ±30 y keeps the four markers visually separated at the shared 0.1 world-scale framing. |
 | `WIND_DIRECTION` / `WIND_SPEED` | 90 / 4 (**applied, v2**) | keep | Live cross-breeze: direction 90 is perpendicular to the battle axis, so the mirror stays perfectly fair (a maneuver and its mirrored counterpart sit at the same point of sail); speed 4 gives ±2 effective speed on the tailwind/headwind arcs (mission convention), and both fleets open at a neutral beam reach. |
 | `PVP_DEFAULT_SEED` | 11 | keep | Hot-seat only (netplay seeds server-side). **Not in the fingerprint**; pinned by the seed-11 focus-fire-vs-split fixtures (vitest + server full-match test), the C# `DefaultSeed` mirror, AND the serialized `seed` baked into `PvPHotseatDemo.unity` (regenerate the scene when tuning). |
@@ -51,8 +54,9 @@ options. That analysis motivated v2 and no v1 constant could change it.
 dominance: closing raises both sides' hit chance and damage and courts
 the ram band, holding range keeps the duel long, and the wind arcs make
 some headings faster than others. Empirically pinned properties
-(`tests/pvpScenario.test.ts`, seed 11): focus-fire-vs-split is a side A
-win at turn 7 (bloodier than v1's static duel — three ships sink);
+(`tests/pvpScenario.test.ts`, seed 11, re-derived under the D1-A
+broadside-arc curve): focus-fire-vs-split is a side A win at turn 6
+(bloodier than v1's static duel — three ships sink);
 straight-ahead hold-fire fleets collide near midfield, exchange exactly
 4 rams, sail through, and never re-engage (draw at the limit); turning
 away on turn 1 avoids contact entirely. **Resolved asymmetry (ram
@@ -67,6 +71,30 @@ plain `ramming`). The residual first-mover effects are marginal
 intentional, not an initiative artifact). Mission 09 keeps the legacy
 recoil rule: the flag is opt-in and flag-off resolution is pinned
 byte-identical.
+
+### Design note: the D1-A broadside-arc curve on this scenario
+
+The 2026-07-28 accuracy inversion (accuracy peaks on the beam, bow/stern
+pay up to 12 points — see `docs/design/art-direction.md` §3.1) was
+evaluated on this exact scenario before its fixtures were re-derived
+(200-seed sweeps, both-focus-fire strategies):
+
+- **Beam play now pays.** A side that swings 90° to the beam on turn 3
+  wins 71.5% of seeds against a bow-on opponent, vs a 58% baseline when
+  both sail bow-on — a +13.5-point tactic. Under the legacy curve the
+  same swing was worth +3.5 points (noise), matching v1/v2's "turning is
+  a trap" analysis. The maneuver buttons are now the point of the game.
+- **Initiative bias is pre-existing and slightly softened.** Resolution
+  order is by ship id, so alpha-side ships fire first and a focused ship
+  can sink before it replies; both-bow-on control runs give side A
+  61%/35.5% under the legacy curve and 58%/40.5% under D1-A. The arc
+  curve did not create and does not worsen this asymmetry.
+- **Accuracy-free fixtures are untouched.** The head-on hold-fire pass
+  still exchanges exactly 4 rams into a 76/76 vs 76/76 draw, and the
+  turn-1 turn-away still stalls clean — neither resolves a broadside.
+- The pinned focus-fire fixture resolves one turn earlier (6, was 7):
+  both sides hit less bow-on, but the seed-11 roll stream sinks the
+  focused bravo pair sooner.
 
 ## Match lifecycle policy (`src/routes/pvp.ts`)
 
@@ -84,7 +112,7 @@ byte-identical.
 
 | Knob | Current | Proposed | Rationale |
 | --- | --- | --- | --- |
-| `TurnDeltaStep` | 15° per press | keep | Matches the engine's 15°-per-point angle penalty granularity, so every press has a legible effect. |
+| `TurnDeltaStep` | 15° per press | keep | Under the D1-A arc curve each 15° press moves the angle penalty by 2 points (7.5°-per-point curve), so every press still has a legible, now stronger, effect. |
 | `TurnDeltaLimit` | ±90° | keep | **Schema-pinned** (`simOrderSchema`); the UI clamp must mirror the server bound. |
 | `SpeedDeltaLimit` | ±2 | keep | **Schema-pinned**; same mirroring requirement. |
 
@@ -118,8 +146,8 @@ conventions; values below are hard-coded in the builders.
   `PVP_DEFAULT_SEED` must update the fingerprint constant in
   `tests/pvpScenario.test.ts`, the same constant in the Unity EditMode
   suite, and `PvpScenario.cs` — and re-derive the empirical fixtures:
-  the seed-11 focus-fire win at turn 7 (vitest + the server full-match
-  test), the head-on 4-ram exchange with its 98/76 hull split, and the
+  the seed-11 focus-fire win at turn 6 (vitest + the server full-match
+  test), the head-on 4-ram exchange with its 76/76 hull split, and the
   turn-1-turn-away clean stall. Tuning only the default seed skips both
   fingerprint constants but still re-derives the fixtures, updates the
   C# `DefaultSeed` mirror, **and regenerates `PvPHotseatDemo.unity`** —

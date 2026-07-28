@@ -167,7 +167,9 @@ describe('both-sides order resolution (hot-seat contract)', () => {
 // SAME literal against server resolution with byte-identical order
 // generators; if either side drifts, one of the two exact-turn asserts
 // breaks and names the divergence.
-const PINNED_FOCUS_FIRE_TURN = 7;
+// Re-derived for the D1-A broadside-arc curve: both sides hit less bow-on,
+// but the seed-11 roll stream now sinks the focused bravo pair a turn sooner.
+const PINNED_FOCUS_FIRE_TURN = 6;
 
 describe('pvp match loop (client-style state chaining)', () => {
   // Mirrors the hot-seat client loop: chain nextState back through
