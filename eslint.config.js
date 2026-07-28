@@ -8,11 +8,14 @@ import tseslint from 'typescript-eslint';
 // `project` parser option keeps type-aware rules working, and `prettier`
 // stays last so it can turn off formatting rules from the sets above it.
 export default tseslint.config(
-  // `dist` and `node_modules` carry over from ignorePatterns. `.worktrees`
-  // is new but not a policy change: eslint 8 skipped dot-directories by
-  // default, and flat config does not, so linting it would newly pull in
-  // gitignored local worktree checkouts that were never linted before.
-  { ignores: ['dist', 'node_modules', '.worktrees'] },
+  // `dist` and `node_modules` carry over from ignorePatterns. The worktree
+  // entries are not a policy change: eslint 8 skipped dot-directories by
+  // default, and flat config does not, so linting them would newly pull in
+  // local worktree checkouts that were never linted before. Codex parks
+  // worktrees in `.worktrees`, Claude Code in `.claude/worktrees`; both must
+  // be listed, because each checkout carries its own tsconfig.json and a
+  // second candidate root makes typescript-eslint refuse to parse any file.
+  { ignores: ['dist', 'node_modules', '.worktrees', '.claude/worktrees'] },
   {
     files: ['**/*.ts'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended, prettier],
