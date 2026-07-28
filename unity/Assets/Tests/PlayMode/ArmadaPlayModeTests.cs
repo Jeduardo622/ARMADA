@@ -997,7 +997,7 @@ namespace Armada.Client.Tests.PlayMode
                         Seed = request.Seed,
                         Result = "win",
                         FailReason = null,
-                        TurnCount = 9,
+                        TurnCount = 10,
                         TurnLimit = Mission06Scenario.TurnLimit,
                         BonusObjectives = new Mission06BonusObjectives
                         {
@@ -1006,10 +1006,10 @@ namespace Armada.Client.Tests.PlayMode
                         },
                         DamageProfile = new Mission06DamageProfile
                         {
-                            PlayerHullDamage = 94,
-                            PlayerHullDamageFraction = 0.26,
-                            PlayerRemainingHp = 266,
-                            EnemyHullDamage = 468,
+                            PlayerHullDamage = 109,
+                            PlayerHullDamageFraction = 0.3,
+                            PlayerRemainingHp = 251,
+                            EnemyHullDamage = 576,
                             EnemyRemainingHp = 0,
                             BossHullDamage = 468,
                             BossRemainingHp = 0
@@ -1019,7 +1019,7 @@ namespace Armada.Client.Tests.PlayMode
                             PhaseTransitions = new List<Mission06PhaseTransition>
                             {
                                 new Mission06PhaseTransition { Turn = 1, Phase = 1 },
-                                new Mission06PhaseTransition { Turn = 5, Phase = 2 }
+                                new Mission06PhaseTransition { Turn = 4, Phase = 2 }
                             },
                             EnragedOnTurn = 6,
                             ReinforcementTurn = Mission06Scenario.ReinforcementTurn,

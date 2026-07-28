@@ -7,7 +7,7 @@ Mission 10 ships as two scenes, both driven by `Mission10Bootstrap` and
 differing only by its `mode`:
 
 - **`Assets/Scenes/SpectatorDemo.unity`** (mode `Spectate`) plays back a
-  resolved run of the pinned seed-2 mixed-battery orders (chain shot into
+  resolved run of the pinned seed-5 mixed-battery orders (chain shot into
   the rigging for three turns, then round shot to sink), animated from the
   server's turn event stream. No gameplay input, but the playback itself
   can be paused, stepped, and speed-scaled (see [Controls](#controls)).
@@ -35,7 +35,7 @@ npm run dev                   # Fastify server on http://localhost:4500
    `Assets/Scenes/Mission10Play.unity` (playable) and press Play.
 
 The `Mission10Bootstrap` in the spectator scene authenticates a guest session, runs
-the mission with seed 2 and the pinned mixed-battery orders, saves the
+the mission with seed 5 and the pinned mixed-battery orders, saves the
 win, then hands the resolved outcome to the `SpectatorRenderer`, which
 plays the turn stream: movement lerps, maneuver rotations, and broadside
 flashes — **chain shot flashes cyan** (the mission's showcase mechanic),
@@ -96,7 +96,7 @@ winning resolve's snapshot is what `/complete` re-sends.
 
 ### Choosing the playable seed
 
-The playable scene runs **seed 872**, not the spectator scene's seed 2.
+The playable scene runs **seed 872**, not the spectator scene's seed 5.
 Seed 2 is the *fixture* seed: it is pinned to win the one hardcoded order
 script, which says nothing about a player writing their own orders. Seed
 872 was picked from a sweep over the order families a captain would
@@ -118,9 +118,10 @@ volley. Dawdling and unfocused fire lose outright.
 
 Worth knowing when reading those numbers: in the current balance chain
 shot never wins *faster* than round shot, and across an 800-seed sweep it
-never left the player with more hull either — its payoff is the bonus
-objectives, not the fight. That is the existing balance, not a property of
-this seed.
+beat round shot on remaining hull in only 8 of 659 mutual wins — its
+payoff is the bonus objectives, not the fight. That is the existing
+balance (re-derived under the broadside-arc accuracy curve), not a
+property of this seed.
 
 ## Notes
 

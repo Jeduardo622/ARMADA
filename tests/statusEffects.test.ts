@@ -21,10 +21,13 @@ const attackerShip = (patch: Partial<ShipState> = {}): ShipState => ({
   ...patch
 });
 
+// The target sits on the attacker's beam (bearing 90 from heading 0): under
+// the D1-A broadside-arc curve that is the zero-penalty firing angle, so the
+// seeds and rolls pinned below keep their legacy hit chances.
 const targetShip = (patch: Partial<ShipState> = {}): ShipState => ({
   id: TARGET_ID,
   side: 'enemy',
-  position: { x: 100, y: 0 },
+  position: { x: 0, y: 100 },
   heading: 90,
   speed: 2,
   hp: 200,

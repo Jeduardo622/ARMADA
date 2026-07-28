@@ -112,15 +112,18 @@ describe('mission 06 scenario', () => {
     expect(second).toEqual(first);
   });
 
-  it('reports a both-bonus win with phase and enrage telemetry for seed 1', () => {
-    const outcome = runMission06(1, swatMidOrders);
+  it('reports a both-bonus win with phase and enrage telemetry for seed 2', () => {
+    // D1-A re-derivation: seed 1 now pays a ship for its win (see below);
+    // seed 2 keeps the intended shape — a clean, in-target siege that still
+    // pays real hull (109) to the 1.5x boss, with the enrage landing turn 6.
+    const outcome = runMission06(2, swatMidOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
-    expect(outcome.turnCount).toBe(9);
+    expect(outcome.turnCount).toBe(10);
     expect(outcome.bonusObjectives).toEqual({ noShipLost: true, withinTurnTarget: true });
     expect(outcome.telemetry.phaseTransitions).toEqual([
       { turn: 1, phase: 1 },
-      { turn: 5, phase: 2 }
+      { turn: 4, phase: 2 }
     ]);
     expect(outcome.telemetry.enragedOnTurn).toBe(6);
     expect(outcome.telemetry.reinforcementTurn).toBe(MISSION_06_REINFORCEMENT_TURN);
@@ -128,15 +131,17 @@ describe('mission 06 scenario', () => {
     // The boss damage scale's most direct signature: what the siege pays for the
     // win. Pinned so a change to the scale cannot pass silently, and so the
     // PlayMode fake client's synthetic copy of this run has a source of truth.
-    expect(outcome.damageProfile.playerHullDamage).toBe(94);
-    expect(outcome.damageProfile.playerHullDamageFraction).toBe(0.26);
-    expect(outcome.damageProfile.playerRemainingHp).toBe(266);
+    expect(outcome.damageProfile.playerHullDamage).toBe(109);
+    expect(outcome.damageProfile.playerHullDamageFraction).toBe(0.3);
+    expect(outcome.damageProfile.playerRemainingHp).toBe(251);
   });
 
-  it('reports a win that loses a ship for seed 106', () => {
-    const outcome = runMission06(106, swatMidOrders);
+  it('reports a win that loses a ship for seed 1', () => {
+    // D1-A re-derivation: the old both-bonus seed now wins at turn 11 minus
+    // one sloop — exactly this fixture's category.
+    const outcome = runMission06(1, swatMidOrders);
     expect(outcome.result).toBe('win');
-    expect(outcome.turnCount).toBe(12);
+    expect(outcome.turnCount).toBe(11);
     expect(outcome.bonusObjectives.noShipLost).toBe(false);
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(true);
   });
@@ -146,8 +151,10 @@ describe('mission 06 scenario', () => {
   // late-swat failure mode: the siege drags to the limit and pays a ship for it.
   // The enrage accuracy bonus alone is what flips this seed; the boss damage
   // scale deepens the damage but does not by itself cost the ship.
-  it('reports a slow win that misses the turn bonus for seed 68', () => {
-    const outcome = runMission06(68, swatLateOrders);
+  it('reports a slow win that misses the turn bonus for seed 78', () => {
+    // D1-A re-derivation: seed 68's late swat now loses; seed 78 keeps the
+    // limit-riding lost-ship slow win.
+    const outcome = runMission06(78, swatLateOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.turnCount).toBe(14);
     expect(outcome.bonusObjectives.noShipLost).toBe(false);
@@ -157,8 +164,10 @@ describe('mission 06 scenario', () => {
   // The fourth bonus-flag combination: the siege stays clean but overruns the
   // turn target. Rare under the 1.5x boss damage (2 of 3000 seeds), so it takes
   // a far seed rather than the swat-late line, which no longer produces it.
-  it('reports a clean win that still misses the turn bonus for seed 2706', () => {
-    const outcome = runMission06(2706, swatMidOrders);
+  it('reports a clean win that still misses the turn bonus for seed 185', () => {
+    // D1-A re-derivation: still rare (6 of 3000 swept seeds); seed 185 keeps
+    // the clean-but-slow turn-13 shape.
+    const outcome = runMission06(185, swatMidOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.turnCount).toBe(13);
     expect(outcome.bonusObjectives.noShipLost).toBe(true);
@@ -170,7 +179,8 @@ describe('mission 06 scenario', () => {
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('timeout');
     expect(outcome.turns).toHaveLength(MISSION_06_TURN_LIMIT);
-    expect(outcome.telemetry.reinforcementDamageDealt).toBe(101);
+    // Re-derived for the D1-A broadside-arc curve (was 101).
+    expect(outcome.telemetry.reinforcementDamageDealt).toBe(133);
   });
 });
 

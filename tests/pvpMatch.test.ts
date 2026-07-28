@@ -326,7 +326,9 @@ const sideBOrders = (state: ShipStateLike): SimOrder[] =>
 
 // Must equal PINNED_FOCUS_FIRE_TURN in tests/pvpScenario.test.ts; a
 // mismatch means server resolution drifted from the engine fixture.
-const PINNED_FOCUS_FIRE_TURN = 7;
+// Re-derived for the D1-A broadside-arc curve: both sides hit less bow-on,
+// but the seed-11 roll stream now sinks the focused bravo pair a turn sooner.
+const PINNED_FOCUS_FIRE_TURN = 6;
 
 describe('pvp match lifecycle', () => {
   it('creates a server-authoritative match: pinned scenario, server seed, waiting state', async () => {

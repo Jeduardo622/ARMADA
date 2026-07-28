@@ -242,7 +242,9 @@ describe('mission 09 scenario', () => {
   });
 
   it('awards unrammed but not hullBreaker when the lines never touch', () => {
-    const outcome = runMission09(1, chargeOrders);
+    // D1-A re-derivation: seed 1's charge now grazes one ram; seed 3 keeps
+    // the clean no-contact turn-8 win.
+    const outcome = runMission09(3, chargeOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.turnCount).toBe(8);
     expect(outcome.telemetry.ramsInflicted).toBe(0);
@@ -251,7 +253,9 @@ describe('mission 09 scenario', () => {
   });
 
   it('denies unrammed when an enemy bow strikes home and sinks itself on the recoil', () => {
-    const outcome = runMission09(41, holdOrders);
+    // D1-A re-derivation: seed 41's brig now survives its recoil (hp 36);
+    // seed 205 reproduces the identical suicide-ram shape, damage included.
+    const outcome = runMission09(205, holdOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.telemetry).toEqual({
       ramsInflicted: 0,

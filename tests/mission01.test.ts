@@ -73,8 +73,11 @@ describe('mission 01 scenario', () => {
     expect(enemyBroadsides.length).toBeLessThan(outcome.turnCount);
   });
 
-  it('reports a win with both bonus objectives for seed 16', () => {
-    const outcome = runMission01(16, allBroadsides);
+  it('reports a win with both bonus objectives for seed 12', () => {
+    // Re-derived for the D1-A broadside-arc curve: seed 16 keeps its win but
+    // takes hull past the bonus threshold; seed 12 wins turn 5 with 21 hull
+    // damage (< 24) under the same scripted all-broadsides play.
+    const outcome = runMission01(12, allBroadsides);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
     expect(outcome.turnCount).toBeLessThanOrEqual(6);
@@ -87,7 +90,9 @@ describe('mission 01 scenario', () => {
   });
 
   it('reports a win without the hull bonus when the player takes heavy fire', () => {
-    const outcome = runMission01(2, allBroadsides);
+    // Seed 16 under D1-A: still a within-target win (turn 5) but over the
+    // hull-damage threshold — the heavy-fire fixture this test wants.
+    const outcome = runMission01(16, allBroadsides);
     expect(outcome.result).toBe('win');
     expect(outcome.bonusObjectives.underHullDamageThreshold).toBe(false);
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(true);
@@ -102,7 +107,9 @@ describe('mission 01 scenario', () => {
   });
 
   it('fails with sunk when the enemy destroys the player', () => {
-    const outcome = runMission01(2, []);
+    // Seed 2's idle run times out under D1-A (the enemy also fires bow-on);
+    // seed 3 still sinks an idle player inside the limit.
+    const outcome = runMission01(3, []);
     expect(outcome.result).toBe('loss');
     expect(outcome.failReason).toBe('sunk');
     expect(outcome.damageProfile.playerRemainingHp).toBe(0);
@@ -265,19 +272,21 @@ describe('engine raking fire (modifiers.rakingFire)', () => {
 
 describe('mission 01 regression pin', () => {
   it('keeps the fixture turn-hash chains stable across combat-rule slices', () => {
-    const fire = runMission01(16, allBroadsides);
+    // Chains re-derived once for the D1-A broadside-arc accuracy curve.
+    const fire = runMission01(12, allBroadsides);
     expect(fire.turns.map((turn) => turn.hash.slice(0, 12))).toEqual([
-      'd5f84192acf5',
-      '45b4a619dd67',
-      'f640d180aedb',
-      '7078747d25e9'
+      '90967219bfe6',
+      'e4655e94f7a0',
+      '48ba35b0f3e5',
+      '6fa5e28b265f',
+      '0dff14d962aa'
     ]);
     const idle = runMission01(8, []);
     expect(idle.turns.map((turn) => turn.hash.slice(0, 12))).toEqual([
       '887fdc2d94f4',
       '92398433325c',
-      '341de9e01e32',
-      'c8f29f0e6545',
+      '0aeeb046c8ed',
+      '2fe532f715e9',
       'fa0ae6e45746',
       '86c4e12ad405',
       '349279f0e69c',

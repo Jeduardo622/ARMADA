@@ -216,7 +216,8 @@ describe('mission 03 scenario', () => {
     expect(outcome.failReason).toBe('timeout');
     expect(outcome.turnCount).toBe(MISSION_03_TURN_LIMIT);
     expect(outcome.turns).toHaveLength(MISSION_03_TURN_LIMIT);
-    expect(outcome.damageProfile.enemyRemainingHp).toBe(47);
+    // Re-derived for the D1-A broadside-arc curve (was 47).
+    expect(outcome.damageProfile.enemyRemainingHp).toBe(30);
   });
 
   // The retune's headline behavioural claim: enemies can now finish the fight,

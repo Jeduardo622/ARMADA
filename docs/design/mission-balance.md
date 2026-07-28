@@ -14,6 +14,15 @@
 > economy constants. Value changes update the matching table **and this
 > status** in the same PR; a design pass graduates it to Reviewed.
 
+> **Measurement-era note (2026-07-28):** every sweep number in this
+> document was measured under the legacy bow-on accuracy curve. The
+> D1-A broadside-arc inversion (`docs/design/art-direction.md` §3.1)
+> reshaped hit chances for all scripted play; no applied mission value
+> changed with it, and its own fixture re-derivations live in the mission
+> test suites, but the win-rate/damage sweep figures below are historical
+> until this document's sweeps are re-run — a named follow-up of the
+> D1-A slice.
+
 Motivation (tracked as an open design knob since the mission arc shipped):
 in missions 03, 05, and 06 the enemy never ended a mission across the
 baseline 200-seed sweeps below — every observed loss is a timeout, and no

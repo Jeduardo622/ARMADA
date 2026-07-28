@@ -33,9 +33,10 @@ namespace Armada.Client.Bootstrap
             Play
         }
 
-        // Seed 2 wins the pinned mixed-battery orders at turn 8 with both
-        // bonuses (tests/mission10.test.ts).
-        public const int DefaultSeed = 2;
+        // Seed 5 wins the pinned mixed-battery orders at turn 8 with both
+        // bonuses (tests/mission10.test.ts; re-derived for the D1-A
+        // broadside-arc accuracy curve — seed 2 times out under it).
+        public const int DefaultSeed = 5;
 
         // Seed for free play. Chosen deliberately: the fixture seed only
         // proves the fixture wins, which says nothing about a player writing

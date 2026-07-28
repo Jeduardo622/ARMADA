@@ -118,8 +118,10 @@ describe('mission 02 scenario', () => {
     expect(second).toEqual(first);
   });
 
-  it('reports a win with both bonuses and rake telemetry for seed 1 focus fire', () => {
-    const outcome = runMission02(1, focusOrders);
+  it('reports a win with both bonuses and rake telemetry for seed 3 focus fire', () => {
+    // D1-A re-derivation: seeds 1 and 3 swapped roles — seed 3 now lands the
+    // turn-7 both-bonus win under the same scripted focus fire.
+    const outcome = runMission02(3, focusOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.failReason).toBeNull();
     expect(outcome.turnCount).toBeLessThanOrEqual(7);
@@ -130,8 +132,10 @@ describe('mission 02 scenario', () => {
     expect(outcome.damageProfile.enemyRemainingHp).toBe(0);
   });
 
-  it('reports a win that misses the turn bonus for seed 3 focus fire', () => {
-    const outcome = runMission02(3, focusOrders);
+  it('reports a win that misses the turn bonus for seed 1 focus fire', () => {
+    // D1-A re-derivation: seed 1 keeps the weather gage all match but now
+    // closes at turn 8, past the turn-7 bonus target.
+    const outcome = runMission02(1, focusOrders);
     expect(outcome.result).toBe('win');
     expect(outcome.bonusObjectives.withinTurnTarget).toBe(false);
     expect(outcome.bonusObjectives.heldWeatherGage).toBe(true);

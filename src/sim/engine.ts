@@ -327,9 +327,15 @@ function resolveBroadside(
   }
   const angleDiff = Math.abs(normalizeHeading(attacker.heading - bearingToTarget));
   const normalizedDiff = Math.min(angleDiff, 360 - angleDiff);
+  // Broadside arc model (GDD p.7, decision D1-A in
+  // docs/design/art-direction.md): accuracy peaks when the target lies on
+  // the beam (90° off the bow) and falls off toward bow and stern, where
+  // only weak chasers bear — soft inversion of the legacy bow-on curve,
+  // keeping the 0–12 penalty range (2 points per 15° turn press).
+  const beamDiff = Math.abs(90 - normalizedDiff);
 
   const rangePenalty = Math.floor(range / 50);
-  const anglePenalty = Math.floor(normalizedDiff / 15);
+  const anglePenalty = Math.floor((beamDiff * 2) / 15);
 
   const baseChance =
     72 - rangePenalty - anglePenalty + Math.floor(attackerSpeed / 2) + accuracyBonus;
