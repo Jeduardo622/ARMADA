@@ -94,6 +94,14 @@ public static class SpectatorVisualCapture
 
     private static void Run()
     {
+        // Menu-path safety (same guard as every scene builder): the capture
+        // replaces the open scene, so unsaved edits must be prompted for
+        // first. Batchmode has no open user scene and no interactive prompt.
+        if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+        {
+            return;
+        }
+
         var fixturePath = Path.GetFullPath(
             Environment.GetEnvironmentVariable("ARMADA_CAPTURE_FIXTURE") ?? DefaultFixturePath);
         var mode = (Environment.GetEnvironmentVariable("ARMADA_CAPTURE_MODE") ?? "baseline")
