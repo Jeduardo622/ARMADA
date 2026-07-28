@@ -1,9 +1,9 @@
 # Spectator Demo Design Tuning
 
-> **Status: Reviewed.** Applied values approved by @Jeduardo622 via the
-> PR #51 merge on 2026-07-21. Originally drafted alongside the tuning
-> slice, following the Mission 07 precedent of authoring the missing
-> design spec with the implementation (see the QA notes in
+> **Status: Review REOPENED** (D2-B mobile-first HUD geometry: label
+> font/rect rows below). Prior status: Reviewed — applied values approved
+> by @Jeduardo622 via the PR #51 merge on 2026-07-21, drafted following
+> the Mission 07 precedent (see the QA notes in
 > `docs/content/missions/mission-07-burning-seas.md`). Future value
 > changes reopen review: update the table and this status in the same PR.
 
@@ -73,8 +73,8 @@ change here (see Regeneration below).
 | Camera background | (0.03, 0.08, 0.15) | keep | Near-black navy makes the sea board read as the play surface. |
 | Board cube | 30×1×16 @ (12.5, −0.55, 0) | keep | Covers sim space (x 0–250, y ±60 at 0.1 world units per sim unit). |
 | Sea material color | (0.07, 0.22, 0.36) | keep | Dark sea keeps all five flash/side colors legible. |
-| Label font size | 20 | keep | Single HUD line fits comfortably at default game-view resolutions. |
-| Label rect (hard-coded) | ±10 edge offset, −40 width inset, 60 height | keep | Two-line safety height with a small margin off the screen edges. |
+| Label font size | 32 (**applied, D2-B**) | keep | Readable at arm's length on a phone; the canvas now scales with screen height (reference 1920×1080). |
+| Label rect (hard-coded) | ±16 edge offset, −64 width inset, 84 height (**applied, D2-B**) | keep | Two-line safety height at the larger font; labels sit inside a `SafeAreaInsets` wrapper so notches never clip them. |
 | Directional light rotation (hard-coded) | (50, −30, 0) | keep | Unity's default key-light angle; markers are flat-tinted so lighting is non-critical. |
 | Initial HUD hint | "Waiting for run... (Space pause, Right Arrow step, 1-4 speed)" | append "+/- cycle" | The +/− preset-cycle bindings shipped in PR #50 but were missing from the hint. |
 

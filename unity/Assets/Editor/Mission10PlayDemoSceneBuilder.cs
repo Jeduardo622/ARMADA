@@ -82,18 +82,24 @@ public static class Mission10PlayDemoSceneBuilder
         var canvasObject = new GameObject("HUD Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         var canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        ConfigureScaler(canvasObject.GetComponent<CanvasScaler>());
 
         // uGUI buttons need an EventSystem to receive clicks (legacy input
-        // module; the Input System package is not in-project).
+        // module; the Input System package is not in-project). Touch input
+        // flows through the same module.
         new GameObject("EventSystem",
             typeof(UnityEngine.EventSystems.EventSystem),
             typeof(UnityEngine.EventSystems.StandaloneInputModule));
 
-        var hudLabel = CreateLabel(canvasObject.transform, "SpectatorHud", anchorTop: true, height: 60f, offsetY: -10f);
+        // Every HUD element parents under the safe-area wrapper so notches
+        // and rounded corners never clip it on device (D2-B, mobile-first).
+        var safeArea = CreateSafeArea(canvasObject.transform);
+
+        var hudLabel = CreateLabel(safeArea, "SpectatorHud", anchorTop: true, height: 84f, offsetY: -16f);
         hudLabel.text = "Mission 10 Sail-Cutter: authenticating...";
-        var statusLabel = CreateLabel(canvasObject.transform, "MissionStatus", anchorTop: true, height: 40f, offsetY: -75f);
+        var statusLabel = CreateLabel(safeArea, "MissionStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
-        var orderLabel = CreateLabel(canvasObject.transform, "OrderPanel", anchorTop: false, height: 140f, offsetY: 70f);
+        var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 136f);
         orderLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
@@ -133,10 +139,10 @@ public static class Mission10PlayDemoSceneBuilder
         };
         for (var i = 0; i < buttons.Length; i++)
         {
-            CreateButton(canvasObject.transform, buttons[i].label, i, buttons[i].handler);
+            CreateButton(safeArea, buttons[i].label, i, buttons[i].handler);
         }
 
-        var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap));
+        var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap), typeof(MobilePresentation));
         var bootstrap = bootstrapObject.GetComponent<Mission10Bootstrap>();
         SetReference(bootstrap, "clientConfig", config);
         SetReference(bootstrap, "determinism", bootstrapObject.GetComponent<DeterministicSimHooks>());
@@ -180,6 +186,29 @@ public static class Mission10PlayDemoSceneBuilder
         return material;
     }
 
+    // Mobile-first canvas scaling (D2-B): author at 1920×1080 landscape and
+    // scale with screen height, so touch targets keep physical size across
+    // phone/tablet aspect ratios; wider screens gain horizontal room.
+    private static void ConfigureScaler(CanvasScaler scaler)
+    {
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 1f;
+    }
+
+    private static Transform CreateSafeArea(Transform canvas)
+    {
+        var safeAreaObject = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaInsets));
+        safeAreaObject.transform.SetParent(canvas, worldPositionStays: false);
+        var rect = safeAreaObject.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        return safeAreaObject.transform;
+    }
+
     private static TextMeshProUGUI CreateLabel(Transform parent, string name, bool anchorTop, float height, float offsetY)
     {
         var labelObject = new GameObject(name, typeof(TextMeshProUGUI));
@@ -190,10 +219,10 @@ public static class Mission10PlayDemoSceneBuilder
         rect.anchorMax = anchorTop ? new Vector2(1f, 1f) : new Vector2(1f, 0f);
         rect.pivot = anchorTop ? new Vector2(0.5f, 1f) : new Vector2(0.5f, 0f);
         rect.anchoredPosition = new Vector2(0f, offsetY);
-        rect.sizeDelta = new Vector2(-40f, height);
+        rect.sizeDelta = new Vector2(-64f, height);
 
         var label = labelObject.GetComponent<TextMeshProUGUI>();
-        label.fontSize = 18f;
+        label.fontSize = 30f;
         label.color = Color.white;
         return label;
     }
@@ -207,9 +236,12 @@ public static class Mission10PlayDemoSceneBuilder
         rect.anchorMin = new Vector2(0f, 0f);
         rect.anchorMax = new Vector2(0f, 0f);
         rect.pivot = new Vector2(0f, 0f);
-        var width = 118f;
-        rect.anchoredPosition = new Vector2(20f + index * (width + 8f), 20f);
-        rect.sizeDelta = new Vector2(width, 40f);
+        // Nine buttons at 190×96 + 12 gaps + 24 margins = 1866 of the
+        // 1920 reference width; ≈ 9 mm tall on a 6" phone, clearing the
+        // 44 pt touch floor (D2-B mobile-first constraint set).
+        var width = 190f;
+        rect.anchoredPosition = new Vector2(24f + index * (width + 12f), 24f);
+        rect.sizeDelta = new Vector2(width, 96f);
 
         var image = buttonObject.GetComponent<Image>();
         image.color = new Color(0.15f, 0.25f, 0.4f, 0.9f);
@@ -225,7 +257,7 @@ public static class Mission10PlayDemoSceneBuilder
         labelRect.sizeDelta = Vector2.zero;
         var text = labelObject.GetComponent<TextMeshProUGUI>();
         text.text = label;
-        text.fontSize = 15f;
+        text.fontSize = 24f;
         text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;
     }
