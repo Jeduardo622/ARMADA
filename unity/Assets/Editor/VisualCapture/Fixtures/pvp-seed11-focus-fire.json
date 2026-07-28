@@ -1,0 +1,888 @@
+{
+  "scenario": "pvp-skirmish-2v2",
+  "seed": 11,
+  "turnLimit": 20,
+  "description": "Pinned focus-fire-vs-split fixture battle (tests/pvpScenario.test.ts): side A win at turn 7.",
+  "shipsAtStart": [
+    {
+      "id": "alpha-frigate-a",
+      "side": "player",
+      "position": {
+        "x": 0,
+        "y": 30
+      },
+      "heading": 0,
+      "speed": 3,
+      "hp": 120,
+      "sail": 80,
+      "crew": 50
+    },
+    {
+      "id": "alpha-frigate-b",
+      "side": "player",
+      "position": {
+        "x": 0,
+        "y": -30
+      },
+      "heading": 0,
+      "speed": 3,
+      "hp": 120,
+      "sail": 80,
+      "crew": 50
+    },
+    {
+      "id": "bravo-frigate-a",
+      "side": "enemy",
+      "position": {
+        "x": 220,
+        "y": 30
+      },
+      "heading": 180,
+      "speed": 3,
+      "hp": 120,
+      "sail": 80,
+      "crew": 50
+    },
+    {
+      "id": "bravo-frigate-b",
+      "side": "enemy",
+      "position": {
+        "x": 220,
+        "y": -30
+      },
+      "heading": 180,
+      "speed": 3,
+      "hp": 120,
+      "sail": 80,
+      "crew": 50
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "hash": "d3c8774525dd6d7157273b95673f3929c88ebe9443b5ad8b27b0ec76acb0af53",
+      "summary": {
+        "playerRemaining": 2,
+        "enemyRemaining": 2,
+        "sunk": []
+      },
+      "events": [
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-a",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-b",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-a",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-b",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 15,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 15,
+            "y": -30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 205,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 205,
+            "y": -30
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-a",
+          "targetShipId": "bravo-frigate-a",
+          "side": "starboard",
+          "hit": true,
+          "roll": 28,
+          "hitChance": 70,
+          "damage": {
+            "hull": 25,
+            "sail": 15,
+            "crew": 8
+          },
+          "targetRemaining": {
+            "hp": 95,
+            "sail": 65,
+            "crew": 42
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-b",
+          "targetShipId": "bravo-frigate-a",
+          "side": "starboard",
+          "hit": true,
+          "roll": 58,
+          "hitChance": 69,
+          "damage": {
+            "hull": 30,
+            "sail": 18,
+            "crew": 10
+          },
+          "targetRemaining": {
+            "hp": 65,
+            "sail": 47,
+            "crew": 32
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "bravo-frigate-a",
+          "targetShipId": "alpha-frigate-a",
+          "side": "starboard",
+          "hit": true,
+          "roll": 15,
+          "hitChance": 70,
+          "damage": {
+            "hull": 23,
+            "sail": 13,
+            "crew": 8
+          },
+          "targetRemaining": {
+            "hp": 97,
+            "sail": 67,
+            "crew": 42
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "bravo-frigate-b",
+          "targetShipId": "alpha-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 69,
+          "hitChance": 70,
+          "damage": {
+            "hull": 28,
+            "sail": 16,
+            "crew": 9
+          },
+          "targetRemaining": {
+            "hp": 92,
+            "sail": 64,
+            "crew": 41
+          }
+        }
+      ]
+    },
+    {
+      "turn": 2,
+      "hash": "39dbdd252042fadbed76711460c3e2ab3c2d896e416b4b4a612c7ff88fc5c10e",
+      "summary": {
+        "playerRemaining": 2,
+        "enemyRemaining": 2,
+        "sunk": []
+      },
+      "events": [
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-a",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-b",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-a",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-b",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 30,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 30,
+            "y": -30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 190,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 190,
+            "y": -30
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-a",
+          "targetShipId": "bravo-frigate-a",
+          "side": "starboard",
+          "hit": true,
+          "roll": 56,
+          "hitChance": 70,
+          "damage": {
+            "hull": 26,
+            "sail": 15,
+            "crew": 9
+          },
+          "targetRemaining": {
+            "hp": 39,
+            "sail": 32,
+            "crew": 23
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-b",
+          "targetShipId": "bravo-frigate-a",
+          "side": "starboard",
+          "hit": true,
+          "roll": 7,
+          "hitChance": 69,
+          "damage": {
+            "hull": 24,
+            "sail": 14,
+            "crew": 8
+          },
+          "targetRemaining": {
+            "hp": 15,
+            "sail": 18,
+            "crew": 15
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "bravo-frigate-a",
+          "targetShipId": "alpha-frigate-a",
+          "side": "starboard",
+          "hit": true,
+          "roll": 3,
+          "hitChance": 70,
+          "damage": {
+            "hull": 22,
+            "sail": 13,
+            "crew": 7
+          },
+          "targetRemaining": {
+            "hp": 75,
+            "sail": 54,
+            "crew": 35
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "bravo-frigate-b",
+          "targetShipId": "alpha-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 9,
+          "hitChance": 70,
+          "damage": {
+            "hull": 27,
+            "sail": 16,
+            "crew": 9
+          },
+          "targetRemaining": {
+            "hp": 65,
+            "sail": 48,
+            "crew": 32
+          }
+        }
+      ]
+    },
+    {
+      "turn": 3,
+      "hash": "5ede9732aec64b2456bfc16e573ee163623bdb5b3cef5b086fc3af22c7be32cf",
+      "summary": {
+        "playerRemaining": 2,
+        "enemyRemaining": 1,
+        "sunk": [
+          "bravo-frigate-a"
+        ]
+      },
+      "events": [
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-a",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-b",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-a",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-b",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 45,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 45,
+            "y": -30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 175,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 175,
+            "y": -30
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-a",
+          "targetShipId": "bravo-frigate-a",
+          "side": "starboard",
+          "hit": true,
+          "roll": 44,
+          "hitChance": 71,
+          "damage": {
+            "hull": 26,
+            "sail": 15,
+            "crew": 9
+          },
+          "targetRemaining": {
+            "hp": 0,
+            "sail": 3,
+            "crew": 6
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "bravo-frigate-b",
+          "targetShipId": "alpha-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 51,
+          "hitChance": 71,
+          "damage": {
+            "hull": 27,
+            "sail": 16,
+            "crew": 9
+          },
+          "targetRemaining": {
+            "hp": 38,
+            "sail": 32,
+            "crew": 23
+          }
+        }
+      ]
+    },
+    {
+      "turn": 4,
+      "hash": "0b5ecd05071c58d4cda3d4e706947569da675823c58708fd0632e651a24882bd",
+      "summary": {
+        "playerRemaining": 2,
+        "enemyRemaining": 1,
+        "sunk": [
+          "bravo-frigate-a"
+        ]
+      },
+      "events": [
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-a",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-b",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-b",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 60,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 60,
+            "y": -30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 160,
+            "y": -30
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-a",
+          "targetShipId": "bravo-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 23,
+          "hitChance": 69,
+          "damage": {
+            "hull": 26,
+            "sail": 15,
+            "crew": 9
+          },
+          "targetRemaining": {
+            "hp": 94,
+            "sail": 65,
+            "crew": 41
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-b",
+          "targetShipId": "bravo-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 40,
+          "hitChance": 71,
+          "damage": {
+            "hull": 25,
+            "sail": 15,
+            "crew": 8
+          },
+          "targetRemaining": {
+            "hp": 69,
+            "sail": 50,
+            "crew": 33
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "bravo-frigate-b",
+          "targetShipId": "alpha-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 22,
+          "hitChance": 71,
+          "damage": {
+            "hull": 27,
+            "sail": 16,
+            "crew": 9
+          },
+          "targetRemaining": {
+            "hp": 11,
+            "sail": 16,
+            "crew": 14
+          }
+        }
+      ]
+    },
+    {
+      "turn": 5,
+      "hash": "5c1cfdf19fb75df0a646924f5a4bfb72a4ed129b22d49cb01e8d37cbf987b7ed",
+      "summary": {
+        "playerRemaining": 1,
+        "enemyRemaining": 1,
+        "sunk": [
+          "alpha-frigate-b",
+          "bravo-frigate-a"
+        ]
+      },
+      "events": [
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-a",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-b",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-b",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 75,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 75,
+            "y": -30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 145,
+            "y": -30
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-a",
+          "targetShipId": "bravo-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 63,
+          "hitChance": 70,
+          "damage": {
+            "hull": 24,
+            "sail": 14,
+            "crew": 8
+          },
+          "targetRemaining": {
+            "hp": 45,
+            "sail": 36,
+            "crew": 25
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-b",
+          "targetShipId": "bravo-frigate-b",
+          "side": "starboard",
+          "hit": false,
+          "roll": 75,
+          "hitChance": 72,
+          "damage": {
+            "hull": 0,
+            "sail": 0,
+            "crew": 0
+          },
+          "targetRemaining": {
+            "hp": 45,
+            "sail": 36,
+            "crew": 25
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "bravo-frigate-b",
+          "targetShipId": "alpha-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 33,
+          "hitChance": 72,
+          "damage": {
+            "hull": 23,
+            "sail": 13,
+            "crew": 8
+          },
+          "targetRemaining": {
+            "hp": 0,
+            "sail": 3,
+            "crew": 6
+          }
+        }
+      ]
+    },
+    {
+      "turn": 6,
+      "hash": "5ef8b767002bc0373dbdb3eb8d18eeb96891fba379ae1f2526f4f919f6222027",
+      "summary": {
+        "playerRemaining": 1,
+        "enemyRemaining": 1,
+        "sunk": [
+          "alpha-frigate-b",
+          "bravo-frigate-a"
+        ]
+      },
+      "events": [
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-a",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-b",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 90,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 130,
+            "y": -30
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-a",
+          "targetShipId": "bravo-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 67,
+          "hitChance": 69,
+          "damage": {
+            "hull": 25,
+            "sail": 15,
+            "crew": 8
+          },
+          "targetRemaining": {
+            "hp": 20,
+            "sail": 21,
+            "crew": 17
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "bravo-frigate-b",
+          "targetShipId": "alpha-frigate-a",
+          "side": "starboard",
+          "hit": true,
+          "roll": 53,
+          "hitChance": 69,
+          "damage": {
+            "hull": 22,
+            "sail": 13,
+            "crew": 7
+          },
+          "targetRemaining": {
+            "hp": 53,
+            "sail": 41,
+            "crew": 28
+          }
+        }
+      ]
+    },
+    {
+      "turn": 7,
+      "hash": "9d5771dd46262078b30837346c4818dc3d3f2270591de0ea2d186149c9bbf9c0",
+      "summary": {
+        "playerRemaining": 1,
+        "enemyRemaining": 0,
+        "sunk": [
+          "alpha-frigate-b",
+          "bravo-frigate-a",
+          "bravo-frigate-b"
+        ]
+      },
+      "events": [
+        {
+          "type": "maneuver",
+          "shipId": "alpha-frigate-a",
+          "heading": 0,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "maneuver",
+          "shipId": "bravo-frigate-b",
+          "heading": 180,
+          "speed": 3,
+          "turnDelta": 0,
+          "speedDelta": 0
+        },
+        {
+          "type": "movement",
+          "shipId": "alpha-frigate-a",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 105,
+            "y": 30
+          }
+        },
+        {
+          "type": "movement",
+          "shipId": "bravo-frigate-b",
+          "effectiveSpeed": 3,
+          "position": {
+            "x": 115,
+            "y": -30
+          }
+        },
+        {
+          "type": "broadside",
+          "shipId": "alpha-frigate-a",
+          "targetShipId": "bravo-frigate-b",
+          "side": "starboard",
+          "hit": true,
+          "roll": 39,
+          "hitChance": 67,
+          "damage": {
+            "hull": 26,
+            "sail": 15,
+            "crew": 9
+          },
+          "targetRemaining": {
+            "hp": 0,
+            "sail": 6,
+            "crew": 8
+          }
+        }
+      ]
+    }
+  ]
+}
