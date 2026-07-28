@@ -1,12 +1,13 @@
 # Art Direction & Art-Readiness Spec
 
-> **Status: Draft — blocked on three human decisions.** Authored following
-> the `docs/design/spectator-tuning.md` precedent (spec drafted alongside
-> the work, reviewed via PR merge). This spec cannot reach **Reviewed**
-> until the decisions in the [Open Decisions](#open-decisions) log are made
-> by a human: **D1 firing arcs**, **D2 platform target**, **D3 render
-> pipeline**. Everything else in this document is either verified fact
-> about the build or a proposal that does not change shipped behaviour.
+> **Status: Draft — D1 and D2 decided by @Jeduardo622 on 2026-07-28;
+> D3 open pending the W5 evidence brief.** Authored following the
+> `docs/design/spectator-tuning.md` precedent (spec drafted alongside the
+> work, reviewed via PR merge; base content merged via PR #79).
+> **D1 firing arcs → option A**: rebalance the sim to reward broadsides
+> (Class C implementation arc, see §3.1). **D2 platform → option B**:
+> mobile-first per the GDD (see §3.3). The spec reaches **Reviewed** once
+> D3 is decided and the D1 rebalance lands its re-derived constraints.
 
 This spec carries every design decision, seam, and convention that must
 exist before 2D/3D art can be applied to Armada — without adding any art.
@@ -45,10 +46,10 @@ decision.
 
 | # | GDD | Built | Proposed resolution |
 | --- | --- | --- | --- |
-| 1 | Mobile iOS/Android, touch, 30fps | Desktop 1920×1080, mouse, generated scenes | **(D2)** Decide the platform target now; it drives layout, hit targets, font sizes, safe areas, aspect handling for every UI asset. |
+| 1 | Mobile iOS/Android, touch, 30fps | Desktop 1920×1080, mouse, generated scenes | **(D2: DECIDED — mobile-first)** Scenes rebuilt around touch/aspect ranges before art lands; desktop stays as the Editor dev harness (§3.3). |
 | 2 | 3v3 battles | 2v2 PvP, 1v2–3v3 missions | Accept as-built. Fleet size is scenario data, not a rendering constraint; art must simply not assume a fixed ship count. No engineering work. |
 | 3 | Waypoint movement on a grid | Heading + speed deltas (WEGO retained) | Accept as-built and document as a deliberate divergence. The heading/speed model is deeply pinned (schema, fixtures, missions). Art consequence: ships need readable **absolute heading** (see §3.2). |
-| 4 | Port/starboard firing arcs, cone UI, vulnerable bow/stern | No firing arc; accuracy maximised bow-on (`engine.ts` angle penalty) | **(D1)** — the central contradiction; see §3.1. Art that draws broadside cones over a bow-on-rewarding sim would lie about the rules. |
+| 4 | Port/starboard firing arcs, cone UI, vulnerable bow/stern | No firing arc; accuracy maximised bow-on (`engine.ts` angle penalty) | **(D1: DECIDED — rebalance the sim)** The engine will reward beam angles per the GDD; firing-model-dependent art waits for the new curve (§3.1). |
 | 5 | Reload timers | None; broadside every turn | Document gap; do not build. No art blocker — "radial cooldown" UI slots designed in the HUD IA (W4) so a future reload system has a home. |
 | 6 | Boarding actions | `boarding` is live in missions 03/04 (orders, cooldowns, telemetry-counted) and rendered as a generic flash + HUD line; PvP defers it | Treat as an **active** mechanic in the art pass: it needs its own visual identity in W2 (today it reuses the ram flash color, so boarding and ramming are indistinguishable on the board). |
 | 7 | Captains, abilities, portraits | Do not exist | Out of scope; document gap. No binding point required — captains attach to ships, and the ship view seam (W2) is sufficient. |
@@ -112,15 +113,16 @@ exists — the attacker-side half does not.
   firing-feedback visual (flash/tracer) originates from the event's
   `side` field so it is already correct if arcs later become real.
 
-**Recommendation: C.** It unblocks all art work immediately, costs
-nothing now, preserves the GDD's intent as a real (opt-in, reviewable)
-path rather than a dead letter, and the modifier mechanism for exactly
-this kind of staged rules change is proven six times over in this repo.
-Option A now would freeze art work behind a full rebalance; Option B
-quietly abandons a core pillar.
-
-**This is a Class C judgement about game rules. No sim change is made in
-this slice; awaiting human decision.**
+**DECIDED: option A** (@Jeduardo622, 2026-07-28) — the sim is rebalanced
+so broadside (beam) firing angles are rewarded, per the GDD, **before**
+art constraints are finalized. Consequences accepted with the decision:
+every pinned fixture re-derives (all ten mission suites, playable-seed
+selections, PvP seed-11 empirical fixtures, both scenario fingerprints,
+C# mirrors), and `docs/design/pvp-tuning.md` review reopens in the
+implementing PR. The rebalance is a Class C arc executed slice-by-slice
+with human merges; ship-view art work that depends on the firing model
+(fire-feedback origin, arc overlays) waits for the new curve, while
+heading visibility (§3.2) proceeds — it is required under any curve.
 
 ### 3.2 Heading visibility (engineering plan — no decision needed)
 
@@ -157,12 +159,15 @@ and whether `perf-budgets.md`'s "mid-tier device" means a phone.
 - **B. Mobile-first per GDD:** demo scenes rebuilt around touch and
   aspect-ratio ranges now; desktop becomes the dev harness. Larger
   engineering slice before any art lands.
-- **Recommendation: A** — the entire existing demo surface (four scenes,
-  mouse order entry, keyboard playback controls) is desktop; option B
-  rebuilds working software before art can start. The portability
-  constraint set keeps the GDD's mobile endgame reachable.
 
-**Awaiting human decision.**
+**DECIDED: option B** (@Jeduardo622, 2026-07-28) — art specs are
+authored mobile-first per GDD p. 24: portrait/landscape aspect ranges,
+touch hit targets (≥ 44 pt), safe-area handling, 30 fps mid-tier budget,
+Android as the locally-buildable reference platform (the WebGL module is
+absent; iOS builds happen off this machine). The demo scenes are rebuilt
+around touch before art lands; keyboard/mouse remain as the Editor dev
+harness. Sequenced **after** the D1-A rebalance (rules first, then the
+view/UI layer that displays them).
 
 ### 3.4 Render pipeline (Decision D3 — HARD STOP, owned by W5)
 
@@ -235,8 +240,8 @@ remains the accessibility fallback.
 
 | ID | Decision | Options | Recommendation | Status |
 | --- | --- | --- | --- | --- |
-| D1 | Firing arcs: reconcile engine accuracy vs GDD broadsides | A rebalance sim / B document divergence / C staged opt-in modifier | **C** | **OPEN — human** |
-| D2 | Platform target for art specs | A desktop-first + portability constraints / B mobile-first rebuild | **A** | **OPEN — human** |
+| D1 | Firing arcs: reconcile engine accuracy vs GDD broadsides | A rebalance sim / B document divergence / C staged opt-in modifier | C | **DECIDED: A** — @Jeduardo622, 2026-07-28 (rebalance chosen over the recommendation; blast radius accepted) |
+| D2 | Platform target for art specs | A desktop-first + portability constraints / B mobile-first rebuild | A | **DECIDED: B** — @Jeduardo622, 2026-07-28 (mobile-first per GDD chosen over the recommendation) |
 | D3 | Render pipeline | URP vs built-in (evidence lands with W5 slice) | URP (provisional) | **OPEN — human, after W5 brief** |
 
 Decisions already taken inside this spec (reversible, engineering-level,
