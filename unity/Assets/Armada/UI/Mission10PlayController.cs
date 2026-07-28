@@ -98,6 +98,9 @@ namespace Armada.Client.UI
             _missionOver = false;
             LastError = null;
             _battle = new Mission10BattleState(Mission10Scenario.BuildExpectedStart(_seed).State.Ships);
+            // Show the opening position before the first orders are written:
+            // the player is aiming at this board, so it must be on screen.
+            ShowBoard($"Mission 10 Sail-Cutter (seed {_seed}) — the clipper line stands off to the east.");
             BeginOrderEntry();
         }
 
@@ -159,8 +162,28 @@ namespace Armada.Client.UI
                 _battle.Apply(record);
             }
 
+            // The renderer still shows the withdrawn turn's end positions and
+            // damage; rewind it too, or the replacement orders are written
+            // against a board a turn ahead of the retained prefix.
+            ShowBoard(_resolvedRecords.Count == 0
+                ? $"Turn 1 orders withdrawn — board rewound to the opening position."
+                : $"Turn {_authoredTurns.Count + 1} orders withdrawn — board rewound to the end of turn {_resolvedRecords.Count}.");
+
             SetStatus($"Turn {_authoredTurns.Count + 1} orders withdrawn — re-enter them.");
             BeginOrderEntry();
+        }
+
+        // Puts the renderer on the current battle snapshot without queuing
+        // playback. Bar maxima stay pinned to the battle-start stats.
+        private void ShowBoard(string hudLine)
+        {
+            if (_spectator != null)
+            {
+                _spectator.ShowBoard(
+                    _battle.Snapshot(),
+                    hudLine,
+                    Mission10Scenario.BuildExpectedStart(_seed).State.Ships);
+            }
         }
 
         /// <summary>

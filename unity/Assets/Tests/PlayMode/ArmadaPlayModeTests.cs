@@ -2210,6 +2210,11 @@ namespace Armada.Client.Tests.PlayMode
                 Assert.That(controller.TurnNumber, Is.EqualTo(1));
                 Assert.That(controller.CurrentSession.Drafts, Has.Count.EqualTo(2));
 
+                // The opening position is on screen before the first orders
+                // are written — the player is aiming at this board.
+                Assert.That(spectator.TryGetMarkerPosition("player-sloop-a", out var openingPosition), Is.True);
+                Assert.That(openingPosition.x, Is.EqualTo(0f).Within(0.001f));
+
                 for (var authored = 1; authored <= FakeMission10PrefixClient.WinOnTurn; authored++)
                 {
                     // Author the turn: fire chain shot at the leading clipper.
@@ -2260,9 +2265,21 @@ namespace Armada.Client.Tests.PlayMode
                         // server holds no run state, so withdrawing a turn
                         // just shortens the next prefix.
                         Assert.That(controller.TurnNumber, Is.EqualTo(2));
+
+                        // Turn 1's movement event carried sloop A to sim x=10,
+                        // i.e. world x=1 at the placeholder 0.1 scale.
+                        Assert.That(spectator.TryGetMarkerPosition("player-sloop-a", out var playedPosition), Is.True);
+                        Assert.That(playedPosition.x, Is.EqualTo(1f).Within(0.001f));
+
                         controller.OnUndoTurn();
                         Assert.That(controller.Phase, Is.EqualTo(Mission10PlayController.PlayPhase.OrderEntry));
                         Assert.That(controller.TurnNumber, Is.EqualTo(1));
+
+                        // The board must rewind with the order array: replacement
+                        // orders are written against the opening position, not
+                        // the withdrawn turn's end state.
+                        Assert.That(spectator.TryGetMarkerPosition("player-sloop-a", out var rewoundPosition), Is.True);
+                        Assert.That(rewoundPosition.x, Is.EqualTo(0f).Within(0.001f));
 
                         // Re-author the withdrawn turn so the run continues.
                         controller.OnCycleTarget();

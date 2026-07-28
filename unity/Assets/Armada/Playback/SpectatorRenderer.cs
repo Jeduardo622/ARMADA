@@ -193,6 +193,45 @@ namespace Armada.Client.Playback
             _stepArmed = false;
             IsFinished = false;
 
+            SpawnMarkers(shipsAtStart, baselineShips);
+
+            _playback = new TurnPlayback(shipsAtStart, turns);
+            SetHud(introLine);
+        }
+
+        /// <summary>
+        /// Re-spawns the markers at a supplied ship snapshot and queues no
+        /// playback: the board simply *is* that state.
+        ///
+        /// Used when the board must jump to a state the renderer never
+        /// animated into — the playable Mission 10 loop's opening position,
+        /// and its undo, which rewinds to the turn being re-authored. Without
+        /// this the renderer would keep showing the withdrawn turn's end
+        /// positions and damage while the player writes replacement orders.
+        /// </summary>
+        public void ShowBoard(
+            IReadOnlyList<SimShip> ships,
+            string hudLine,
+            IReadOnlyList<SimShip> baselineShips = null)
+        {
+            ClearMarkers();
+            _outcome = null;
+            _playback = null;
+            _currentStep = null;
+            _stepArmed = false;
+            // Nothing is queued, so playback is trivially done; consumers
+            // polling IsFinished must not wait on a run that will never step.
+            IsFinished = true;
+
+            SpawnMarkers(ships, baselineShips);
+            SetHud(hudLine);
+        }
+
+        // Spawns one marker per ship, taking readout-bar maxima from the
+        // matching baseline ship when one is supplied (mid-battle snapshots
+        // must keep the battle-start maxima, not re-baseline to themselves).
+        private void SpawnMarkers(IReadOnlyList<SimShip> ships, IReadOnlyList<SimShip> baselineShips)
+        {
             var baselineById = new Dictionary<string, SimShip>();
             if (baselineShips != null)
             {
@@ -205,13 +244,15 @@ namespace Armada.Client.Playback
                 }
             }
 
-            foreach (var ship in shipsAtStart)
+            if (ships == null)
+            {
+                return;
+            }
+
+            foreach (var ship in ships)
             {
                 SpawnMarker(ship, baselineById.TryGetValue(ship.Id ?? string.Empty, out var baseline) ? baseline : ship);
             }
-
-            _playback = new TurnPlayback(shipsAtStart, turns);
-            SetHud(introLine);
         }
 
         public bool TryGetMarkerPosition(string shipId, out Vector3 position)
