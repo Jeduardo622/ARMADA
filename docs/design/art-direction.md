@@ -50,7 +50,7 @@ decision.
 | 3 | Waypoint movement on a grid | Heading + speed deltas (WEGO retained) | Accept as-built and document as a deliberate divergence. The heading/speed model is deeply pinned (schema, fixtures, missions). Art consequence: ships need readable **absolute heading** (see §3.2). |
 | 4 | Port/starboard firing arcs, cone UI, vulnerable bow/stern | No firing arc; accuracy maximised bow-on (`engine.ts` angle penalty) | **(D1)** — the central contradiction; see §3.1. Art that draws broadside cones over a bow-on-rewarding sim would lie about the rules. |
 | 5 | Reload timers | None; broadside every turn | Document gap; do not build. No art blocker — "radial cooldown" UI slots designed in the HUD IA (W4) so a future reload system has a home. |
-| 6 | Boarding actions | `boarding` action + cooldown exist in schema and engine; no mission/PvP surface uses it in the demos | Document as dormant mechanic. The view abstraction must leave a binding point for a boarding state cue; no further work. |
+| 6 | Boarding actions | `boarding` is live in missions 03/04 (orders, cooldowns, telemetry-counted) and rendered as a generic flash + HUD line; PvP defers it | Treat as an **active** mechanic in the art pass: it needs its own visual identity in W2 (today it reuses the ram flash color, so boarding and ramming are indistinguishable on the board). |
 | 7 | Captains, abilities, portraits | Do not exist | Out of scope; document gap. No binding point required — captains attach to ships, and the ship view seam (W2) is sufficient. |
 | 8 | Harbor hub | Does not exist | Out of scope; document gap. |
 | 9 | Wind as core tactic, compass UI | Wind fully mechanical (`windMovement`, `windTurnRate`) but **never rendered** | Close the gap before art: wind direction/speed needs a world or HUD representation (W1 audit row; W2/W4 binding points). |
@@ -197,9 +197,9 @@ visual today. "Must render" = required before art (binding point in W2/W4).
 | Current target | order surface | yes (local) | text blob only | **yes** | Target line/reticle overlay slot in W2 board view. |
 | Broadside side (port/starboard) | order + event `side` | yes | no | yes | Fire feedback must originate from the correct side of the view so D1-C stays honest (§3.1). |
 | Hit / miss + roll/chance | broadside events | yes | flash regardless of hit | **yes** | GDD: splashes on miss. Distinct hit-vs-miss cue is a binding point. |
-| Rake state (`bow`/`stern`) | broadside event `rake` | yes | no | yes | The showcase tactic; needs a distinct flourish slot. |
+| Rake state (`bow`/`stern`) | broadside event `rake` | **no — discarded at the wire**: the C# `SimEvent` model has no `Rake` property, so deserialization drops the server field and `TurnPlayback` never sees it | no | yes | The showcase tactic; W2 must extend the C# wire model + playback mapping before a flourish slot can exist. |
 | Ram / collision | ram events | yes | white flash | yes | Keep; needs contact-point binding. |
-| Boarding | boarding events + `cooldowns.boarding` | yes | **no** | yes (dormant) | Binding point only (divergence row 6). |
+| Boarding | boarding events + `cooldowns.boarding` | yes | partial (ram-colored flash + HUD line) | **yes** | Active in missions 03/04 (divergence row 6); needs a visual distinct from ramming. |
 | Status: fire | `status.onFire` + counters, status events | yes | **no** | **yes** | Mechanically live (`statusEffects` missions). Particle/tint slot. |
 | Status: slow | `status.slowed` + counters | yes | **no** | **yes** | Shredded-sail visual pairs with sail bar. |
 | Sinking / death | hp = 0, summary `sunk` | yes | marker vanishes | **yes** | Needs a real sink state (GDD: stylized sinking); today ships pop out of existence. |
