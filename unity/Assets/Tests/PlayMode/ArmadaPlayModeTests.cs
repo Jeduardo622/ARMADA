@@ -2084,5 +2084,267 @@ namespace Armada.Client.Tests.PlayMode
 
             yield return null;
         }
+
+        /// <summary>
+        /// Stands in for the mission 10 resolve route. Mirrors the two
+        /// behaviours the play loop depends on: every call re-resolves the
+        /// whole submitted prefix, and the server always simulates through to
+        /// the turn limit, resolving turns past the authored prefix with no
+        /// player orders. The run "wins" once the player has authored
+        /// <see cref="WinOnTurn"/> turns.
+        /// </summary>
+        private sealed class FakeMission10PrefixClient : IMission10Client
+        {
+            public const int WinOnTurn = 3;
+
+            public readonly List<int> ResolvedPrefixLengths = new();
+            public Mission01ResolveRequest LastResolveRequest;
+
+            public Task<ServiceResult<Mission10StartResponse>> StartMission10Async(int seed)
+            {
+                return Task.FromResult(new ServiceResult<Mission10StartResponse>
+                {
+                    Data = Mission10Scenario.BuildExpectedStart(seed),
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+
+            public Task<ServiceResult<Mission10Outcome>> ResolveMission10Async(Mission01ResolveRequest request)
+            {
+                LastResolveRequest = request;
+                var authored = request.Turns?.Count ?? 0;
+                ResolvedPrefixLengths.Add(authored);
+
+                var won = authored >= WinOnTurn;
+                var recordCount = won ? WinOnTurn : Mission10Scenario.TurnLimit;
+                var records = new List<Mission01TurnRecord>();
+                for (var turn = 1; turn <= recordCount; turn++)
+                {
+                    var sunk = won && turn == WinOnTurn
+                        ? new List<string> { "enemy-clipper-a", "enemy-clipper-b" }
+                        : new List<string>();
+                    records.Add(new Mission01TurnRecord
+                    {
+                        Turn = turn,
+                        Hash = $"hash-{turn}",
+                        Summary = new SimSummary
+                        {
+                            PlayerRemaining = 2,
+                            EnemyRemaining = won && turn == WinOnTurn ? 0 : 2,
+                            Sunk = sunk
+                        },
+                        Events = new List<SimEvent>
+                        {
+                            // Distinct per turn so the test can tell which
+                            // record the renderer was handed.
+                            new SimEvent
+                            {
+                                Type = "movement",
+                                ShipId = "player-sloop-a",
+                                Position = new SimVector2 { X = turn * 10, Y = 30 }
+                            }
+                        }
+                    });
+                }
+
+                return Task.FromResult(new ServiceResult<Mission10Outcome>
+                {
+                    Data = new Mission10Outcome
+                    {
+                        MissionCode = Mission10Scenario.MissionCode,
+                        Seed = request.Seed,
+                        Result = won ? "win" : "loss",
+                        FailReason = won ? null : "timeout",
+                        TurnCount = won ? WinOnTurn : Mission10Scenario.TurnLimit,
+                        TurnLimit = Mission10Scenario.TurnLimit,
+                        BonusObjectives = new Mission10BonusObjectives
+                        {
+                            SailShredder = won,
+                            MixedBattery = won
+                        },
+                        Telemetry = new Mission10Telemetry(),
+                        Turns = records
+                    },
+                    Success = true,
+                    Status = HttpStatusCode.OK
+                });
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Mission10PlayController_AuthorsTurnByTurnAndCompletesWithTheAuthoredProof()
+        {
+            var missionClient = new FakeMission10PrefixClient();
+            var completionClient = new FakeMissionCompletionClient();
+            var flow = new Mission10Flow(missionClient, null, completionClient);
+
+            // Inactive so Update never runs: the test drives PollPlayback and
+            // the renderer's Tick itself, and MissionUIController.Start never
+            // fires a network refresh.
+            var gameObject = new GameObject("mission10-play-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var controller = gameObject.AddComponent<Mission10PlayController>();
+                var spectator = gameObject.AddComponent<SpectatorRenderer>();
+                var missionUI = gameObject.AddComponent<MissionUIController>();
+
+                var authService = new AuthService(null, null);
+                typeof(AuthService)
+                    .GetField("_state", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(authService, new AuthState
+                    {
+                        Token = "test-token",
+                        Player = new Player { Id = "11111111-1111-1111-1111-111111111111" }
+                    });
+                typeof(MissionUIController)
+                    .GetField("authService", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(missionUI, authService);
+
+                controller.Compose(flow, spectator, missionUI, Mission10Bootstrap.PlayableSeed);
+                controller.BeginMission();
+
+                // Turn 1 opens with both sloops available to order.
+                Assert.That(controller.Phase, Is.EqualTo(Mission10PlayController.PlayPhase.OrderEntry));
+                Assert.That(controller.TurnNumber, Is.EqualTo(1));
+                Assert.That(controller.CurrentSession.Drafts, Has.Count.EqualTo(2));
+
+                // The opening position is on screen before the first orders
+                // are written — the player is aiming at this board.
+                Assert.That(spectator.TryGetMarkerPosition("player-sloop-a", out var openingPosition), Is.True);
+                Assert.That(openingPosition.x, Is.EqualTo(0f).Within(0.001f));
+
+                for (var authored = 1; authored <= FakeMission10PrefixClient.WinOnTurn; authored++)
+                {
+                    // Author the turn: fire chain shot at the leading clipper.
+                    controller.OnCycleTarget();
+                    controller.OnToggleAmmo();
+                    controller.OnConfirmTurn();
+
+                    // The fake client completes synchronously, so the awaited
+                    // continuation can already have carried the phase past
+                    // Resolving by the time the click handler returns; a real
+                    // HTTP client yields first. Either way a submit is
+                    // in flight and the phase must have left order entry.
+                    Assert.That(controller.ActiveSubmit, Is.Not.Null);
+                    Assert.That(
+                        controller.Phase,
+                        Is.EqualTo(Mission10PlayController.PlayPhase.Resolving)
+                            .Or.EqualTo(Mission10PlayController.PlayPhase.Playback));
+                    while (!controller.ActiveSubmit.IsCompleted)
+                    {
+                        yield return null;
+                    }
+
+                    Assert.That(controller.LastError, Is.Null);
+                    Assert.That(controller.Phase, Is.EqualTo(Mission10PlayController.PlayPhase.Playback));
+
+                    // Only the newest record is played back, never the whole
+                    // prefix and never the ghost tail the server resolved past
+                    // the authored turns.
+                    var playedTurns = new HashSet<int>();
+                    for (var tick = 0; tick < 200 && !spectator.IsFinished; tick++)
+                    {
+                        spectator.Tick(0.5f);
+                        var step = spectator.CurrentStep;
+                        if (step != null && step.Kind != PlaybackStepKind.RunComplete)
+                        {
+                            playedTurns.Add(step.Turn);
+                        }
+                    }
+
+                    Assert.That(spectator.IsFinished, Is.True);
+                    Assert.That(playedTurns, Is.EquivalentTo(new[] { authored }));
+
+                    controller.PollPlayback();
+
+                    if (authored == 1)
+                    {
+                        // Undo is free: the order array is client-side and the
+                        // server holds no run state, so withdrawing a turn
+                        // just shortens the next prefix.
+                        Assert.That(controller.TurnNumber, Is.EqualTo(2));
+
+                        // Turn 1's movement event carried sloop A to sim x=10,
+                        // i.e. world x=1 at the placeholder 0.1 scale.
+                        Assert.That(spectator.TryGetMarkerPosition("player-sloop-a", out var playedPosition), Is.True);
+                        Assert.That(playedPosition.x, Is.EqualTo(1f).Within(0.001f));
+
+                        controller.OnUndoTurn();
+                        Assert.That(controller.Phase, Is.EqualTo(Mission10PlayController.PlayPhase.OrderEntry));
+                        Assert.That(controller.TurnNumber, Is.EqualTo(1));
+
+                        // The board must rewind with the order array: replacement
+                        // orders are written against the opening position, not
+                        // the withdrawn turn's end state.
+                        Assert.That(spectator.TryGetMarkerPosition("player-sloop-a", out var rewoundPosition), Is.True);
+                        Assert.That(rewoundPosition.x, Is.EqualTo(0f).Within(0.001f));
+
+                        // Re-author the withdrawn turn so the run continues.
+                        controller.OnCycleTarget();
+                        controller.OnToggleAmmo();
+                        controller.OnConfirmTurn();
+                        while (!controller.ActiveSubmit.IsCompleted)
+                        {
+                            yield return null;
+                        }
+
+                        for (var tick = 0; tick < 200 && !spectator.IsFinished; tick++)
+                        {
+                            spectator.Tick(0.5f);
+                        }
+
+                        controller.PollPlayback();
+                    }
+
+                    if (authored < FakeMission10PrefixClient.WinOnTurn)
+                    {
+                        // Not over: the server's ghost tail past the authored
+                        // prefix reported a timeout loss, which the loop must
+                        // ignore.
+                        Assert.That(controller.Phase, Is.EqualTo(Mission10PlayController.PlayPhase.OrderEntry));
+                        Assert.That(controller.LastOutcome.Result, Is.EqualTo("loss"));
+                        Assert.That(controller.TurnNumber, Is.EqualTo(authored + 1));
+                    }
+                }
+
+                // The win landed inside the authored prefix, so the run is over.
+                Assert.That(controller.Phase, Is.EqualTo(Mission10PlayController.PlayPhase.Finished));
+                Assert.That(controller.LastOutcome.Result, Is.EqualTo("win"));
+
+                // One resolve per confirmed turn, each re-sending the whole
+                // prefix; the undone turn re-sent length 1 a second time.
+                Assert.That(
+                    missionClient.ResolvedPrefixLengths,
+                    Is.EqualTo(new[] { 1, 1, 2, 3 }));
+
+                // CompleteMission10 is async void; with fake clients it
+                // finishes within a few frames.
+                for (var frame = 0; completionClient.LastRequest == null && frame < 120; frame++)
+                {
+                    yield return null;
+                }
+
+                // The completion proof is the array the player authored — the
+                // exact turns the winning resolve was called with.
+                Assert.That(completionClient.LastCode, Is.EqualTo(Mission10Scenario.MissionCode));
+                Assert.That(completionClient.LastRequest.Seed, Is.EqualTo(Mission10Bootstrap.PlayableSeed));
+                Assert.That(completionClient.LastRequest.Turns, Has.Count.EqualTo(FakeMission10PrefixClient.WinOnTurn));
+                Assert.That(
+                    completionClient.LastRequest.Turns,
+                    Is.SameAs(missionClient.LastResolveRequest.Turns));
+                Assert.That(completionClient.LastRequest.Turns[0][0].Ammo, Is.EqualTo("chain"));
+                Assert.That(
+                    completionClient.LastRequest.Turns[0][0].TargetShipId,
+                    Is.EqualTo(Mission10Scenario.EnemyShipIds[0]));
+                // The mission carries no upgrade tiers.
+                Assert.That(completionClient.LastRequest.Upgrades, Is.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
     }
 }

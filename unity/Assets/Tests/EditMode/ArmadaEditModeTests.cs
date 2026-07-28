@@ -1122,6 +1122,154 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(inFlightField.GetValue(authService), Is.Null);
         }
 
+        [Test]
+        public void Mission10OrderSession_BuildsOrdersTheMissionResolveRouteAccepts()
+        {
+            // The playable loop authors mission 10 orders through the same
+            // PvpOrderSession the hot-seat uses. This pins the request shape
+            // against the route's validation (src/routes/missions.ts): every
+            // order must name a player sloop, any target must be an enemy
+            // clipper, deltas must stay inside simOrderSchema's clamps, and
+            // round shot must omit the ammo key so payloads stay
+            // byte-identical to the legacy shape.
+            var start = Mission10Scenario.BuildExpectedStart(
+                Armada.Client.Bootstrap.Mission10Bootstrap.PlayableSeed);
+            var battle = new Mission10BattleState(start.State.Ships);
+            var session = new PvpOrderSession(
+                "Player",
+                battle.LivingShips("player"),
+                battle.LivingShips("enemy"),
+                "Turn 1/10 — your orders:");
+
+            Assert.That(session.Drafts, Has.Count.EqualTo(2));
+            Assert.That(session.Describe(), Does.StartWith("Turn 1/10 — your orders:"));
+
+            // Sloop A: hard a-starboard at full sail, chain into clipper A.
+            session.CycleTarget();
+            session.ToggleAmmo();
+            for (var i = 0; i < 10; i++)
+            {
+                session.AdjustTurn(1);
+                session.AdjustSpeed(1);
+            }
+
+            // Sloop B: hold fire and manoeuvre only.
+            session.NextShip();
+            session.AdjustSpeed(-1);
+
+            var orders = session.BuildOrders();
+            Assert.That(orders, Has.Count.EqualTo(2));
+
+            var chaseOrder = orders[0];
+            Assert.That(chaseOrder.ShipId, Is.EqualTo(Mission10Scenario.PlayerShipIds[0]));
+            Assert.That(chaseOrder.Action, Is.EqualTo("broadside"));
+            Assert.That(chaseOrder.TargetShipId, Is.EqualTo(Mission10Scenario.EnemyShipIds[0]));
+            Assert.That(chaseOrder.Side, Is.EqualTo("starboard"));
+            Assert.That(chaseOrder.Ammo, Is.EqualTo("chain"));
+            // Repeated presses clamp at the schema bounds rather than running away.
+            Assert.That(chaseOrder.TurnDelta, Is.EqualTo(PvpOrderSession.TurnDeltaLimit));
+            Assert.That(chaseOrder.SpeedDelta, Is.EqualTo(PvpOrderSession.SpeedDeltaLimit));
+
+            var maneuverOrder = orders[1];
+            Assert.That(maneuverOrder.ShipId, Is.EqualTo(Mission10Scenario.PlayerShipIds[1]));
+            Assert.That(maneuverOrder.Action, Is.EqualTo("maneuver"));
+            Assert.That(maneuverOrder.TargetShipId, Is.Null);
+            Assert.That(maneuverOrder.Side, Is.Null);
+            // No target means no ammo key, even though the draft still
+            // carries the default round-shot load.
+            Assert.That(maneuverOrder.Ammo, Is.Null);
+            Assert.That(maneuverOrder.SpeedDelta, Is.EqualTo(-1));
+
+            // Cycling past the last clipper returns to "hold fire", so a
+            // player can always withdraw an attack order.
+            session.CycleTarget();
+            session.CycleTarget();
+            session.CycleTarget();
+            Assert.That(session.BuildOrders()[1].TargetShipId, Is.Null);
+        }
+
+        [Test]
+        public void Mission10BattleState_TracksSurvivorsFromTheResolvedEventStream()
+        {
+            // Mission 10's /resolve returns no per-turn state, so the play
+            // loop rebuilds the ship snapshot from the reported events. Only
+            // living ships may be offered as order subjects or targets.
+            var start = Mission10Scenario.BuildExpectedStart(
+                Armada.Client.Bootstrap.Mission10Bootstrap.PlayableSeed);
+            var battle = new Mission10BattleState(start.State.Ships);
+
+            Assert.That(battle.LivingShips("player"), Has.Count.EqualTo(2));
+            Assert.That(battle.LivingShips("enemy"), Has.Count.EqualTo(2));
+
+            battle.Apply(new Mission01TurnRecord
+            {
+                Turn = 1,
+                Events = new List<SimEvent>
+                {
+                    new SimEvent { Type = "maneuver", ShipId = "player-sloop-a", Heading = 45 },
+                    new SimEvent
+                    {
+                        Type = "movement",
+                        ShipId = "player-sloop-a",
+                        Position = new SimVector2 { X = 40, Y = 32 }
+                    },
+                    new SimEvent
+                    {
+                        Type = "broadside",
+                        ShipId = "player-sloop-a",
+                        TargetShipId = "enemy-clipper-a",
+                        Hit = true,
+                        Ammo = "chain",
+                        TargetRemaining = new SimRemaining { Hp = 140, Sail = 20, Crew = 48 }
+                    },
+                    new SimEvent
+                    {
+                        Type = "broadside",
+                        ShipId = "enemy-clipper-b",
+                        TargetShipId = "player-sloop-b",
+                        Hit = true,
+                        TargetRemaining = new SimRemaining { Hp = 0, Sail = 40, Crew = 12 }
+                    }
+                }
+            });
+
+            // Server-reported position and heading carried into the snapshot.
+            var sloopA = battle.Ships[0];
+            Assert.That(sloopA.Id, Is.EqualTo("player-sloop-a"));
+            Assert.That(sloopA.Heading, Is.EqualTo(45));
+            Assert.That(sloopA.Position.X, Is.EqualTo(40));
+            Assert.That(sloopA.Position.Y, Is.EqualTo(32));
+
+            // Chain shot stripped rigging without sinking: still a target.
+            var clipperA = battle.LivingShips("enemy")[0];
+            Assert.That(clipperA.Id, Is.EqualTo("enemy-clipper-a"));
+            Assert.That(clipperA.Sail, Is.EqualTo(20));
+
+            // Sloop B went down, so the next turn may not order it.
+            var livingPlayers = battle.LivingShips("player");
+            Assert.That(livingPlayers, Has.Count.EqualTo(1));
+            Assert.That(livingPlayers[0].Id, Is.EqualTo("player-sloop-a"));
+
+            // Snapshots are deep copies: a later turn must not mutate what an
+            // in-flight playback already spawned from.
+            var snapshot = battle.Snapshot();
+            battle.Apply(new Mission01TurnRecord
+            {
+                Turn = 2,
+                Events = new List<SimEvent>
+                {
+                    new SimEvent
+                    {
+                        Type = "movement",
+                        ShipId = "player-sloop-a",
+                        Position = new SimVector2 { X = 90, Y = 32 }
+                    }
+                }
+            });
+            Assert.That(snapshot[0].Position.X, Is.EqualTo(40));
+            Assert.That(battle.Ships[0].Position.X, Is.EqualTo(90));
+        }
+
         private static TelemetryEvent Event(string type, string value)
         {
             return new TelemetryEvent

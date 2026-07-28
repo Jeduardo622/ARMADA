@@ -12,16 +12,45 @@ namespace Armada.Client.Bootstrap
 {
     /// <summary>
     /// Runtime composition root for the Mission 10 "Sail-Cutter" slice.
-    /// Constructs the client service graph, runs Mission10Flow with a
-    /// deterministic seed and the pinned mixed-battery orders, then reports a
-    /// win through MissionUIController.CompleteMission10 so the completion
-    /// proof re-sends the resolved run's snapshotted seed and turns.
+    /// Constructs the client service graph, then runs the mission in one of
+    /// two modes:
+    ///
+    /// Spectate — resolves the pinned mixed-battery order fixture in one shot
+    /// and plays the whole run back. No input.
+    ///
+    /// Play — hands the run to Mission10PlayController, which authors orders
+    /// a turn at a time and re-resolves the growing prefix.
+    ///
+    /// Either way a win reports through MissionUIController.CompleteMission10
+    /// so the completion proof re-sends the resolved run's snapshotted seed
+    /// and turns.
     /// </summary>
     public sealed class Mission10Bootstrap : MonoBehaviour
     {
+        public enum Mission10Mode
+        {
+            Spectate,
+            Play
+        }
+
         // Seed 2 wins the pinned mixed-battery orders at turn 8 with both
         // bonuses (tests/mission10.test.ts).
         public const int DefaultSeed = 2;
+
+        // Seed for free play. Chosen deliberately: the fixture seed only
+        // proves the fixture wins, which says nothing about a player writing
+        // their own orders. Seed 872 was selected from a sweep over the
+        // families of orders a captain would plausibly try (see
+        // docs/demo.md "Choosing the playable seed"):
+        //   * focused round shot wins at turn 9, so a player who never touches
+        //     the ammo toggle can still finish the mission;
+        //   * opening with one to three chain volleys wins on the same turn
+        //     for the same hull cost and claims both bonus objectives, so the
+        //     showcase mechanic is rewarded rather than required;
+        //   * a fourth chain volley loses — the trade has a visible cliff;
+        //   * pure chain, split fire, and holding fire all lose, so the
+        //     mission still has to be played rather than clicked through.
+        public const int PlayableSeed = 872;
 
         [Header("Config")]
         [SerializeField] private ArmadaClientConfig clientConfig;
@@ -36,7 +65,12 @@ namespace Armada.Client.Bootstrap
         [Header("Spectator (optional)")]
         [SerializeField] private Playback.SpectatorRenderer spectator;
 
+        // Wired by the playable scene only; required when mode is Play.
+        [Header("Play mode (optional)")]
+        [SerializeField] private Mission10PlayController playUI;
+
         [Header("Run")]
+        [SerializeField] private Mission10Mode mode = Mission10Mode.Spectate;
         [SerializeField] private int seed = DefaultSeed;
 
         private AuthService _authService;
@@ -88,6 +122,23 @@ namespace Armada.Client.Bootstrap
             }
 
             await _authService.GetTokenAsync();
+
+            if (mode == Mission10Mode.Play)
+            {
+                if (playUI == null)
+                {
+                    Debug.LogError("[Mission10Bootstrap] Play mode needs a Mission10PlayController; staying idle.");
+                    return;
+                }
+
+                // The play controller owns the turn loop from here: it
+                // authors orders, re-resolves the growing prefix, and
+                // completes the mission on a win.
+                playUI.Compose(_flow, spectator, missionUI, seed);
+                playUI.BeginMission();
+                return;
+            }
+
             var run = await DriveAsync(_flow, missionUI, seed, BuildMixedBatteryOrders());
             if (spectator != null)
             {
