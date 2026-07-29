@@ -1318,6 +1318,60 @@ namespace Armada.Client.Tests.PlayMode
             yield return null;
         }
 
+        private sealed class MastheadViewProvider : Armada.Client.Playback.ShipViewProvider
+        {
+            public int Created;
+
+            public override Armada.Client.Playback.ShipView CreateShipView(SimShip ship, Transform parent)
+            {
+                Created++;
+                var root = new GameObject($"masthead-{ship.Id}");
+                root.transform.SetParent(parent, worldPositionStays: false);
+                var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                body.transform.SetParent(root.transform, worldPositionStays: false);
+                var view = root.AddComponent<Armada.Client.Playback.ShipView>();
+                view.Configure(body.GetComponent<Renderer>(), null, 2f);
+                return view;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ShipViewProvider_OnTheSameGameObjectIsUsedWithoutWiring()
+        {
+            // The documented no-wiring extension path (Codex P2 on PR #87): a
+            // provider component beside the renderer must win over the
+            // primitive default even when the serialized field is unset — and
+            // its reported TopClearance must drive the bar lift.
+            var gameObject = new GameObject("ship-view-custom-provider-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var custom = gameObject.AddComponent<MastheadViewProvider>();
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>(),
+                    turnLimit: 1,
+                    introLine: "custom provider test",
+                    completionLine: "done");
+
+                Assert.That(custom.Created, Is.EqualTo(1));
+                Assert.That(spectator.transform.Find("masthead-player-sloop-a"), Is.Not.Null);
+                var hullBar = spectator.transform.Find("hull-bar-player-sloop-a");
+                Assert.That(hullBar, Is.Not.Null);
+                // markerHeight 0.5 + custom TopClearance 2.0 + barClearance 0.4.
+                Assert.That(hullBar.position.y, Is.EqualTo(0.5f + 2f + 0.4f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+            yield break;
+        }
+
         [UnityTest]
         public IEnumerator ShipViewProvider_SpawnsDirectionalViewsWithDerivedBarClearance()
         {

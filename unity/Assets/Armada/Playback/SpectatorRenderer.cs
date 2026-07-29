@@ -574,6 +574,14 @@ namespace Armada.Client.Playback
             {
                 if (shipViewProvider == null)
                 {
+                    // A provider living on this GameObject wins before the
+                    // primitive default is created — the documented no-wiring
+                    // extension path (Codex P2 on PR #87).
+                    shipViewProvider = GetComponent<ShipViewProvider>();
+                }
+
+                if (shipViewProvider == null)
+                {
                     // Pre-art default: the primitive views every scene shipped
                     // with, now behind the same seam a prefab provider uses.
                     shipViewProvider = gameObject.AddComponent<PrimitiveShipViewProvider>();
