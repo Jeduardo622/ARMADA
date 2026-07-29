@@ -1,7 +1,8 @@
 # Spectator Demo Design Tuning
 
-> **Status: Review REOPENED** (D2-B mobile-first HUD geometry: label
-> font/rect rows below). Prior status: Reviewed — applied values approved
+> **Status: Review REOPENED** (D2-B touch playback controls: the HUD-hint
+> row below; the prior D2-B geometry reopening was signed off by
+> @Jeduardo622 via the human merge of PR #83 on 2026-07-28). Prior status: Reviewed — applied values approved
 > by @Jeduardo622 via the PR #51 merge on 2026-07-21, drafted following
 > the Mission 07 precedent (see the QA notes in
 > `docs/content/missions/mission-07-burning-seas.md`). Future value
@@ -76,7 +77,7 @@ change here (see Regeneration below).
 | Label font size | 32 (**applied, D2-B**) | keep | Readable at arm's length on a phone; the canvas now scales with screen height (reference 1920×1080). |
 | Label rect (hard-coded) | ±16 edge offset, −64 width inset, 84 height (**applied, D2-B**) | keep | Two-line safety height at the larger font; labels sit inside a `SafeAreaInsets` wrapper so notches never clip them. |
 | Directional light rotation (hard-coded) | (50, −30, 0) | keep | Unity's default key-light angle; markers are flat-tinted so lighting is non-critical. |
-| Initial HUD hint | "Waiting for run... (Space pause, Right Arrow step, 1-4 speed)" | append "+/- cycle" | The +/− preset-cycle bindings shipped in PR #50 but were missing from the hint. |
+| Initial HUD hint | "Waiting for run... (buttons below; keys: Space pause, Right Arrow step, 1-4 speed, +/- cycle)" (**applied, D2-B**) | keep | Touch buttons are the primary control surface; the key list stays as the Editor dev harness reference. |
 
 ## Constraints (do not tune past these)
 

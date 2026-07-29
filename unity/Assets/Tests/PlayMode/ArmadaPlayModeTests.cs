@@ -1319,6 +1319,69 @@ namespace Armada.Client.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator PlaybackControlsController_DrivesPauseStepAndSpeedThroughTheRendererApi()
+        {
+            // Inactive so neither component's Update runs; the test drives the
+            // button handlers directly — the same calls the on-screen touch
+            // buttons make (D2-B) — and asserts renderer state.
+            var gameObject = new GameObject("playback-controls-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                var controls = gameObject.AddComponent<Armada.Client.UI.PlaybackControlsController>();
+                typeof(Armada.Client.UI.PlaybackControlsController)
+                    .GetField("spectator", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(controls, spectator);
+
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>
+                    {
+                        new Mission01TurnRecord { Turn = 1, Events = new List<SimEvent>() }
+                    },
+                    turnLimit: 1,
+                    introLine: "controls test",
+                    completionLine: "done");
+
+                // Pause toggle mirrors the renderer state and its caption
+                // always names the action the button performs.
+                Assert.That(controls.PauseCaption, Is.EqualTo("Pause"));
+                controls.OnTogglePause();
+                Assert.That(spectator.IsPaused, Is.True);
+                Assert.That(controls.PauseCaption, Is.EqualTo("Resume"));
+
+                // Step arms exactly one playback step while paused.
+                controls.OnStep();
+                spectator.Tick(0.1f);
+                Assert.That(spectator.CurrentStep, Is.Not.Null);
+                Assert.That(spectator.CurrentStep.Kind, Is.EqualTo(Armada.Client.Playback.PlaybackStepKind.TurnStart));
+
+                // Speed buttons cycle the shared presets, clamped at the ends.
+                Assert.That(spectator.SpeedMultiplier, Is.EqualTo(1f));
+                controls.OnSpeedUp();
+                Assert.That(spectator.SpeedMultiplier, Is.EqualTo(2f));
+                controls.OnSpeedUp();
+                controls.OnSpeedUp();
+                Assert.That(spectator.SpeedMultiplier, Is.EqualTo(4f));
+                controls.OnSpeedDown();
+                Assert.That(spectator.SpeedMultiplier, Is.EqualTo(2f));
+
+                controls.OnTogglePause();
+                Assert.That(spectator.IsPaused, Is.False);
+                Assert.That(controls.PauseCaption, Is.EqualTo("Pause"));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+            yield break;
+        }
+
+        [UnityTest]
         public IEnumerator SpectatorRenderer_ControlsPauseStepScaleSpeedAndDriveReadoutBars()
         {
             // Inactive so Update (and its input polling) never runs; the test

@@ -5,8 +5,10 @@ using Armada.Client.Playback;
 using Armada.Client.UI;
 using TMPro;
 using UnityEditor;
+using UnityEditor.Events;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 /// <summary>
@@ -65,23 +67,42 @@ public static class SpectatorDemoSceneBuilder
         board.transform.localScale = new Vector3(30f, 1f, 16f);
         board.GetComponent<Renderer>().sharedMaterial = boardMaterial;
 
-        var canvasObject = new GameObject("HUD Canvas", typeof(Canvas), typeof(CanvasScaler));
+        // GraphicRaycaster + EventSystem are new with the D2-B playback
+        // buttons: this scene was previously spectate-only with no
+        // interactive UI at all.
+        var canvasObject = new GameObject("HUD Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         ConfigureScaler(canvasObject.GetComponent<CanvasScaler>());
         var canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+        new GameObject("EventSystem",
+            typeof(UnityEngine.EventSystems.EventSystem),
+            typeof(UnityEngine.EventSystems.StandaloneInputModule));
 
         // Every HUD element parents under the safe-area wrapper so notches
         // and rounded corners never clip it on device (D2-B, mobile-first).
         var safeArea = CreateSafeArea(canvasObject.transform);
 
         var hudLabel = CreateLabel(safeArea, "SpectatorHud", anchorTop: true);
-        hudLabel.text = "Waiting for run... (Space pause, Right Arrow step, 1-4 speed, +/- cycle)";
+        hudLabel.text = "Waiting for run... (buttons below; keys: Space pause, Right Arrow step, 1-4 speed, +/- cycle)";
         var statusLabel = CreateLabel(safeArea, "MissionStatus", anchorTop: false);
         statusLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
         var spectator = spectatorObject.GetComponent<SpectatorRenderer>();
         SetReference(spectator, "hudLabel", hudLabel);
+
+        // On-screen playback controls (D2-B touch controls): pause/step/speed
+        // buttons calling the same renderer API as the keyboard bindings.
+        var playbackObject = new GameObject("PlaybackControls", typeof(PlaybackControlsController));
+        var playbackControls = playbackObject.GetComponent<PlaybackControlsController>();
+        SetReference(playbackControls, "spectator", spectator);
+        var playbackGrid = CreateButtonGrid(safeArea, "PlaybackButtons", 116f, anchorTop: true);
+        var pauseCaption = CreateButton(playbackGrid, "Pause", playbackControls.OnTogglePause);
+        SetReference(playbackControls, "pauseLabel", pauseCaption);
+        CreateButton(playbackGrid, "Step", playbackControls.OnStep);
+        CreateButton(playbackGrid, "Speed -", playbackControls.OnSpeedDown);
+        CreateButton(playbackGrid, "Speed +", playbackControls.OnSpeedUp);
 
         var missionUIObject = new GameObject("MissionUI", typeof(MissionUIController));
         var missionUI = missionUIObject.GetComponent<MissionUIController>();
@@ -156,6 +177,51 @@ public static class SpectatorDemoSceneBuilder
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
         return safeAreaObject.transform;
+    }
+
+    // Wrapping button strip (shared geometry with the other scene builders;
+    // see the D2-B notes there): 190×140 cells clear the 44 pt touch floor on
+    // the minimum supported device, and the grid wraps on narrow aspects.
+    private static Transform CreateButtonGrid(Transform parent, string name, float edgeOffset, bool anchorTop = false)
+    {
+        var gridObject = new GameObject(name, typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        gridObject.transform.SetParent(parent, worldPositionStays: false);
+        var rect = gridObject.GetComponent<RectTransform>();
+        rect.anchorMin = anchorTop ? new Vector2(0f, 1f) : new Vector2(0f, 0f);
+        rect.anchorMax = anchorTop ? new Vector2(1f, 1f) : new Vector2(1f, 0f);
+        rect.pivot = anchorTop ? new Vector2(0.5f, 1f) : new Vector2(0.5f, 0f);
+        rect.anchoredPosition = new Vector2(0f, anchorTop ? -edgeOffset : edgeOffset);
+        rect.sizeDelta = new Vector2(-48f, 0f);
+        var grid = gridObject.GetComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(190f, 140f);
+        grid.spacing = new Vector2(12f, 12f);
+        grid.startCorner = anchorTop ? GridLayoutGroup.Corner.UpperLeft : GridLayoutGroup.Corner.LowerLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = anchorTop ? TextAnchor.UpperLeft : TextAnchor.LowerLeft;
+        gridObject.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        return gridObject.transform;
+    }
+
+    private static TextMeshProUGUI CreateButton(Transform parent, string label, UnityAction handler)
+    {
+        var buttonObject = new GameObject($"Button-{label}", typeof(RectTransform), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(parent, worldPositionStays: false);
+
+        buttonObject.GetComponent<Image>().color = new Color(0.15f, 0.25f, 0.4f, 0.9f);
+        UnityEventTools.AddVoidPersistentListener(buttonObject.GetComponent<Button>().onClick, handler);
+
+        var labelObject = new GameObject("Label", typeof(TextMeshProUGUI));
+        labelObject.transform.SetParent(buttonObject.transform, worldPositionStays: false);
+        var labelRect = labelObject.GetComponent<RectTransform>();
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.sizeDelta = Vector2.zero;
+        var text = labelObject.GetComponent<TextMeshProUGUI>();
+        text.text = label;
+        text.fontSize = 26f;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = Color.white;
+        return text;
     }
 
     private static TextMeshProUGUI CreateLabel(Transform parent, string name, bool anchorTop)

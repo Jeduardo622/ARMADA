@@ -313,7 +313,12 @@ namespace Armada.Client.Playback
             }
         }
 
-        private void CycleSpeedPreset(int direction)
+        /// <summary>
+        /// Steps to the neighbouring speed preset (+1 faster, −1 slower),
+        /// clamped at the ends. Shared by the keyboard bindings above and the
+        /// on-screen playback buttons (D2-B touch controls).
+        /// </summary>
+        public void CycleSpeedPreset(int direction)
         {
             if (speedPresets == null || speedPresets.Length == 0)
             {

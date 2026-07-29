@@ -46,6 +46,10 @@ from applied (remaining-block) losses, never nominal rolls.
 
 ## Controls
 
+On-screen **Pause / Step / Speed − / Speed +** buttons (top strip) drive
+playback on every scene — they are the touch controls on device. The
+keyboard bindings below remain as the Editor dev harness:
+
 - **Space** — pause / resume playback.
 - **Right Arrow** — while paused, play exactly one playback step
   (banner, maneuver, move, or attack flash), then freeze again.

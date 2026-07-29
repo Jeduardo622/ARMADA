@@ -95,6 +95,18 @@ public static class PvPNetplayDemoSceneBuilder
         // camera every tick, never zooming tighter than the authored 8.5.
         SetReference(spectator, "followCamera", camera);
 
+        // On-screen playback controls (D2-B touch controls): pause/step/speed
+        // buttons calling the same renderer API as the keyboard bindings.
+        var playbackObject = new GameObject("PlaybackControls", typeof(PlaybackControlsController));
+        var playbackControls = playbackObject.GetComponent<PlaybackControlsController>();
+        SetReference(playbackControls, "spectator", spectator);
+        var playbackGrid = CreateButtonGrid(safeArea, "PlaybackButtons", 184f, anchorTop: true);
+        var pauseCaption = CreateButton(playbackGrid, "Pause", playbackControls.OnTogglePause);
+        SetReference(playbackControls, "pauseLabel", pauseCaption);
+        CreateButton(playbackGrid, "Step", playbackControls.OnStep);
+        CreateButton(playbackGrid, "Speed -", playbackControls.OnSpeedDown);
+        CreateButton(playbackGrid, "Speed +", playbackControls.OnSpeedUp);
+
         var netplayUIObject = new GameObject("PvpNetplayUI", typeof(PvpNetplayUIController));
         var netplayUI = netplayUIObject.GetComponent<PvpNetplayUIController>();
         SetReference(netplayUI, "orderLabel", orderLabel);
@@ -102,7 +114,7 @@ public static class PvPNetplayDemoSceneBuilder
 
         // Menu strip (Create, code input, Join) wraps independently above
         // the order strip.
-        var menuGrid = CreateButtonGrid(safeArea, "MenuButtons", bottomOffset: 176f);
+        var menuGrid = CreateButtonGrid(safeArea, "MenuButtons", edgeOffset: 176f);
         CreateButton(menuGrid, "Create Match", netplayUI.OnCreateMatch);
         CreateJoinCodeInput(menuGrid, netplayUI);
         CreateButton(menuGrid, "Join Match", netplayUI.OnJoinMatch);
@@ -119,7 +131,7 @@ public static class PvPNetplayDemoSceneBuilder
             ("Ammo", netplayUI.OnToggleAmmo),
             ("Confirm Orders", netplayUI.OnConfirmOrders)
         };
-        var orderGrid = CreateButtonGrid(safeArea, "OrderButtons", bottomOffset: 24f);
+        var orderGrid = CreateButtonGrid(safeArea, "OrderButtons", edgeOffset: 24f);
         for (var i = 0; i < orderButtons.Length; i++)
         {
             CreateButton(orderGrid, orderButtons[i].label, orderButtons[i].handler);
@@ -214,27 +226,27 @@ public static class PvPNetplayDemoSceneBuilder
     // iPhone 8 landscape matches 750 px against the 1080 reference (scale
     // 0.694), so 140 units render at ~97 px = ~48.6 pt on its 2x display —
     // above the 44 pt floor; 96 units would land at 33 pt.
-    private static Transform CreateButtonGrid(Transform parent, string name, float bottomOffset)
+    private static Transform CreateButtonGrid(Transform parent, string name, float edgeOffset, bool anchorTop = false)
     {
         var gridObject = new GameObject(name, typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
         gridObject.transform.SetParent(parent, worldPositionStays: false);
         var rect = gridObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(1f, 0f);
-        rect.pivot = new Vector2(0.5f, 0f);
-        rect.anchoredPosition = new Vector2(0f, bottomOffset);
+        rect.anchorMin = anchorTop ? new Vector2(0f, 1f) : new Vector2(0f, 0f);
+        rect.anchorMax = anchorTop ? new Vector2(1f, 1f) : new Vector2(1f, 0f);
+        rect.pivot = anchorTop ? new Vector2(0.5f, 1f) : new Vector2(0.5f, 0f);
+        rect.anchoredPosition = new Vector2(0f, anchorTop ? -edgeOffset : edgeOffset);
         rect.sizeDelta = new Vector2(-48f, 0f);
         var grid = gridObject.GetComponent<GridLayoutGroup>();
         grid.cellSize = new Vector2(190f, 140f);
         grid.spacing = new Vector2(12f, 12f);
-        grid.startCorner = GridLayoutGroup.Corner.LowerLeft;
+        grid.startCorner = anchorTop ? GridLayoutGroup.Corner.UpperLeft : GridLayoutGroup.Corner.LowerLeft;
         grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-        grid.childAlignment = TextAnchor.LowerLeft;
+        grid.childAlignment = anchorTop ? TextAnchor.UpperLeft : TextAnchor.LowerLeft;
         gridObject.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         return gridObject.transform;
     }
 
-    private static void CreateButton(Transform parent, string label, UnityAction handler)
+    private static TextMeshProUGUI CreateButton(Transform parent, string label, UnityAction handler)
     {
         var buttonObject = new GameObject($"Button-{label}", typeof(RectTransform), typeof(Image), typeof(Button));
         buttonObject.transform.SetParent(parent, worldPositionStays: false);
@@ -253,6 +265,7 @@ public static class PvPNetplayDemoSceneBuilder
         text.fontSize = 26f;
         text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;
+        return text;
     }
 
     // Join-code entry uses the legacy uGUI InputField (not TMP_InputField)
