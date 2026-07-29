@@ -114,7 +114,7 @@ public static class Mission10PlayDemoSceneBuilder
         var playbackObject = new GameObject("PlaybackControls", typeof(PlaybackControlsController));
         var playbackControls = playbackObject.GetComponent<PlaybackControlsController>();
         SetReference(playbackControls, "spectator", spectator);
-        var playbackGrid = CreateButtonGrid(safeArea, "PlaybackButtons", 184f, anchorTop: true);
+        var playbackGrid = CreateButtonGrid(safeArea, "PlaybackButtons", edgeOffset: 24f);
         var pauseCaption = CreateButton(playbackGrid, "Pause", playbackControls.OnTogglePause);
         SetReference(playbackControls, "pauseLabel", pauseCaption);
         CreateButton(playbackGrid, "Step", playbackControls.OnStep);
@@ -154,6 +154,14 @@ public static class Mission10PlayDemoSceneBuilder
         {
             CreateButton(buttonGrid, buttons[i].label, buttons[i].handler);
         }
+
+        // Runtime stacking (Codex P2 on PR #84): grids wrap to different row
+        // counts as the viewport narrows, so fixed offsets cannot keep them
+        // apart at every aspect. The stacker repositions the strips bottom-up
+        // from their live wrapped heights each frame.
+        var stackerObject = new GameObject("HudStripStacker", typeof(BottomStripStacker));
+        var stacker = stackerObject.GetComponent<BottomStripStacker>();
+        SetStripArray(stacker, "strips", (RectTransform)buttonGrid, (RectTransform)playbackGrid);
 
         var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap), typeof(MobilePresentation));
         var bootstrap = bootstrapObject.GetComponent<Mission10Bootstrap>();
@@ -288,6 +296,26 @@ public static class Mission10PlayDemoSceneBuilder
         text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;
         return text;
+    }
+
+
+    private static void SetStripArray(Component component, string fieldName, params RectTransform[] strips)
+    {
+        var serialized = new SerializedObject(component);
+        var property = serialized.FindProperty(fieldName);
+        if (property == null)
+        {
+            Debug.LogError($"[Mission10PlayDemoSceneBuilder] Missing serialized field '{fieldName}' on {component.GetType().Name}.");
+            return;
+        }
+
+        property.arraySize = strips.Length;
+        for (var i = 0; i < strips.Length; i++)
+        {
+            property.GetArrayElementAtIndex(i).objectReferenceValue = strips[i];
+        }
+
+        serialized.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static void SetReference(Component component, string fieldName, Object value)

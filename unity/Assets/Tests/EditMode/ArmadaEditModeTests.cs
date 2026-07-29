@@ -1271,6 +1271,19 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void BottomStripStacker_NextOffset_AccumulatesWrappedStripHeights()
+        {
+            // Two strips on a narrow viewport: a 3-row order grid (444) then a
+            // 1-row playback grid; the second strip starts above the first
+            // plus spacing, and a degenerate height cannot move the cursor
+            // backwards.
+            var afterOrder = Armada.Client.UI.BottomStripStacker.NextOffset(24f, 444f, 12f);
+            Assert.That(afterOrder, Is.EqualTo(480f));
+            Assert.That(Armada.Client.UI.BottomStripStacker.NextOffset(afterOrder, 140f, 12f), Is.EqualTo(632f));
+            Assert.That(Armada.Client.UI.BottomStripStacker.NextOffset(100f, -50f, 12f), Is.EqualTo(112f));
+        }
+
+        [Test]
         public void SafeAreaInsets_ComputeAnchors_MapsPixelSafeAreaToNormalizedAnchors()
         {
             // 2436×1125 landscape with a 132 px notch inset on the left and a

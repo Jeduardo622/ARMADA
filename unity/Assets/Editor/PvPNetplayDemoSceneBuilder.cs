@@ -100,7 +100,7 @@ public static class PvPNetplayDemoSceneBuilder
         var playbackObject = new GameObject("PlaybackControls", typeof(PlaybackControlsController));
         var playbackControls = playbackObject.GetComponent<PlaybackControlsController>();
         SetReference(playbackControls, "spectator", spectator);
-        var playbackGrid = CreateButtonGrid(safeArea, "PlaybackButtons", 184f, anchorTop: true);
+        var playbackGrid = CreateButtonGrid(safeArea, "PlaybackButtons", edgeOffset: 24f);
         var pauseCaption = CreateButton(playbackGrid, "Pause", playbackControls.OnTogglePause);
         SetReference(playbackControls, "pauseLabel", pauseCaption);
         CreateButton(playbackGrid, "Step", playbackControls.OnStep);
@@ -115,6 +115,7 @@ public static class PvPNetplayDemoSceneBuilder
         // Menu strip (Create, code input, Join) wraps independently above
         // the order strip.
         var menuGrid = CreateButtonGrid(safeArea, "MenuButtons", edgeOffset: 176f);
+        var menuGridRect = (RectTransform)menuGrid;
         CreateButton(menuGrid, "Create Match", netplayUI.OnCreateMatch);
         CreateJoinCodeInput(menuGrid, netplayUI);
         CreateButton(menuGrid, "Join Match", netplayUI.OnJoinMatch);
@@ -136,6 +137,14 @@ public static class PvPNetplayDemoSceneBuilder
         {
             CreateButton(orderGrid, orderButtons[i].label, orderButtons[i].handler);
         }
+
+        // Runtime stacking (Codex P2 on PR #84): grids wrap to different row
+        // counts as the viewport narrows, so fixed offsets cannot keep them
+        // apart at every aspect. The stacker repositions the strips bottom-up
+        // from their live wrapped heights each frame.
+        var stackerObject = new GameObject("HudStripStacker", typeof(BottomStripStacker));
+        var stacker = stackerObject.GetComponent<BottomStripStacker>();
+        SetStripArray(stacker, "strips", (RectTransform)orderGrid, menuGridRect, (RectTransform)playbackGrid);
 
         var bootstrapObject = new GameObject("PvpNetplayBootstrap", typeof(DeterministicSimHooks), typeof(PvpNetplayBootstrap), typeof(MobilePresentation));
         var bootstrap = bootstrapObject.GetComponent<PvpNetplayBootstrap>();
@@ -309,6 +318,26 @@ public static class PvPNetplayDemoSceneBuilder
         input.placeholder = placeholder;
         input.characterLimit = 8;
         UnityEventTools.AddPersistentListener(input.onValueChanged, netplayUI.SetJoinCode);
+    }
+
+
+    private static void SetStripArray(Component component, string fieldName, params RectTransform[] strips)
+    {
+        var serialized = new SerializedObject(component);
+        var property = serialized.FindProperty(fieldName);
+        if (property == null)
+        {
+            Debug.LogError($"[PvPNetplayDemoSceneBuilder] Missing serialized field '{fieldName}' on {component.GetType().Name}.");
+            return;
+        }
+
+        property.arraySize = strips.Length;
+        for (var i = 0; i < strips.Length; i++)
+        {
+            property.GetArrayElementAtIndex(i).objectReferenceValue = strips[i];
+        }
+
+        serialized.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static void SetReference(Component component, string fieldName, Object value)

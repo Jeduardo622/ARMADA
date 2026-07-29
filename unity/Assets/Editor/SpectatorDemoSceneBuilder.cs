@@ -97,12 +97,20 @@ public static class SpectatorDemoSceneBuilder
         var playbackObject = new GameObject("PlaybackControls", typeof(PlaybackControlsController));
         var playbackControls = playbackObject.GetComponent<PlaybackControlsController>();
         SetReference(playbackControls, "spectator", spectator);
-        var playbackGrid = CreateButtonGrid(safeArea, "PlaybackButtons", 116f, anchorTop: true);
+        var playbackGrid = CreateButtonGrid(safeArea, "PlaybackButtons", edgeOffset: 116f);
         var pauseCaption = CreateButton(playbackGrid, "Pause", playbackControls.OnTogglePause);
         SetReference(playbackControls, "pauseLabel", pauseCaption);
         CreateButton(playbackGrid, "Step", playbackControls.OnStep);
         CreateButton(playbackGrid, "Speed -", playbackControls.OnSpeedDown);
         CreateButton(playbackGrid, "Speed +", playbackControls.OnSpeedUp);
+
+        // Runtime stacking (Codex P2 on PR #84): a single strip here, kept
+        // above the bottom status label; the stacker still owns its offset so
+        // the convention matches the interactive scenes.
+        var stackerObject = new GameObject("HudStripStacker", typeof(BottomStripStacker));
+        var stacker = stackerObject.GetComponent<BottomStripStacker>();
+        SetStripArray(stacker, "strips", (RectTransform)playbackGrid);
+        SetFloat(stacker, "edgeOffset", 116f);
 
         var missionUIObject = new GameObject("MissionUI", typeof(MissionUIController));
         var missionUI = missionUIObject.GetComponent<MissionUIController>();
@@ -240,6 +248,40 @@ public static class SpectatorDemoSceneBuilder
         label.fontSize = 32f;
         label.color = Color.white;
         return label;
+    }
+
+
+    private static void SetStripArray(Component component, string fieldName, params RectTransform[] strips)
+    {
+        var serialized = new SerializedObject(component);
+        var property = serialized.FindProperty(fieldName);
+        if (property == null)
+        {
+            Debug.LogError($"[SpectatorDemoSceneBuilder] Missing serialized field '{fieldName}' on {component.GetType().Name}.");
+            return;
+        }
+
+        property.arraySize = strips.Length;
+        for (var i = 0; i < strips.Length; i++)
+        {
+            property.GetArrayElementAtIndex(i).objectReferenceValue = strips[i];
+        }
+
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private static void SetFloat(Component component, string fieldName, float value)
+    {
+        var serialized = new SerializedObject(component);
+        var property = serialized.FindProperty(fieldName);
+        if (property == null)
+        {
+            Debug.LogError($"[SpectatorDemoSceneBuilder] Missing serialized field '{fieldName}' on {component.GetType().Name}.");
+            return;
+        }
+
+        property.floatValue = value;
+        serialized.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static void SetReference(Component component, string fieldName, Object value)
