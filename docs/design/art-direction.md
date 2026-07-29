@@ -163,8 +163,10 @@ and whether `perf-budgets.md`'s "mid-tier device" means a phone.
 **DECIDED: option B** (@Jeduardo622, 2026-07-28) — art specs are
 authored mobile-first per GDD p. 24: landscape-first battle scenes with
 defensive reflow across aspect ranges (button strips wrap on narrow
-aspects; a battle-scene landscape orientation lock is a separate Class C
-PlayerSettings proposal, and portrait-optimized HUD layout is W4 scope),
+aspects; the battle-scene sensor-landscape orientation lock was approved
+by @Jeduardo622 on 2026-07-29 and applied in PlayerSettings, and
+portrait-optimized HUD layout remains W4 scope — the capture matrix
+keeps its portrait frames as defensive-reflow evidence),
 touch hit targets ≥ 44 pt **on the minimum supported device** (iPhone 8:
 scaler-aware math, not reference-pixel claims), safe-area handling,
 30 fps mid-tier budget,
