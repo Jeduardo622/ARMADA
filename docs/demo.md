@@ -28,9 +28,9 @@ npm run dev                   # Fastify server on http://localhost:4500
 ## 2. Open the scene
 
 1. Open the `unity/` project in Unity `2022.3.62f3`.
-2. First open only: import TMP Essentials when prompted
-   (Window → TextMeshPro → Import TMP Essential Resources), otherwise the
-   HUD text will not render.
+2. TMP Essential Resources are committed under `Assets/TextMesh Pro`
+   (imported via `Assets → Armada → Import TMP Essential Resources`), so
+   HUD text renders on a fresh clone with no import prompt.
 3. Open `Assets/Scenes/SpectatorDemo.unity` (spectate) or
    `Assets/Scenes/Mission10Play.unity` (playable) and press Play.
 

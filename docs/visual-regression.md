@@ -102,6 +102,28 @@ silent re-capture at different moments.
   `Library` state stays out of the repo and the developer's Editor lock is
   never contended.
 
+## HUD aspect matrix (D2-B slice 3)
+
+```bash
+node scripts/visual/hud-capture.mjs
+```
+
+Renders every generated scene's **world + HUD** at four aspect ratios
+(16:9, 20:9, 4:3 landscape, 9:16 portrait) into
+`reports/unity/visual/hud/` and diffs against
+`tests/visual/baselines/hud/` (same SHA + tolerance rules; re-baseline
+with `--update-baselines`, re-diff without Unity via `--diff-only`).
+
+The scenes author ScreenSpaceOverlay canvases, which `Camera.Render()`
+ignores, so `HudLayoutCapture` temporarily switches each canvas to
+ScreenSpaceCamera over the scene's own camera (in memory only), forces
+the scaler/layout pass for each aspect, and runs every
+`BottomStripStacker.Restack()` — LateUpdate never fires in edit mode.
+Frames show the static pre-play HUD (hint copy, button strips), which is
+exactly the layout surface where the PR #83/#84 review findings lived:
+fixed rows overflowing narrow widths and strips overlapping now show up
+as diffable pixels.
+
 ## Limits
 
 - The tolerance is tight (delta ≤ 2, ≤ 0.01% of pixels): any intended visual change re-baselines. That is
