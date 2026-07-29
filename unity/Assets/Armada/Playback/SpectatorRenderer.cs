@@ -47,8 +47,8 @@ namespace Armada.Client.Playback
 
         [Header("Readout bars (design-tunable placeholders)")]
         [SerializeField] private float barWidth = 1.2f;
-        [Tooltip("Must clear the tallest marker: enemy capsules top out at y=1.5 under the top-down camera.")]
-        [SerializeField] private float barLift = 1.4f;
+        [Tooltip("Gap between the view's reported top (ShipView.TopClearance) and the bars; the lift is derived per view, never hardcoded to a shape.")]
+        [SerializeField] private float barClearance = 0.4f;
         [SerializeField] private Color hullBarColor = new Color(0.40f, 0.95f, 0.40f);
         [SerializeField] private Color sailBarColor = new Color(0.95f, 0.90f, 0.55f);
 
@@ -63,8 +63,13 @@ namespace Armada.Client.Playback
         [Tooltip("Never zoom tighter than the authored opening framing.")]
         [SerializeField] private float followMinSize = 8.5f;
 
+        [Header("View provider (optional; primitives when null)")]
+        [Tooltip("Factory for ship visuals. Null adds the primitive provider at first spawn; an art-backed provider replaces it without a renderer change (W2).")]
+        [SerializeField] private ShipViewProvider shipViewProvider;
+
         private sealed class Marker
         {
+            public ShipView View;
             public Transform Transform;
             public Renderer Renderer;
             public Color BaseColor;
@@ -453,7 +458,7 @@ namespace Armada.Client.Playback
                     _stepDuration = maneuverSeconds;
                     if (step.Heading.HasValue && TryGetMarker(step.ShipId, out var maneuvering))
                     {
-                        maneuvering.Transform.rotation = Quaternion.Euler(0f, step.Heading.Value, 0f);
+                        maneuvering.Transform.rotation = HeadingToRotation(step.Heading.Value);
                     }
                     break;
                 case PlaybackStepKind.Move:
@@ -563,6 +568,34 @@ namespace Armada.Client.Playback
                 + $" | applied to enemy: hull {inflicted.Hull}, sail {inflicted.Sail}, crew {inflicted.Crew}");
         }
 
+        private ShipViewProvider Provider
+        {
+            get
+            {
+                if (shipViewProvider == null)
+                {
+                    // Pre-art default: the primitive views every scene shipped
+                    // with, now behind the same seam a prefab provider uses.
+                    shipViewProvider = gameObject.AddComponent<PrimitiveShipViewProvider>();
+                }
+
+                return shipViewProvider;
+            }
+        }
+
+        /// <summary>
+        /// Sim heading to view yaw. The engine moves ships along
+        /// (cos h, sin h) in sim x/y — world x/z at this renderer's scale —
+        /// and a view's bow is its local +z, so yaw must be 90 − h for the
+        /// bow to track the motion. The legacy yaw = h mapping was wrong for
+        /// every heading off the diagonal, invisible only because symmetric
+        /// primitives had no bow to contradict it (W2 bow-cue finding).
+        /// </summary>
+        private static Quaternion HeadingToRotation(float heading)
+        {
+            return Quaternion.Euler(0f, 90f - heading, 0f);
+        }
+
         private void SpawnMarker(SimShip ship)
         {
             SpawnMarker(ship, ship);
@@ -572,25 +605,18 @@ namespace Armada.Client.Playback
         // spawned snapshot only for mid-battle playback (hot-seat turns).
         private void SpawnMarker(SimShip ship, SimShip baselineShip)
         {
-            // Placeholder art: player ships are cubes, enemy ships capsules,
-            // flat-tinted with the side color.
-            var primitive = GameObject.CreatePrimitive(ship.Side == "player" ? PrimitiveType.Cube : PrimitiveType.Capsule);
-            primitive.name = $"marker-{ship.Id}";
-            primitive.transform.SetParent(transform, worldPositionStays: false);
-            primitive.transform.position = ToWorld(ship.Position.X, ship.Position.Y);
-            primitive.transform.rotation = Quaternion.Euler(0f, ship.Heading, 0f);
+            var view = Provider.CreateShipView(ship, transform);
+            view.transform.position = ToWorld(ship.Position.X, ship.Position.Y);
+            view.transform.rotation = HeadingToRotation(ship.Heading);
 
-            var markerRenderer = primitive.GetComponent<Renderer>();
             var baseColor = ship.Side == "player" ? playerColor : enemyColor;
-            if (markerRenderer != null)
-            {
-                markerRenderer.material.color = baseColor;
-            }
+            view.SetBaseTint(baseColor);
 
             var marker = new Marker
             {
-                Transform = primitive.transform,
-                Renderer = markerRenderer,
+                View = view,
+                Transform = view.transform,
+                Renderer = view.TintRenderer,
                 BaseColor = baseColor,
                 MaxHull = Mathf.Max(1, baselineShip.Hp),
                 MaxSail = Mathf.Max(1, baselineShip.Sail),
@@ -644,18 +670,21 @@ namespace Armada.Client.Playback
         {
             // Screen-up for the top-down camera is world +z, so the bars sit
             // just "above" the marker; offsets are design-tunable placeholders.
-            PositionBar(marker.HullBar, marker.Transform.position, 0.45f, hullFraction);
-            PositionBar(marker.SailBar, marker.Transform.position, 0.30f, sailFraction);
+            // The lift derives from the view's reported top, never a
+            // hardcoded shape height (spectator-tuning bar-clearance rule).
+            var lift = (marker.View != null ? marker.View.TopClearance : 1f) + barClearance;
+            PositionBar(marker.HullBar, marker.Transform.position, lift, 0.45f, hullFraction);
+            PositionBar(marker.SailBar, marker.Transform.position, lift, 0.30f, sailFraction);
         }
 
-        private void PositionBar(Transform bar, Vector3 markerPosition, float zOffset, float fraction)
+        private void PositionBar(Transform bar, Vector3 markerPosition, float lift, float zOffset, float fraction)
         {
             if (bar == null)
             {
                 return;
             }
 
-            bar.position = markerPosition + new Vector3(0f, barLift, zOffset);
+            bar.position = markerPosition + new Vector3(0f, lift, zOffset);
             var scale = bar.localScale;
             scale.x = barWidth * fraction;
             bar.localScale = scale;

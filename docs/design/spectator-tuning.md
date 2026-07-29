@@ -1,8 +1,8 @@
 # Spectator Demo Design Tuning
 
-> **Status: Review REOPENED** (D2-B touch playback controls: the HUD-hint
-> row below; the prior D2-B geometry reopening was signed off by
-> @Jeduardo622 via the human merge of PR #83 on 2026-07-28). Prior status: Reviewed — applied values approved
+> **Status: Review REOPENED** (W2 view seam: the bar-clearance row and
+> constraint below; prior reopenings signed off via the merges of PRs
+> #83/#84 on 2026-07-28/29). Prior status: Reviewed — applied values approved
 > by @Jeduardo622 via the PR #51 merge on 2026-07-21, drafted following
 > the Mission 07 precedent (see the QA notes in
 > `docs/content/missions/mission-07-burning-seas.md`). Future value
@@ -58,7 +58,7 @@ change here (see Regeneration below).
 | Knob | Current | Proposed | Rationale |
 | --- | --- | --- | --- |
 | `barWidth` | 1.2 | keep | Slightly wider than the 1-unit markers; fractions divide by it, so no test coupling. |
-| `barLift` | 1.2 | 1.4 | Doubles the clearance margin over the enemy capsule top (y = 1.5) flagged in the PR #50 review; bars now sit at y = 1.9. |
+| `barClearance` (replaces `barLift`) | 0.4 (**applied, W2**) | keep | Gap above the view's reported top (`ShipView.TopClearance`): lift = clearance + top, derived per view — enemy capsules keep bars at y = 1.9, player cubes tighten to 1.4, and any future model with an honest TopClearance is automatically cleared. |
 | `hullBarColor` | (0.40, 0.95, 0.40) | keep | Bright green reads against the dark sea the bars actually render over. |
 | `sailBarColor` | (0.95, 0.90, 0.55) | keep | Yellow distinct from hull green at a glance. |
 | Hull bar z-offset (`PositionBars`, hard-coded) | 0.45 | keep | Screen-up for the top-down camera; hull sits above sail. |
@@ -87,8 +87,10 @@ change here (see Regeneration below).
 - **Tick budget:** both spectator PlayMode tests bound playback at 100 ticks
   of 0.5s — keep per-step timings the same order of magnitude, and treat
   0.5s as a per-step boundary (crossing it doubles ticks consumed).
-- **Bar clearance:** marker y + `barLift` must exceed 1.5 (enemy capsule top
-  under the top-down camera).
+- **Bar clearance:** derived — marker y + `ShipView.TopClearance` +
+  `barClearance`; a view must report an honest TopClearance and the bars
+  clear it by construction (W2; replaces the fixed “must exceed 1.5”
+  rule tied to the enemy capsule).
 - **Showcase distinctness:** `chainShotFlashColor` must stay visually
   distinct from `roundShotFlashColor`.
 
