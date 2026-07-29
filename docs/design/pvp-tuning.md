@@ -1,7 +1,8 @@
 # PvP Demo Design Tuning
 
-> **Status: Review REOPENED** (scenario v2 under the D1-A broadside-arc
-> accuracy curve). The engine-side accuracy inversion decided by
+> **Status: Review REOPENED** (D2-B mobile-first HUD geometry; previously
+> reopened for the D1-A accuracy curve, re-signed off by @Jeduardo622 via
+> the human merge of PR #82 on 2026-07-28). The engine-side accuracy inversion decided by
 > @Jeduardo622 on 2026-07-28 (docs/design/art-direction.md, decision D1-A)
 > changes no scenario constant, but it reshapes the hit-chance curve every
 > empirical fixture and the v2 design analysis stand on, so this spec's
@@ -130,14 +131,14 @@ conventions; values below are hard-coded in the builders.
 
 | Knob | Current | Proposed | Rationale |
 | --- | --- | --- | --- |
-| Camera `orthographicSize` / position | 8.5 @ (11, 20, 0) | keep | The *opening* frame only under v2: battle midline sits at sim x = 110 → world x = 11; the follow behavior below takes over once ships move. |
+| Camera `orthographicSize` / position | 8.5 @ (11, 20, 0) | keep | The *opening* frame only under v2: battle midline sits at sim x = 110 → world x = 11; the follow behavior below takes over once ships move. Mobile aspects: the scaler matches height, and the follow camera reads the live aspect, so narrower screens zoom out rather than crop. |
 | Follow camera (`SpectatorRenderer.followCamera`, wired by both PvP builders) | `followPadding` 2, `followMinSize` 8.5 | keep (**new, v2**) | Re-frames the orthographic camera every tick to keep all markers (and their bars, via the padding) in view; never zooms tighter than the authored 8.5. Mission scenes leave the field null and keep their fixed framing. |
 | Board cube | 140×1×120 @ (11, −0.55, 0) (**applied, v2**) | keep | Sea under any realistic 20-turn line once ships actually sail; extreme max-speed runs can still reach open void past the edge — cosmetic only, the follow camera keeps the ships themselves in view. |
-| Button size / spacing / margin | 130×40, 8 gap, 20 edge | keep | Eight order buttons fit one row at default game-view widths. |
+| Button strip | wrapping grid, 190×140 cells, 12 gap, 24 edge (**applied, D2-B**) | keep | Touch-first: 140 units ≈ 48.6 pt on the minimum device (iPhone 8 landscape, scale 0.694) — above the 44 pt floor. The grid wraps into extra rows upward on narrow aspects (portrait, 4:3 tablets) so confirm actions are always reachable. Canvas scales with screen height (reference 1920×1080); HUD parents under a `SafeAreaInsets` wrapper. |
 | Button fill color | (0.15, 0.25, 0.4, 0.9) | keep | Muted navy; readable TMP white labels without competing with the board. |
-| Order/HUD label layout | hud 60h @ −10; status 40h @ −75; order panel 140h @ 70 (hot-seat) / 116 (netplay) | keep | Netplay lifts the order panel above its second (menu) button row at y = 66. |
-| Label / button font sizes | 18 / 16 | keep | Denser than the mission scene's 20 — the PvP HUD carries three text blocks. |
-| Join-code input (netplay) | 8-char limit, LegacyRuntime 18pt, white field (0.9), gray italic "MATCH CODE" placeholder | keep | Legacy uGUI InputField keeps the interactive path off TMP; limit mirrors the server code length. |
+| Order/HUD label layout | hud 84h @ −16; status 56h @ −112; order panel 200h @ 180 (hot-seat) / 340 (netplay) (**applied, D2-B**) | keep | Sized for the single-row landscape case; wrapped button rows may overlap the panel on narrow aspects — a known interim until the W4 HUD IA restructures the panel. Netplay's menu strip sits at y = 176 above the order strip. |
+| Label / button font sizes | 30 / 26 (**applied, D2-B**) | keep | Readable at arm's length on a phone under the height-matched scaler; still denser than the mission scenes' 32. |
+| Join-code input (netplay) | 8-char limit, LegacyRuntime 30pt, menu-grid cell (190×140, 0.9 white), gray italic "MATCH CODE" placeholder (**applied, D2-B**) | keep | Legacy uGUI InputField keeps the interactive path off TMP; limit mirrors the server code length. |
 | Hot-seat handoff copy | "Side A locked in. Hand the seat to Side B…" | keep | The interstitial is a review-mandated fairness gate; copy is free to change, the extra confirm press is not. |
 
 ## Constraints (do not tune past these)

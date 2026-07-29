@@ -1270,6 +1270,51 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(battle.Ships[0].Position.X, Is.EqualTo(90));
         }
 
+        [Test]
+        public void SafeAreaInsets_ComputeAnchors_MapsPixelSafeAreaToNormalizedAnchors()
+        {
+            // 2436×1125 landscape with a 132 px notch inset on the left and a
+            // 21 px home-indicator inset at the bottom (iPhone-style).
+            var (min, max) = Armada.Client.UI.SafeAreaInsets.ComputeAnchors(
+                new Rect(132f, 21f, 2172f, 1104f), 2436f, 1125f);
+            Assert.That(min.x, Is.EqualTo(132f / 2436f).Within(1e-5f));
+            Assert.That(min.y, Is.EqualTo(21f / 1125f).Within(1e-5f));
+            Assert.That(max.x, Is.EqualTo((132f + 2172f) / 2436f).Within(1e-5f));
+            Assert.That(max.y, Is.EqualTo(1f).Within(1e-5f));
+        }
+
+        [Test]
+        public void SafeAreaInsets_ComputeAnchors_FullScreenSafeAreaIsIdentity()
+        {
+            var (min, max) = Armada.Client.UI.SafeAreaInsets.ComputeAnchors(
+                new Rect(0f, 0f, 1920f, 1080f), 1920f, 1080f);
+            Assert.That(min, Is.EqualTo(Vector2.zero));
+            Assert.That(max, Is.EqualTo(Vector2.one));
+        }
+
+        [Test]
+        public void SafeAreaInsets_ComputeAnchors_DegenerateInputNeverCollapsesTheUi()
+        {
+            // Zero screen, empty safe area, and inverted safe area all fall
+            // back to the full screen instead of a zero-size rect.
+            Assert.That(
+                Armada.Client.UI.SafeAreaInsets.ComputeAnchors(new Rect(0f, 0f, 100f, 100f), 0f, 0f),
+                Is.EqualTo((Vector2.zero, Vector2.one)));
+            Assert.That(
+                Armada.Client.UI.SafeAreaInsets.ComputeAnchors(new Rect(0f, 0f, 0f, 0f), 1920f, 1080f),
+                Is.EqualTo((Vector2.zero, Vector2.one)));
+            Assert.That(
+                Armada.Client.UI.SafeAreaInsets.ComputeAnchors(new Rect(500f, 500f, -100f, -100f), 1920f, 1080f),
+                Is.EqualTo((Vector2.zero, Vector2.one)));
+        }
+
+        [Test]
+        public void MobilePresentation_PinsTheHandheldFrameRateBudget()
+        {
+            // docs/perf-budgets.md: 30 fps target on mid-tier devices.
+            Assert.That(Armada.Client.UI.MobilePresentation.MobileTargetFrameRate, Is.EqualTo(30));
+        }
+
         private static TelemetryEvent Event(string type, string value)
         {
             return new TelemetryEvent

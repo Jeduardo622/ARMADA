@@ -66,12 +66,17 @@ public static class SpectatorDemoSceneBuilder
         board.GetComponent<Renderer>().sharedMaterial = boardMaterial;
 
         var canvasObject = new GameObject("HUD Canvas", typeof(Canvas), typeof(CanvasScaler));
+        ConfigureScaler(canvasObject.GetComponent<CanvasScaler>());
         var canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
-        var hudLabel = CreateLabel(canvasObject.transform, "SpectatorHud", anchorTop: true);
+        // Every HUD element parents under the safe-area wrapper so notches
+        // and rounded corners never clip it on device (D2-B, mobile-first).
+        var safeArea = CreateSafeArea(canvasObject.transform);
+
+        var hudLabel = CreateLabel(safeArea, "SpectatorHud", anchorTop: true);
         hudLabel.text = "Waiting for run... (Space pause, Right Arrow step, 1-4 speed, +/- cycle)";
-        var statusLabel = CreateLabel(canvasObject.transform, "MissionStatus", anchorTop: false);
+        var statusLabel = CreateLabel(safeArea, "MissionStatus", anchorTop: false);
         statusLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
@@ -89,7 +94,7 @@ public static class SpectatorDemoSceneBuilder
         // the status label on the inactive object.
         missionUIObject.SetActive(false);
 
-        var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap));
+        var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap), typeof(MobilePresentation));
         var bootstrap = bootstrapObject.GetComponent<Mission10Bootstrap>();
         SetReference(bootstrap, "clientConfig", config);
         SetReference(bootstrap, "determinism", bootstrapObject.GetComponent<DeterministicSimHooks>());
@@ -130,6 +135,29 @@ public static class SpectatorDemoSceneBuilder
         return material;
     }
 
+    // Mobile-first canvas scaling (D2-B): author at 1920×1080 landscape and
+    // scale with screen height, so text keeps physical size across
+    // phone/tablet aspect ratios; wider screens gain horizontal room.
+    private static void ConfigureScaler(CanvasScaler scaler)
+    {
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 1f;
+    }
+
+    private static Transform CreateSafeArea(Transform canvas)
+    {
+        var safeAreaObject = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaInsets));
+        safeAreaObject.transform.SetParent(canvas, worldPositionStays: false);
+        var rect = safeAreaObject.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        return safeAreaObject.transform;
+    }
+
     private static TextMeshProUGUI CreateLabel(Transform parent, string name, bool anchorTop)
     {
         var labelObject = new GameObject(name, typeof(TextMeshProUGUI));
@@ -139,11 +167,11 @@ public static class SpectatorDemoSceneBuilder
         rect.anchorMin = anchorTop ? new Vector2(0f, 1f) : new Vector2(0f, 0f);
         rect.anchorMax = anchorTop ? new Vector2(1f, 1f) : new Vector2(1f, 0f);
         rect.pivot = anchorTop ? new Vector2(0.5f, 1f) : new Vector2(0.5f, 0f);
-        rect.anchoredPosition = anchorTop ? new Vector2(0f, -10f) : new Vector2(0f, 10f);
-        rect.sizeDelta = new Vector2(-40f, 60f);
+        rect.anchoredPosition = anchorTop ? new Vector2(0f, -16f) : new Vector2(0f, 16f);
+        rect.sizeDelta = new Vector2(-64f, 84f);
 
         var label = labelObject.GetComponent<TextMeshProUGUI>();
-        label.fontSize = 20f;
+        label.fontSize = 32f;
         label.color = Color.white;
         return label;
     }

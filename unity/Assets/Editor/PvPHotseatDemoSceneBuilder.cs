@@ -76,6 +76,7 @@ public static class PvPHotseatDemoSceneBuilder
         var canvasObject = new GameObject("HUD Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         var canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        ConfigureScaler(canvasObject.GetComponent<CanvasScaler>());
 
         // uGUI buttons need an EventSystem to receive clicks (legacy input
         // module; the Input System package is not in-project).
@@ -83,11 +84,15 @@ public static class PvPHotseatDemoSceneBuilder
             typeof(UnityEngine.EventSystems.EventSystem),
             typeof(UnityEngine.EventSystems.StandaloneInputModule));
 
-        var hudLabel = CreateLabel(canvasObject.transform, "SpectatorHud", anchorTop: true, height: 60f, offsetY: -10f);
+        // Every HUD element parents under the safe-area wrapper so notches
+        // and rounded corners never clip it on device (D2-B, mobile-first).
+        var safeArea = CreateSafeArea(canvasObject.transform);
+
+        var hudLabel = CreateLabel(safeArea, "SpectatorHud", anchorTop: true, height: 84f, offsetY: -16f);
         hudLabel.text = "PvP hot-seat: waiting for match start...";
-        var statusLabel = CreateLabel(canvasObject.transform, "PhaseStatus", anchorTop: true, height: 40f, offsetY: -75f);
+        var statusLabel = CreateLabel(safeArea, "PhaseStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
-        var orderLabel = CreateLabel(canvasObject.transform, "OrderPanel", anchorTop: false, height: 140f, offsetY: 70f);
+        var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 180f);
         orderLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
@@ -115,12 +120,13 @@ public static class PvPHotseatDemoSceneBuilder
             ("Ammo", orderUI.OnToggleAmmo),
             ("Confirm Side", orderUI.OnConfirmSide)
         };
+        var buttonGrid = CreateButtonGrid(safeArea, "OrderButtons", bottomOffset: 24f);
         for (var i = 0; i < buttons.Length; i++)
         {
-            CreateButton(canvasObject.transform, buttons[i].label, i, buttons.Length, buttons[i].handler);
+            CreateButton(buttonGrid, buttons[i].label, buttons[i].handler);
         }
 
-        var bootstrapObject = new GameObject("PvpHotseatBootstrap", typeof(DeterministicSimHooks), typeof(PvpHotseatBootstrap));
+        var bootstrapObject = new GameObject("PvpHotseatBootstrap", typeof(DeterministicSimHooks), typeof(PvpHotseatBootstrap), typeof(MobilePresentation));
         var bootstrap = bootstrapObject.GetComponent<PvpHotseatBootstrap>();
         SetReference(bootstrap, "clientConfig", config);
         SetReference(bootstrap, "determinism", bootstrapObject.GetComponent<DeterministicSimHooks>());
@@ -161,6 +167,29 @@ public static class PvPHotseatDemoSceneBuilder
         return material;
     }
 
+    // Mobile-first canvas scaling (D2-B): author at 1920×1080 landscape and
+    // scale with screen height, so touch targets keep physical size across
+    // phone/tablet aspect ratios; wider screens gain horizontal room.
+    private static void ConfigureScaler(CanvasScaler scaler)
+    {
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 1f;
+    }
+
+    private static Transform CreateSafeArea(Transform canvas)
+    {
+        var safeAreaObject = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaInsets));
+        safeAreaObject.transform.SetParent(canvas, worldPositionStays: false);
+        var rect = safeAreaObject.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        return safeAreaObject.transform;
+    }
+
     private static TextMeshProUGUI CreateLabel(Transform parent, string name, bool anchorTop, float height, float offsetY)
     {
         var labelObject = new GameObject(name, typeof(TextMeshProUGUI));
@@ -171,32 +200,49 @@ public static class PvPHotseatDemoSceneBuilder
         rect.anchorMax = anchorTop ? new Vector2(1f, 1f) : new Vector2(1f, 0f);
         rect.pivot = anchorTop ? new Vector2(0.5f, 1f) : new Vector2(0.5f, 0f);
         rect.anchoredPosition = new Vector2(0f, offsetY);
-        rect.sizeDelta = new Vector2(-40f, height);
+        rect.sizeDelta = new Vector2(-64f, height);
 
         var label = labelObject.GetComponent<TextMeshProUGUI>();
-        label.fontSize = 18f;
+        label.fontSize = 30f;
         label.color = Color.white;
         return label;
     }
 
-    private static void CreateButton(Transform parent, string label, int index, int count, UnityAction handler)
+    // Wrapping button strip (Codex P1 on PR #83): a fixed row overflows any
+    // screen narrower than its total width — a 4:3 tablet in landscape, or
+    // portrait phones — leaving confirm actions unreachable. The grid wraps
+    // into extra rows upward from the bottom edge instead, at any aspect.
+    // Cell height 140 keeps the minimum supported device honest (Codex P2):
+    // iPhone 8 landscape matches 750 px against the 1080 reference (scale
+    // 0.694), so 140 units render at ~97 px = ~48.6 pt on its 2x display —
+    // above the 44 pt floor; 96 units would land at 33 pt.
+    private static Transform CreateButtonGrid(Transform parent, string name, float bottomOffset)
+    {
+        var gridObject = new GameObject(name, typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        gridObject.transform.SetParent(parent, worldPositionStays: false);
+        var rect = gridObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.anchoredPosition = new Vector2(0f, bottomOffset);
+        rect.sizeDelta = new Vector2(-48f, 0f);
+        var grid = gridObject.GetComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(190f, 140f);
+        grid.spacing = new Vector2(12f, 12f);
+        grid.startCorner = GridLayoutGroup.Corner.LowerLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = TextAnchor.LowerLeft;
+        gridObject.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        return gridObject.transform;
+    }
+
+    private static void CreateButton(Transform parent, string label, UnityAction handler)
     {
         var buttonObject = new GameObject($"Button-{label}", typeof(RectTransform), typeof(Image), typeof(Button));
         buttonObject.transform.SetParent(parent, worldPositionStays: false);
 
-        var rect = buttonObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 0f);
-        rect.pivot = new Vector2(0f, 0f);
-        var width = 130f;
-        rect.anchoredPosition = new Vector2(20f + index * (width + 8f), 20f);
-        rect.sizeDelta = new Vector2(width, 40f);
-
-        var image = buttonObject.GetComponent<Image>();
-        image.color = new Color(0.15f, 0.25f, 0.4f, 0.9f);
-
-        var button = buttonObject.GetComponent<Button>();
-        UnityEventTools.AddVoidPersistentListener(button.onClick, handler);
+        buttonObject.GetComponent<Image>().color = new Color(0.15f, 0.25f, 0.4f, 0.9f);
+        UnityEventTools.AddVoidPersistentListener(buttonObject.GetComponent<Button>().onClick, handler);
 
         var labelObject = new GameObject("Label", typeof(TextMeshProUGUI));
         labelObject.transform.SetParent(buttonObject.transform, worldPositionStays: false);
@@ -206,7 +252,7 @@ public static class PvPHotseatDemoSceneBuilder
         labelRect.sizeDelta = Vector2.zero;
         var text = labelObject.GetComponent<TextMeshProUGUI>();
         text.text = label;
-        text.fontSize = 16f;
+        text.fontSize = 26f;
         text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;
     }

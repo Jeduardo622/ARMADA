@@ -71,16 +71,21 @@ public static class PvPNetplayDemoSceneBuilder
         var canvasObject = new GameObject("HUD Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         var canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        ConfigureScaler(canvasObject.GetComponent<CanvasScaler>());
 
         new GameObject("EventSystem",
             typeof(UnityEngine.EventSystems.EventSystem),
             typeof(UnityEngine.EventSystems.StandaloneInputModule));
 
-        var hudLabel = CreateLabel(canvasObject.transform, "SpectatorHud", anchorTop: true, height: 60f, offsetY: -10f);
+        // Every HUD element parents under the safe-area wrapper so notches
+        // and rounded corners never clip it on device (D2-B, mobile-first).
+        var safeArea = CreateSafeArea(canvasObject.transform);
+
+        var hudLabel = CreateLabel(safeArea, "SpectatorHud", anchorTop: true, height: 84f, offsetY: -16f);
         hudLabel.text = "PvP netplay: waiting for sign-in...";
-        var statusLabel = CreateLabel(canvasObject.transform, "PhaseStatus", anchorTop: true, height: 40f, offsetY: -75f);
+        var statusLabel = CreateLabel(safeArea, "PhaseStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
-        var orderLabel = CreateLabel(canvasObject.transform, "OrderPanel", anchorTop: false, height: 140f, offsetY: 116f);
+        var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 340f);
         orderLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
@@ -95,10 +100,12 @@ public static class PvPNetplayDemoSceneBuilder
         SetReference(netplayUI, "orderLabel", orderLabel);
         SetReference(netplayUI, "statusLabel", statusLabel);
 
-        // Menu row: Create, code input, Join.
-        CreateButton(canvasObject.transform, "Create Match", 0, netplayUI.OnCreateMatch, rowY: 66f);
-        CreateJoinCodeInput(canvasObject.transform, netplayUI, rowY: 66f, slot: 1);
-        CreateButton(canvasObject.transform, "Join Match", 2, netplayUI.OnJoinMatch, rowY: 66f);
+        // Menu strip (Create, code input, Join) wraps independently above
+        // the order strip.
+        var menuGrid = CreateButtonGrid(safeArea, "MenuButtons", bottomOffset: 176f);
+        CreateButton(menuGrid, "Create Match", netplayUI.OnCreateMatch);
+        CreateJoinCodeInput(menuGrid, netplayUI);
+        CreateButton(menuGrid, "Join Match", netplayUI.OnJoinMatch);
 
         // Order-entry row (own side only).
         var orderButtons = new (string label, UnityAction handler)[]
@@ -112,12 +119,13 @@ public static class PvPNetplayDemoSceneBuilder
             ("Ammo", netplayUI.OnToggleAmmo),
             ("Confirm Orders", netplayUI.OnConfirmOrders)
         };
+        var orderGrid = CreateButtonGrid(safeArea, "OrderButtons", bottomOffset: 24f);
         for (var i = 0; i < orderButtons.Length; i++)
         {
-            CreateButton(canvasObject.transform, orderButtons[i].label, i, orderButtons[i].handler, rowY: 20f);
+            CreateButton(orderGrid, orderButtons[i].label, orderButtons[i].handler);
         }
 
-        var bootstrapObject = new GameObject("PvpNetplayBootstrap", typeof(DeterministicSimHooks), typeof(PvpNetplayBootstrap));
+        var bootstrapObject = new GameObject("PvpNetplayBootstrap", typeof(DeterministicSimHooks), typeof(PvpNetplayBootstrap), typeof(MobilePresentation));
         var bootstrap = bootstrapObject.GetComponent<PvpNetplayBootstrap>();
         SetReference(bootstrap, "clientConfig", config);
         SetReference(bootstrap, "determinism", bootstrapObject.GetComponent<DeterministicSimHooks>());
@@ -157,6 +165,29 @@ public static class PvPNetplayDemoSceneBuilder
         return material;
     }
 
+    // Mobile-first canvas scaling (D2-B): author at 1920×1080 landscape and
+    // scale with screen height, so touch targets keep physical size across
+    // phone/tablet aspect ratios; wider screens gain horizontal room.
+    private static void ConfigureScaler(CanvasScaler scaler)
+    {
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 1f;
+    }
+
+    private static Transform CreateSafeArea(Transform canvas)
+    {
+        var safeAreaObject = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaInsets));
+        safeAreaObject.transform.SetParent(canvas, worldPositionStays: false);
+        var rect = safeAreaObject.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        return safeAreaObject.transform;
+    }
+
     private static TextMeshProUGUI CreateLabel(Transform parent, string name, bool anchorTop, float height, float offsetY)
     {
         var labelObject = new GameObject(name, typeof(TextMeshProUGUI));
@@ -167,26 +198,46 @@ public static class PvPNetplayDemoSceneBuilder
         rect.anchorMax = anchorTop ? new Vector2(1f, 1f) : new Vector2(1f, 0f);
         rect.pivot = anchorTop ? new Vector2(0.5f, 1f) : new Vector2(0.5f, 0f);
         rect.anchoredPosition = new Vector2(0f, offsetY);
-        rect.sizeDelta = new Vector2(-40f, height);
+        rect.sizeDelta = new Vector2(-64f, height);
 
         var label = labelObject.GetComponent<TextMeshProUGUI>();
-        label.fontSize = 18f;
+        label.fontSize = 30f;
         label.color = Color.white;
         return label;
     }
 
-    private static void CreateButton(Transform parent, string label, int slot, UnityAction handler, float rowY)
+    // Wrapping button strip (Codex P1 on PR #83): a fixed row overflows any
+    // screen narrower than its total width — a 4:3 tablet in landscape, or
+    // portrait phones — leaving confirm actions unreachable. The grid wraps
+    // into extra rows upward from the bottom edge instead, at any aspect.
+    // Cell height 140 keeps the minimum supported device honest (Codex P2):
+    // iPhone 8 landscape matches 750 px against the 1080 reference (scale
+    // 0.694), so 140 units render at ~97 px = ~48.6 pt on its 2x display —
+    // above the 44 pt floor; 96 units would land at 33 pt.
+    private static Transform CreateButtonGrid(Transform parent, string name, float bottomOffset)
+    {
+        var gridObject = new GameObject(name, typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        gridObject.transform.SetParent(parent, worldPositionStays: false);
+        var rect = gridObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.anchoredPosition = new Vector2(0f, bottomOffset);
+        rect.sizeDelta = new Vector2(-48f, 0f);
+        var grid = gridObject.GetComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(190f, 140f);
+        grid.spacing = new Vector2(12f, 12f);
+        grid.startCorner = GridLayoutGroup.Corner.LowerLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = TextAnchor.LowerLeft;
+        gridObject.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        return gridObject.transform;
+    }
+
+    private static void CreateButton(Transform parent, string label, UnityAction handler)
     {
         var buttonObject = new GameObject($"Button-{label}", typeof(RectTransform), typeof(Image), typeof(Button));
         buttonObject.transform.SetParent(parent, worldPositionStays: false);
-
-        var rect = buttonObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 0f);
-        rect.pivot = new Vector2(0f, 0f);
-        var width = 130f;
-        rect.anchoredPosition = new Vector2(20f + slot * (width + 8f), rowY);
-        rect.sizeDelta = new Vector2(width, 40f);
 
         buttonObject.GetComponent<Image>().color = new Color(0.15f, 0.25f, 0.4f, 0.9f);
         UnityEventTools.AddVoidPersistentListener(buttonObject.GetComponent<Button>().onClick, handler);
@@ -199,7 +250,7 @@ public static class PvPNetplayDemoSceneBuilder
         labelRect.sizeDelta = Vector2.zero;
         var text = labelObject.GetComponent<TextMeshProUGUI>();
         text.text = label;
-        text.fontSize = 16f;
+        text.fontSize = 26f;
         text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;
     }
@@ -207,18 +258,12 @@ public static class PvPNetplayDemoSceneBuilder
     // Join-code entry uses the legacy uGUI InputField (not TMP_InputField)
     // so the interactive path has no dependency on the TMP Essentials
     // import; the built-in LegacyRuntime font renders it.
-    private static void CreateJoinCodeInput(Transform parent, PvpNetplayUIController netplayUI, float rowY, int slot)
+    private static void CreateJoinCodeInput(Transform parent, PvpNetplayUIController netplayUI)
     {
+        // Lives inside the menu grid; the grid cell supplies the touch-size
+        // geometry (D2-B).
         var inputObject = new GameObject("JoinCodeInput", typeof(RectTransform), typeof(Image), typeof(InputField));
         inputObject.transform.SetParent(parent, worldPositionStays: false);
-
-        var rect = inputObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 0f);
-        rect.pivot = new Vector2(0f, 0f);
-        var width = 130f;
-        rect.anchoredPosition = new Vector2(20f + slot * (width + 8f), rowY);
-        rect.sizeDelta = new Vector2(width, 40f);
         inputObject.GetComponent<Image>().color = new Color(0.9f, 0.9f, 0.9f, 0.95f);
 
         var textObject = new GameObject("Text", typeof(RectTransform), typeof(Text));
@@ -229,7 +274,7 @@ public static class PvPNetplayDemoSceneBuilder
         textRect.sizeDelta = new Vector2(-12f, -8f);
         var text = textObject.GetComponent<Text>();
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.fontSize = 18;
+        text.fontSize = 30;
         text.color = Color.black;
         text.supportRichText = false;
 
@@ -241,7 +286,7 @@ public static class PvPNetplayDemoSceneBuilder
         placeholderRect.sizeDelta = new Vector2(-12f, -8f);
         var placeholder = placeholderObject.GetComponent<Text>();
         placeholder.font = text.font;
-        placeholder.fontSize = 18;
+        placeholder.fontSize = 30;
         placeholder.fontStyle = FontStyle.Italic;
         placeholder.color = new Color(0.4f, 0.4f, 0.4f);
         placeholder.text = "MATCH CODE";

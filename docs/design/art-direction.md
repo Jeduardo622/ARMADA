@@ -161,8 +161,13 @@ and whether `perf-budgets.md`'s "mid-tier device" means a phone.
   engineering slice before any art lands.
 
 **DECIDED: option B** (@Jeduardo622, 2026-07-28) — art specs are
-authored mobile-first per GDD p. 24: portrait/landscape aspect ranges,
-touch hit targets (≥ 44 pt), safe-area handling, 30 fps mid-tier budget,
+authored mobile-first per GDD p. 24: landscape-first battle scenes with
+defensive reflow across aspect ranges (button strips wrap on narrow
+aspects; a battle-scene landscape orientation lock is a separate Class C
+PlayerSettings proposal, and portrait-optimized HUD layout is W4 scope),
+touch hit targets ≥ 44 pt **on the minimum supported device** (iPhone 8:
+scaler-aware math, not reference-pixel claims), safe-area handling,
+30 fps mid-tier budget,
 Android as the locally-buildable reference platform (the WebGL module is
 absent; iOS builds happen off this machine). The demo scenes are rebuilt
 around touch before art lands; keyboard/mouse remain as the Editor dev
