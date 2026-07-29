@@ -22,6 +22,16 @@ namespace Armada.Client.UI
 
         private void LateUpdate()
         {
+            Restack();
+        }
+
+        /// <summary>
+        /// Applies the stacking pass immediately. Public so headless capture
+        /// tooling can drive it outside play mode, where LateUpdate never
+        /// runs (the HUD aspect matrix must show the stacked layout).
+        /// </summary>
+        public void Restack()
+        {
             if (strips == null)
             {
                 return;

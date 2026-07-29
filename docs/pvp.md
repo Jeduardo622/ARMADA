@@ -36,8 +36,8 @@ npm run dev                   # Fastify server on http://localhost:4500
 Each running client signs in as its own guest player. The demo pairing is
 the Editor plus a standalone build:
 
-1. **Editor client**: open `unity/` in Unity `2022.3.62f3` (first open
-   only: import TMP Essentials when prompted), open
+1. **Editor client**: open `unity/` in Unity `2022.3.62f3` (TMP
+   essentials are committed; no import prompt), open
    `Assets/Scenes/PvPNetplayDemo.unity`, press Play.
 2. **Standalone client**: build once via
    `Assets → Armada → Build PvP Netplay Standalone (Win64)` (or batch:
