@@ -1318,6 +1318,116 @@ namespace Armada.Client.Tests.PlayMode
             yield return null;
         }
 
+        private sealed class MastheadViewProvider : Armada.Client.Playback.ShipViewProvider
+        {
+            public int Created;
+
+            public override Armada.Client.Playback.ShipView CreateShipView(SimShip ship, Transform parent)
+            {
+                Created++;
+                var root = new GameObject($"masthead-{ship.Id}");
+                root.transform.SetParent(parent, worldPositionStays: false);
+                var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                body.transform.SetParent(root.transform, worldPositionStays: false);
+                var view = root.AddComponent<Armada.Client.Playback.ShipView>();
+                view.Configure(body.GetComponent<Renderer>(), null, 2f);
+                return view;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ShipViewProvider_OnTheSameGameObjectIsUsedWithoutWiring()
+        {
+            // The documented no-wiring extension path (Codex P2 on PR #87): a
+            // provider component beside the renderer must win over the
+            // primitive default even when the serialized field is unset — and
+            // its reported TopClearance must drive the bar lift.
+            var gameObject = new GameObject("ship-view-custom-provider-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var custom = gameObject.AddComponent<MastheadViewProvider>();
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>(),
+                    turnLimit: 1,
+                    introLine: "custom provider test",
+                    completionLine: "done");
+
+                Assert.That(custom.Created, Is.EqualTo(1));
+                Assert.That(spectator.transform.Find("masthead-player-sloop-a"), Is.Not.Null);
+                var hullBar = spectator.transform.Find("hull-bar-player-sloop-a");
+                Assert.That(hullBar, Is.Not.Null);
+                // markerHeight 0.5 + custom TopClearance 2.0 + barClearance 0.4.
+                Assert.That(hullBar.position.y, Is.EqualTo(0.5f + 2f + 0.4f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+            yield break;
+        }
+
+        [UnityTest]
+        public IEnumerator ShipViewProvider_SpawnsDirectionalViewsWithDerivedBarClearance()
+        {
+            // W2 view-abstraction contract: views come from the provider seam
+            // (primitives by default), carry a bow cue on local +z, yaw
+            // 90 − heading so the bow tracks the engine's (cos h, sin h)
+            // motion, and readout bars float at the view's reported top plus
+            // the clearance gap — never a hardcoded shape height.
+            var gameObject = new GameObject("ship-view-provider-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 },
+                        new SimShip { Id = "enemy-clipper-a", Side = "enemy", Position = new SimVector2 { X = 100, Y = 0 }, Heading = 180, Speed = 3, Hp = 140, Sail = 110, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>(),
+                    turnLimit: 1,
+                    introLine: "view test",
+                    completionLine: "done");
+
+                var player = spectator.transform.Find("marker-player-sloop-a");
+                var enemy = spectator.transform.Find("marker-enemy-clipper-a");
+                Assert.That(player, Is.Not.Null);
+                Assert.That(enemy, Is.Not.Null);
+
+                // Provider seam satisfied: every marker is a ShipView with a
+                // directional bow cue.
+                Assert.That(player.GetComponent<Armada.Client.Playback.ShipView>(), Is.Not.Null);
+                Assert.That(player.Find("bow-cue"), Is.Not.Null);
+                Assert.That(enemy.Find("bow-cue"), Is.Not.Null);
+
+                // Heading 0 moves +x in world space, so yaw must be 90; the
+                // legacy yaw = heading mapping pointed the bow at +z.
+                Assert.That(player.rotation.eulerAngles.y, Is.EqualTo(90f).Within(0.01f));
+                Assert.That(enemy.rotation.eulerAngles.y, Is.EqualTo(270f).Within(0.01f));
+
+                // Bar lift derives from the view: cube top 0.5 vs capsule top
+                // 1.0, plus the 0.4 clearance gap over markerHeight 0.5.
+                var playerHull = spectator.transform.Find("hull-bar-player-sloop-a");
+                var enemyHull = spectator.transform.Find("hull-bar-enemy-clipper-a");
+                Assert.That(playerHull, Is.Not.Null);
+                Assert.That(enemyHull, Is.Not.Null);
+                Assert.That(playerHull.position.y, Is.EqualTo(0.5f + 0.5f + 0.4f).Within(0.001f));
+                Assert.That(enemyHull.position.y, Is.EqualTo(0.5f + 1f + 0.4f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+            yield break;
+        }
+
         [UnityTest]
         public IEnumerator PlaybackControlsController_DrivesPauseStepAndSpeedThroughTheRendererApi()
         {
