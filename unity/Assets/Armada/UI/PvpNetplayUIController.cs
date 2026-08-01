@@ -400,8 +400,14 @@ namespace Armada.Client.UI
                 if (orderPanel != null)
                 {
                     orderPanel.Render(_session);
+                    // The rows carry the orders; the label keeps only the
+                    // headline and hints (Codex P2 on #91).
+                    SetOrderText(_session.Headline + "\nNext Ship | Turn +/- | Speed +/- | Target | Ammo | Confirm Orders");
                 }
-                SetOrderText(_session.Describe() + "\nNext Ship | Turn +/- | Speed +/- | Target | Ammo | Confirm Orders");
+                else
+                {
+                    SetOrderText(_session.Describe() + "\nNext Ship | Turn +/- | Speed +/- | Target | Ammo | Confirm Orders");
+                }
             }
         }
 
