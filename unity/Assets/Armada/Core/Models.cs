@@ -310,6 +310,10 @@ namespace Armada.Client.Core
         // Broadside chain-shot marker (docs/api/openapi.yaml SimEvent
         // "broadside" variant): present only when chain shot actually fired.
         public string Ammo { get; set; }
+        // Raking-fire marker ("bow"/"stern", rakingFire missions only). Was
+        // silently dropped at this wire model until W2 slice 2 — the server
+        // always sent it (art-direction.md §4 audit).
+        public string Rake { get; set; }
     }
 
     [Serializable]

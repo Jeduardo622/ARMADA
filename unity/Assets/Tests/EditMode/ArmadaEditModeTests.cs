@@ -922,6 +922,45 @@ namespace Armada.Client.Tests.EditMode
         }
 
         [Test]
+        public void TurnPlayback_CarriesBroadsideSideAndRakeThroughToTheStep()
+        {
+            // W2 slice 2: the server always sent side and rake on broadside
+            // events; the wire model dropped rake and the step dropped both.
+            var ships = new List<SimShip>
+            {
+                new SimShip { Id = "a", Side = "player", Hp = 100, Sail = 80, Crew = 40 },
+                new SimShip { Id = "b", Side = "enemy", Hp = 100, Sail = 80, Crew = 40 }
+            };
+            var turns = new List<Mission01TurnRecord>
+            {
+                new Mission01TurnRecord
+                {
+                    Turn = 1,
+                    Events = new List<SimEvent>
+                    {
+                        new SimEvent
+                        {
+                            Type = "broadside",
+                            ShipId = "a",
+                            TargetShipId = "b",
+                            Hit = true,
+                            Side = "port",
+                            Rake = "stern",
+                            TargetRemaining = new SimRemaining { Hp = 70, Sail = 80, Crew = 40 }
+                        }
+                    }
+                }
+            };
+            var playback = new TurnPlayback(ships, turns);
+            Assert.That(playback.TryStep(out var banner), Is.True);
+            Assert.That(banner.Kind, Is.EqualTo(PlaybackStepKind.TurnStart));
+            Assert.That(playback.TryStep(out var broadside), Is.True);
+            Assert.That(broadside.Side, Is.EqualTo("port"));
+            Assert.That(broadside.Rake, Is.EqualTo("stern"));
+            Assert.That(broadside.AppliedHull, Is.EqualTo(30));
+        }
+
+        [Test]
         public void TurnPlayback_StepsResolvedEventsAndCountsAppliedLossFromRemainingDeltas()
         {
             var ships = Mission10Scenario.BuildExpectedStart(Armada.Client.Bootstrap.Mission10Bootstrap.DefaultSeed).State.Ships;

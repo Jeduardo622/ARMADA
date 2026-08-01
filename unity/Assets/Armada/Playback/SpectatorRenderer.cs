@@ -36,6 +36,8 @@ namespace Armada.Client.Playback
         [Tooltip("Chain shot is the Mission 10 showcase; its flash must read distinct from round shot.")]
         [SerializeField] private Color chainShotFlashColor = new Color(0.20f, 0.90f, 1.00f);
         [SerializeField] private Color ramFlashColor = Color.white;
+        [Tooltip("Boarding actions were visually identical to rams before W2 slice 2; violet is distinct from every shot and ram color.")]
+        [SerializeField] private Color boardingFlashColor = new Color(0.75f, 0.40f, 1.00f);
 
         [Header("Playback controls (design-tunable placeholder bindings)")]
         [SerializeField] private KeyCode pauseKey = KeyCode.Space;
@@ -471,9 +473,16 @@ namespace Armada.Client.Playback
                     break;
                 case PlaybackStepKind.Broadside:
                     _stepDuration = flashSeconds;
-                    Flash(step.ShipId, step.ChainShot ? chainShotFlashColor : roundShotFlashColor);
+                    Flash(step.ShipId, BroadsideFlashColor(step));
+                    if (step.Rake != null && step.Hit)
+                    {
+                        // Rake flourish: the victim shudders in the shot color
+                        // too — the showcase tactic reads on the board, not
+                        // just in the narration.
+                        Flash(step.TargetShipId, BroadsideFlashColor(step));
+                    }
                     SetHud(step.Hit
-                        ? $"T{step.Turn} {step.ShipId} => {step.TargetShipId}: {(step.ChainShot ? "CHAIN SHOT" : "round shot")} hit (hull -{step.AppliedHull}, sail -{step.AppliedSail}, crew -{step.AppliedCrew})"
+                        ? $"T{step.Turn} {step.ShipId} => {step.TargetShipId}: {(step.ChainShot ? "CHAIN SHOT" : "round shot")}{RakeSuffix(step)} hit (hull -{step.AppliedHull}, sail -{step.AppliedSail}, crew -{step.AppliedCrew})"
                         : $"T{step.Turn} {step.ShipId} => {step.TargetShipId}: {(step.ChainShot ? "CHAIN SHOT" : "round shot")} miss");
                     break;
                 case PlaybackStepKind.Ram:
@@ -484,7 +493,7 @@ namespace Armada.Client.Playback
                     break;
                 case PlaybackStepKind.Boarding:
                     _stepDuration = flashSeconds;
-                    Flash(step.ShipId, ramFlashColor);
+                    Flash(step.ShipId, boardingFlashColor);
                     SetHud($"T{step.Turn} {step.ShipId} boards {step.TargetShipId}: {(step.Hit ? "success" : "repelled")} (crew -{step.AppliedCrew})");
                     break;
                 case PlaybackStepKind.Status:
@@ -508,14 +517,18 @@ namespace Armada.Client.Playback
                     }
                     break;
                 case PlaybackStepKind.Broadside:
-                    FadeFlash(step.ShipId, step.ChainShot ? chainShotFlashColor : roundShotFlashColor, progress);
+                    FadeFlash(step.ShipId, BroadsideFlashColor(step), progress);
+                    if (step.Rake != null && step.Hit)
+                    {
+                        FadeFlash(step.TargetShipId, BroadsideFlashColor(step), progress);
+                    }
                     break;
                 case PlaybackStepKind.Ram:
                     FadeFlash(step.ShipId, ramFlashColor, progress);
                     FadeFlash(step.TargetShipId, ramFlashColor, progress);
                     break;
                 case PlaybackStepKind.Boarding:
-                    FadeFlash(step.ShipId, ramFlashColor, progress);
+                    FadeFlash(step.ShipId, boardingFlashColor, progress);
                     break;
             }
         }
@@ -602,6 +615,20 @@ namespace Armada.Client.Playback
         private static Quaternion HeadingToRotation(float heading)
         {
             return Quaternion.Euler(0f, 90f - heading, 0f);
+        }
+
+        // Misses read as a muted half-flash instead of the same triumphant
+        // color as a hit (W2 slice 2: the GDD wants splash-on-miss feedback;
+        // the dim flash is its pre-art stand-in).
+        private Color BroadsideFlashColor(PlaybackStep step)
+        {
+            var color = step.ChainShot ? chainShotFlashColor : roundShotFlashColor;
+            return step.Hit ? color : Color.Lerp(color, Color.gray, 0.6f);
+        }
+
+        private static string RakeSuffix(PlaybackStep step)
+        {
+            return step.Rake == null ? string.Empty : $" {step.Rake.ToUpperInvariant()} RAKE";
         }
 
         private void SpawnMarker(SimShip ship)

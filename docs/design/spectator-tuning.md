@@ -1,8 +1,8 @@
 # Spectator Demo Design Tuning
 
-> **Status: Review REOPENED** (W2 view seam: the bar-clearance row and
-> constraint below; prior reopenings signed off via the merges of PRs
-> #83/#84 on 2026-07-28/29). Prior status: Reviewed — applied values approved
+> **Status: Review REOPENED** (W2 slice 2: the attack-feedback rows in
+> Colors below; the W2 view-seam reopening was signed off via the merge
+> of PR #87 on 2026-07-29). Prior status: Reviewed — applied values approved
 > by @Jeduardo622 via the PR #51 merge on 2026-07-21, drafted following
 > the Mission 07 precedent (see the QA notes in
 > `docs/content/missions/mission-07-burning-seas.md`). Future value
@@ -42,6 +42,9 @@ change here (see Regeneration below).
 | `roundShotFlashColor` | (1.00, 0.60, 0.10) | (1.00, 0.72, 0.05) | More separation from enemy red when an enemy attacker flashes, while staying warm-family so chain cyan stays the distinct showcase. |
 | `chainShotFlashColor` | (0.20, 0.90, 1.00) | keep | Mission 10 showcase; cyan must stay visually distinct from round shot. |
 | `ramFlashColor` | white | keep | Neutral, distinct from both shot flashes. |
+| `boardingFlashColor` | (0.75, 0.40, 1.00) (**new, W2**) | keep | Boarding was visually identical to a ram before W2 slice 2; violet is distinct from white ram, orange round shot, and cyan chain. |
+| Miss feedback (derived, hard-coded) | hit color pulled 60% toward gray (**new, W2**) | keep | Misses read muted instead of triumphant - the pre-art stand-in for the GDD's splash-on-miss. |
+| Rake flourish (derived, hard-coded) | victim flashes the shot color too; HUD appends "BOW/STERN RAKE" (**new, W2**) | keep | The showcase tactic reads on the board, not just in the narration. |
 
 ### Playback control bindings
 
