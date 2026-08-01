@@ -314,6 +314,9 @@ namespace Armada.Client.Core
         // silently dropped at this wire model until W2 slice 2 — the server
         // always sent it (art-direction.md §4 audit).
         public string Rake { get; set; }
+        // Status-event authoritative block (W2 slice 3 follow-up): fire DoT
+        // hull loss arrives only here.
+        public SimRemaining Remaining { get; set; }
     }
 
     [Serializable]

@@ -210,7 +210,6 @@ namespace Armada.Client.Playback
         {
             ClearMarkers();
             SpawnBoardFeatures(obstacles, slowZones);
-            SetWind(wind);
             _outcome = null;
             _turnLimit = turnLimit;
             _completionLine = completionLine;
@@ -219,6 +218,9 @@ namespace Armada.Client.Playback
             IsFinished = false;
 
             SpawnMarkers(shipsAtStart, baselineShips);
+            // After the markers: the arrow anchors to the fleet centroid,
+            // which is empty until they exist (Codex P2 on #89).
+            SetWind(wind);
 
             _playback = new TurnPlayback(shipsAtStart, turns);
             SetHud(introLine);
@@ -244,7 +246,6 @@ namespace Armada.Client.Playback
         {
             ClearMarkers();
             SpawnBoardFeatures(obstacles, slowZones);
-            SetWind(wind);
             _outcome = null;
             _playback = null;
             _currentStep = null;
@@ -254,6 +255,9 @@ namespace Armada.Client.Playback
             IsFinished = true;
 
             SpawnMarkers(ships, baselineShips);
+            // After the markers, for the same anchoring reason as BeginTurns;
+            // ShowBoard has no tick loop to correct a stale position later.
+            SetWind(wind);
             SetHud(hudLine);
         }
 
@@ -525,7 +529,7 @@ namespace Armada.Client.Playback
                     {
                         statused.View.SetStatus(step.OnFire, step.Slowed);
                         SetHud(step.OnFire
-                            ? $"T{step.Turn} {step.ShipId} is ABLAZE"
+                            ? $"T{step.Turn} {step.ShipId} is ABLAZE{(step.AppliedHull > 0 ? $" (burns hull -{step.AppliedHull})" : string.Empty)}"
                             : step.Slowed
                                 ? $"T{step.Turn} {step.ShipId} is slowed, rigging fouled"
                                 : $"T{step.Turn} {step.ShipId} recovers");
@@ -691,10 +695,38 @@ namespace Armada.Client.Playback
                 SailBar = SpawnBar($"sail-bar-{ship.Id}", sailBarColor)
             };
             _markers[ship.Id] = marker;
+
+            // Snapshot-only boards (mission 10 undo) can contain ships that
+            // are already sunk; there is no playback to sink them later
+            // (Codex P2 on #89).
+            if (ship.Hp <= 0)
+            {
+                SinkMarker(marker);
+                return;
+            }
+
             PositionBars(
                 marker,
                 Mathf.Clamp01(ship.Hp / (float)marker.MaxHull),
                 Mathf.Clamp01(ship.Sail / (float)marker.MaxSail));
+        }
+
+        private static void SinkMarker(Marker marker)
+        {
+            if (marker.View != null)
+            {
+                marker.View.SetSunk();
+            }
+
+            if (marker.HullBar != null)
+            {
+                marker.HullBar.gameObject.SetActive(false);
+            }
+
+            if (marker.SailBar != null)
+            {
+                marker.SailBar.gameObject.SetActive(false);
+            }
         }
 
         // Bars parent to the renderer, not the marker, so heading rotations
@@ -731,9 +763,7 @@ namespace Armada.Client.Playback
                 // block reaching zero hull sinks the view and hides its bars.
                 if (remaining.Hp <= 0 && marker.View != null && !marker.View.IsSunk)
                 {
-                    marker.View.SetSunk();
-                    if (marker.HullBar != null) marker.HullBar.gameObject.SetActive(false);
-                    if (marker.SailBar != null) marker.SailBar.gameObject.SetActive(false);
+                    SinkMarker(marker);
                 }
 
                 if (marker.View != null && marker.View.IsSunk)

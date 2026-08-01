@@ -942,7 +942,10 @@ namespace Armada.Client.Tests.EditMode
                         {
                             Type = "status",
                             ShipId = "a",
-                            Status = new SimShipStatus { OnFire = true, Slowed = false }
+                            Status = new SimShipStatus { OnFire = true, Slowed = false },
+                            // Fire DoT hull loss arrives only here (Codex P2
+                            // on #89): 100 -> 95.
+                            Remaining = new SimRemaining { Hp = 95, Sail = 80, Crew = 40 }
                         },
                         new SimEvent
                         {
@@ -961,6 +964,9 @@ namespace Armada.Client.Tests.EditMode
             Assert.That(status.Kind, Is.EqualTo(PlaybackStepKind.Status));
             Assert.That(status.OnFire, Is.True);
             Assert.That(status.Slowed, Is.False);
+            Assert.That(status.AppliedHull, Is.EqualTo(5));
+            Assert.That(playback.TryGetRemaining("a", out var burning), Is.True);
+            Assert.That(burning.Hp, Is.EqualTo(95));
             Assert.That(playback.TryStep(out var kill), Is.True);
             Assert.That(kill.TargetSunk, Is.True);
         }

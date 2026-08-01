@@ -260,14 +260,21 @@ namespace Armada.Client.Playback
                     };
                 }
                 case "status":
+                {
+                    // Fire DoT hull loss arrives only on the status event's
+                    // remaining block; older payloads without one leave the
+                    // tracker untouched (Codex P2 on PR #89).
+                    var applied = ApplyRemaining(simEvent.ShipId, simEvent.Remaining);
                     return new PlaybackStep
                     {
                         Kind = PlaybackStepKind.Status,
                         Turn = turn,
                         ShipId = simEvent.ShipId,
                         OnFire = simEvent.Status?.OnFire == true,
-                        Slowed = simEvent.Status?.Slowed == true
+                        Slowed = simEvent.Status?.Slowed == true,
+                        AppliedHull = applied.Hull
                     };
+                }
                 default:
                     return null;
             }
