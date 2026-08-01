@@ -1318,6 +1318,67 @@ namespace Armada.Client.Tests.PlayMode
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator SpectatorRenderer_RakeFlourishAndMissDimReadOnTheBoard()
+        {
+            // W2 slice 2 feedback contract: a raked hit narrates the rake and
+            // flashes the victim too; a miss flashes muted instead of the hit
+            // color. Colors are asserted against the renderer's own math.
+            var gameObject = new GameObject("event-feedback-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 },
+                        new SimShip { Id = "b", Side = "enemy", Position = new SimVector2 { X = 100, Y = 0 }, Heading = 180, Speed = 3, Hp = 140, Sail = 110, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>
+                    {
+                        new Mission01TurnRecord
+                        {
+                            Turn = 1,
+                            Events = new List<SimEvent>
+                            {
+                                new SimEvent { Type = "broadside", ShipId = "a", TargetShipId = "b", Hit = true, Side = "starboard", Rake = "bow", TargetRemaining = new SimRemaining { Hp = 100, Sail = 110, Crew = 50 } },
+                                new SimEvent { Type = "broadside", ShipId = "b", TargetShipId = "a", Hit = false, TargetRemaining = new SimRemaining { Hp = 120, Sail = 80, Crew = 50 } }
+                            }
+                        }
+                    },
+                    turnLimit: 1,
+                    introLine: "feedback test",
+                    completionLine: "done");
+
+                var attacker = spectator.transform.Find("marker-a").GetComponent<Renderer>();
+                var victim = spectator.transform.Find("marker-b").GetComponent<Renderer>();
+
+                spectator.Tick(0.1f);  // begin turn banner
+                spectator.Tick(0.6f);  // finish banner
+                spectator.Tick(0.1f);  // begin raked broadside
+                Assert.That(spectator.HudText, Does.Contain("BOW RAKE"));
+                // Rake flourish: attacker AND victim carry the shot color.
+                var roundShot = new Color(1.00f, 0.72f, 0.05f);
+                Assert.That(attacker.material.color, Is.EqualTo(roundShot));
+                Assert.That(victim.material.color, Is.EqualTo(roundShot));
+
+                spectator.Tick(0.5f);  // finish the flash
+                spectator.Tick(0.1f);  // begin the miss
+                Assert.That(spectator.HudText, Does.Contain("miss"));
+                // Miss reads muted: the hit color pulled 60% toward gray.
+                var dimmed = Color.Lerp(roundShot, Color.gray, 0.6f);
+                Assert.That(victim.material.color.r, Is.EqualTo(dimmed.r).Within(0.001f));
+                Assert.That(victim.material.color.g, Is.EqualTo(dimmed.g).Within(0.001f));
+                Assert.That(victim.material.color.b, Is.EqualTo(dimmed.b).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+            yield break;
+        }
+
         private sealed class MastheadViewProvider : Armada.Client.Playback.ShipViewProvider
         {
             public int Created;

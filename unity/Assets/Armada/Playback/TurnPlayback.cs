@@ -34,6 +34,12 @@ namespace Armada.Client.Playback
         public int? Heading { get; init; }
         public bool Hit { get; init; }
         public bool ChainShot { get; init; }
+        // Broadside firing side ("port"/"starboard") — the future muzzle-flash
+        // anchor; carried so a view can originate fire feedback from the
+        // correct battery (art-direction.md §3.1, decision D1-A).
+        public string Side { get; init; }
+        // Raking-fire marker ("bow"/"stern") for the rake flourish.
+        public string Rake { get; init; }
         public int AppliedHull { get; init; }
         public int AppliedSail { get; init; }
         public int AppliedCrew { get; init; }
@@ -199,6 +205,8 @@ namespace Armada.Client.Playback
                         TargetShipId = simEvent.TargetShipId,
                         Hit = simEvent.Hit == true,
                         ChainShot = simEvent.Ammo == "chain",
+                        Side = simEvent.Side,
+                        Rake = simEvent.Rake,
                         AppliedHull = applied.Hull,
                         AppliedSail = applied.Sail,
                         AppliedCrew = applied.Crew

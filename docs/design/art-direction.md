@@ -207,11 +207,11 @@ visual today. "Must render" = required before art (binding point in W2/W4).
 | Crew | ship state | yes | **no** | yes (HUD) | Live for boarding math; cosmetic in PvP v1. Bar or HUD stat; binding point required. |
 | Ammo selection (round/chain) | order + broadside event `ammo` | yes | flash color only (cyan/orange) | yes | Order panel icon slot (W4); flash stays the world cue. |
 | Current target | order surface | yes (local) | text blob only | **yes** | Target line/reticle overlay slot in W2 board view. |
-| Broadside side (port/starboard) | order + event `side` | yes | no | yes | Fire feedback must originate from the correct side of the view so D1-C stays honest (§3.1). |
-| Hit / miss + roll/chance | broadside events | yes | flash regardless of hit | **yes** | GDD: splashes on miss. Distinct hit-vs-miss cue is a binding point. |
-| Rake state (`bow`/`stern`) | broadside event `rake` | **no — discarded at the wire**: the C# `SimEvent` model has no `Rake` property, so deserialization drops the server field and `TurnPlayback` never sees it | no | yes | The showcase tactic; W2 must extend the C# wire model + playback mapping before a flourish slot can exist. |
+| Broadside side (port/starboard) | order + event `side` | yes — carried into `PlaybackStep.Side` (W2 slice 2) | not yet (flash is whole-hull) | yes | The muzzle-flash anchor exists; a positional effect uses it via the view seam. |
+| Hit / miss + roll/chance | broadside events | yes | yes — misses flash muted (W2 slice 2) | yes | Pre-art stand-in for the GDD's splash-on-miss. |
+| Rake state (`bow`/`stern`) | broadside event `rake` | yes (wire model + playback mapping fixed, W2 slice 2) | yes — victim co-flash + HUD callout | yes | Pre-art flourish; a real effect replaces it via the view seam. |
 | Ram / collision | ram events | yes | white flash | yes | Keep; needs contact-point binding. |
-| Boarding | boarding events + `cooldowns.boarding` | yes | partial (ram-colored flash + HUD line) | **yes** | Active in missions 03/04 (divergence row 6); needs a visual distinct from ramming. |
+| Boarding | boarding events + `cooldowns.boarding` | yes | yes — own violet flash (W2 slice 2) | yes | Distinct from ramming at last; portraits/animations are art scope. |
 | Status: fire | `status.onFire` + counters, status events | yes | **no** | **yes** | Mechanically live (`statusEffects` missions). Particle/tint slot. |
 | Status: slow | `status.slowed` + counters | yes | **no** | **yes** | Shredded-sail visual pairs with sail bar. |
 | Sinking / death | hp = 0, summary `sunk` | yes | marker vanishes | **yes** | Needs a real sink state (GDD: stylized sinking); today ships pop out of existence. |
