@@ -86,6 +86,19 @@ public static class PvPNetplayDemoSceneBuilder
         var statusLabel = CreateLabel(safeArea, "PhaseStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
         var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 340f);
+
+        // Structured order rows (W4 HUD IA) above the order-panel text; the
+        // controller renders one row per ship draft during order entry.
+        var orderRowsObject = new GameObject("OrderRows", typeof(RectTransform), typeof(OrderPanelView));
+        orderRowsObject.transform.SetParent(safeArea, worldPositionStays: false);
+        var orderRowsRect = orderRowsObject.GetComponent<RectTransform>();
+        orderRowsRect.anchorMin = new Vector2(0f, 0f);
+        orderRowsRect.anchorMax = new Vector2(1f, 0f);
+        orderRowsRect.pivot = new Vector2(0.5f, 0f);
+        orderRowsRect.anchoredPosition = new Vector2(24f, 550f);
+        orderRowsRect.sizeDelta = new Vector2(-48f, 200f);
+        var orderPanel = orderRowsObject.GetComponent<OrderPanelView>();
+        SetReference(orderPanel, "rowContainer", orderRowsRect);
         orderLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
@@ -110,6 +123,7 @@ public static class PvPNetplayDemoSceneBuilder
         var netplayUIObject = new GameObject("PvpNetplayUI", typeof(PvpNetplayUIController));
         var netplayUI = netplayUIObject.GetComponent<PvpNetplayUIController>();
         SetReference(netplayUI, "orderLabel", orderLabel);
+        SetReference(netplayUI, "orderPanel", orderPanel);
         SetReference(netplayUI, "statusLabel", statusLabel);
 
         // Menu strip (Create, code input, Join) wraps independently above

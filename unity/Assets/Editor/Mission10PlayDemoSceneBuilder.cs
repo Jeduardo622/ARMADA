@@ -100,6 +100,19 @@ public static class Mission10PlayDemoSceneBuilder
         var statusLabel = CreateLabel(safeArea, "MissionStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
         var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 180f);
+
+        // Structured order rows (W4 HUD IA) above the order-panel text; the
+        // controller renders one row per ship draft during order entry.
+        var orderRowsObject = new GameObject("OrderRows", typeof(RectTransform), typeof(OrderPanelView));
+        orderRowsObject.transform.SetParent(safeArea, worldPositionStays: false);
+        var orderRowsRect = orderRowsObject.GetComponent<RectTransform>();
+        orderRowsRect.anchorMin = new Vector2(0f, 0f);
+        orderRowsRect.anchorMax = new Vector2(1f, 0f);
+        orderRowsRect.pivot = new Vector2(0.5f, 0f);
+        orderRowsRect.anchoredPosition = new Vector2(24f, 390f);
+        orderRowsRect.sizeDelta = new Vector2(-48f, 200f);
+        var orderPanel = orderRowsObject.GetComponent<OrderPanelView>();
+        SetReference(orderPanel, "rowContainer", orderRowsRect);
         orderLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
@@ -124,6 +137,7 @@ public static class Mission10PlayDemoSceneBuilder
         var playUIObject = new GameObject("Mission10PlayUI", typeof(Mission10PlayController));
         var playUI = playUIObject.GetComponent<Mission10PlayController>();
         SetReference(playUI, "orderLabel", orderLabel);
+        SetReference(playUI, "orderPanel", orderPanel);
         SetReference(playUI, "statusLabel", statusLabel);
 
         var missionUIObject = new GameObject("MissionUI", typeof(MissionUIController));

@@ -269,7 +269,32 @@ gaps, not build work.
   invariant was deliberately replaced with the floor: under the D1-A
   curve the endgame is close-range, and the old invariant kept it tiny.
   GDD fairness holds — framing always contains every living ship.
-- **W4** HUD information architecture: structure only, skinnable to §1.
+- **W4** HUD information architecture (**slice 1 applied**; structure
+  only, skinnable to §1). Zone map, top to bottom, every element an
+  addressable slot for the nautical skin:
+  1. **Narration line** (top, safe-area): one event sentence at a time —
+     the battle ticker. Skin slot: parchment banner. Priority: highest
+     during playback.
+  2. **Phase/status line** (below narration): match phase, connection
+     state, verdicts. Skin slot: secondary parchment strip.
+  3. **Conditions** (world-space today): wind arrow at the fleet
+     centroid; turn N/limit lives in the narration. Skin slots: compass
+     rose (W5+ HUD form), banner turn counter.
+  4. **Order rows** (above the order text, entry phases only): one
+     structured row per ship — cursor, ship, turn delta, speed delta,
+     target+ammo — via `OrderPanelView`, replacing the `Describe()` text
+     blob. Skin slots: per-row parchment cards, ammo icons, active-row
+     emphasis; radial-cooldown slot reserved beside each row for a
+     future reload system (divergence row 5).
+  5. **Order text line**: headline/hints and non-entry copy (kept for
+     back-compat; the rows carry the structure).
+  6. **Button strips** (bottom stack, wrap-safe): order entry, menu,
+     playback — cells are the skin slots (rope-framed buttons).
+  7. **World readouts**: hull/sail bars above each view (hull-shaped
+     bars are an art-pass swap via the view seam), status tints, sink
+     presentation.
+  Remaining W4 slices: portrait-aspect panel restructure (the documented
+  overlap interim), HUD wind/turn numeric forms.
 - **W5** pipeline + measurable perf budgets + Addressables policy.
 - **W6** asset pipeline conventions (folders, naming, import presets,
   GUID discipline for generated scenes, licensing ledger).
