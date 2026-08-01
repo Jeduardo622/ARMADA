@@ -2,6 +2,10 @@
   "scenario": "pvp-skirmish-2v2",
   "seed": 11,
   "turnLimit": 20,
+  "wind": {
+    "direction": 90,
+    "speed": 4
+  },
   "description": "Pinned focus-fire-vs-split fixture battle (tests/pvpScenario.test.ts): side A win at turn 6.",
   "shipsAtStart": [
     {

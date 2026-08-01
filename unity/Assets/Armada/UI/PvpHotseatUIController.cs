@@ -161,7 +161,8 @@ namespace Armada.Client.UI
                     CompletionLineFor(resolution),
                     // Battle-start stats keep the HP/sail bars on the true
                     // maxima when replaying a mid-battle turn snapshot.
-                    PvpScenario.BuildInitialState().Ships);
+                    PvpScenario.BuildInitialState().Ships,
+                    wind: PvpScenario.BuildInitialState().Wind);
                 Phase = HotseatPhase.Playback;
                 SetStatus($"Turn {resolution.Turn} resolved — spectating playback.");
             }

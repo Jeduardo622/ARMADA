@@ -182,7 +182,8 @@ namespace Armada.Client.UI
                 _spectator.ShowBoard(
                     _battle.Snapshot(),
                     hudLine,
-                    Mission10Scenario.BuildExpectedStart(_seed).State.Ships);
+                    Mission10Scenario.BuildExpectedStart(_seed).State.Ships,
+                    wind: Mission10Scenario.BuildExpectedStart(_seed).State.Wind);
             }
         }
 
@@ -255,7 +256,8 @@ namespace Armada.Client.UI
                     CompletionLineFor(record, authoredCount),
                     // Battle-start stats keep the HP/sail bars on the true
                     // maxima when replaying a mid-battle turn snapshot.
-                    Mission10Scenario.BuildExpectedStart(_seed).State.Ships);
+                    Mission10Scenario.BuildExpectedStart(_seed).State.Ships,
+                    wind: Mission10Scenario.BuildExpectedStart(_seed).State.Wind);
                 Phase = PlayPhase.Playback;
                 SetStatus($"Turn {record.Turn} resolved — watching playback.");
             }

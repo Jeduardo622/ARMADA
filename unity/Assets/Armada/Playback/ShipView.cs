@@ -23,6 +23,45 @@ namespace Armada.Client.Playback
     public sealed class ShipView : MonoBehaviour
     {
         private const float AccentLightening = 0.4f;
+        private static readonly Color EmberTint = new Color(1.00f, 0.45f, 0.10f);
+        private static readonly Color SunkTint = new Color(0.10f, 0.16f, 0.24f);
+        private const float SunkSubmersion = 0.35f;
+
+        private Color _baseColor = Color.white;
+        private bool _onFire;
+        private bool _slowed;
+
+        /// <summary>True once the view has sunk; flashes stop applying.</summary>
+        public bool IsSunk { get; private set; }
+
+        /// <summary>
+        /// The color the hull currently rests at between flashes: the side
+        /// color warmed while on fire, dimmed while slowed, or the deep-sea
+        /// sunk tint. The renderer restores flashes to this.
+        /// </summary>
+        public Color RestingColor
+        {
+            get
+            {
+                if (IsSunk)
+                {
+                    return SunkTint;
+                }
+
+                var color = _baseColor;
+                if (_onFire)
+                {
+                    color = Color.Lerp(color, EmberTint, 0.45f);
+                }
+
+                if (_slowed)
+                {
+                    color = Color.Lerp(color, Color.gray, 0.35f);
+                }
+
+                return color;
+            }
+        }
 
         [SerializeField] private Renderer tintRenderer;
         [SerializeField] private Renderer accentRenderer;
@@ -41,14 +80,47 @@ namespace Armada.Client.Playback
         /// </summary>
         public void SetBaseTint(Color color)
         {
+            _baseColor = color;
+            ApplyResting();
+        }
+
+        /// <summary>Fire/slow status presentation (modifiers.statusEffects).</summary>
+        public void SetStatus(bool onFire, bool slowed)
+        {
+            _onFire = onFire;
+            _slowed = slowed;
+            ApplyResting();
+        }
+
+        /// <summary>
+        /// Sink presentation (irreversible): deep-sea tint, hull settles
+        /// below the waterline, accent cue dims with it.
+        /// </summary>
+        public void SetSunk()
+        {
+            if (IsSunk)
+            {
+                return;
+            }
+
+            IsSunk = true;
+            transform.position += new Vector3(0f, -SunkSubmersion, 0f);
+            ApplyResting();
+        }
+
+        private void ApplyResting()
+        {
+            var resting = RestingColor;
             if (tintRenderer != null)
             {
-                tintRenderer.material.color = color;
+                tintRenderer.material.color = resting;
             }
 
             if (accentRenderer != null)
             {
-                accentRenderer.material.color = Color.Lerp(color, Color.white, AccentLightening);
+                accentRenderer.material.color = IsSunk
+                    ? Color.Lerp(SunkTint, Color.white, 0.15f)
+                    : Color.Lerp(resting, Color.white, AccentLightening);
             }
         }
 

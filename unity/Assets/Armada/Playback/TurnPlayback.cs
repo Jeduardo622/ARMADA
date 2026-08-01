@@ -40,6 +40,13 @@ namespace Armada.Client.Playback
         public string Side { get; init; }
         // Raking-fire marker ("bow"/"stern") for the rake flourish.
         public string Rake { get; init; }
+        // Status-event payload (modifiers.statusEffects missions): the
+        // decoder previously dropped it, leaving fire/slow invisible.
+        public bool OnFire { get; init; }
+        public bool Slowed { get; init; }
+        // True when this step's applied damage left the target at zero hull:
+        // the renderer's sink cue (W2 slice 3).
+        public bool TargetSunk { get; init; }
         public int AppliedHull { get; init; }
         public int AppliedSail { get; init; }
         public int AppliedCrew { get; init; }
@@ -209,7 +216,8 @@ namespace Armada.Client.Playback
                         Rake = simEvent.Rake,
                         AppliedHull = applied.Hull,
                         AppliedSail = applied.Sail,
-                        AppliedCrew = applied.Crew
+                        AppliedCrew = applied.Crew,
+                        TargetSunk = simEvent.TargetRemaining?.Hp == 0
                     };
                 }
                 case "ram":
@@ -230,7 +238,8 @@ namespace Armada.Client.Playback
                         AppliedHull = applied.Hull,
                         AppliedSail = applied.Sail,
                         AppliedCrew = applied.Crew,
-                        SelfAppliedHull = recoil.Hull
+                        SelfAppliedHull = recoil.Hull,
+                        TargetSunk = simEvent.TargetRemaining?.Hp == 0
                     };
                 }
                 case "boarding":
@@ -246,7 +255,8 @@ namespace Armada.Client.Playback
                         Hit = simEvent.Success == true,
                         AppliedHull = applied.Hull,
                         AppliedSail = applied.Sail,
-                        AppliedCrew = applied.Crew
+                        AppliedCrew = applied.Crew,
+                        TargetSunk = simEvent.TargetRemaining?.Hp == 0
                     };
                 }
                 case "status":
@@ -254,7 +264,9 @@ namespace Armada.Client.Playback
                     {
                         Kind = PlaybackStepKind.Status,
                         Turn = turn,
-                        ShipId = simEvent.ShipId
+                        ShipId = simEvent.ShipId,
+                        OnFire = simEvent.Status?.OnFire == true,
+                        Slowed = simEvent.Status?.Slowed == true
                     };
                 default:
                     return null;
