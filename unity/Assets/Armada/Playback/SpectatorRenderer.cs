@@ -62,8 +62,10 @@ namespace Armada.Client.Playback
         [SerializeField] private Camera followCamera;
         [Tooltip("World units of margin kept around the outermost markers.")]
         [SerializeField] private float followPadding = 2f;
-        [Tooltip("Never zoom tighter than the authored opening framing.")]
-        [SerializeField] private float followMinSize = 8.5f;
+        [Tooltip("Zoom floor (W3): the camera may tighten well below the authored opening as the fight concentrates, but never past this. Was 8.5 (the opening size), which kept the endgame tiny in an empty frame.")]
+        [SerializeField] private float followMinSize = 5f;
+        [Tooltip("Seconds for the follow camera to close ~63% of the gap to its target framing; 0 snaps instantly (W3).")]
+        [SerializeField] private float followSmoothingSeconds = 0.25f;
 
         [Header("Board features & wind (design-tunable placeholders)")]
         [Tooltip("Impassable terrain (rocks/islands): dark cylinders scaled by sim radius.")]
@@ -383,6 +385,16 @@ namespace Armada.Client.Playback
         /// </summary>
         public void Tick(float dt)
         {
+            // Playback advances first, camera second: the frame must fit the
+            // positions the step animation just produced (Codex P1 on #90),
+            // and the camera keeps settling after the battle ends or while
+            // paused because this tail runs on every tick.
+            TickPlayback(dt);
+            UpdateFollowCamera(dt * SpeedMultiplier);
+        }
+
+        private void TickPlayback(float dt)
+        {
             if (_playback == null || IsFinished)
             {
                 return;
@@ -418,13 +430,17 @@ namespace Armada.Client.Playback
             }
 
             UpdateReadouts();
-            UpdateFollowCamera();
         }
 
-        // Keeps every marker inside the (orthographic, top-down) view once
-        // windMovement lets ships sail beyond the authored opening framing.
-        // Null camera (mission scenes) keeps the fixed framing untouched.
-        private void UpdateFollowCamera()
+
+        // Keeps every LIVING marker inside the (orthographic, top-down) view
+        // once windMovement lets ships sail beyond the authored opening
+        // framing, tightening toward the action as the fight concentrates
+        // (W3): wrecks stop pinning the frame open, the zoom floor is
+        // followMinSize rather than the authored opening size, and the
+        // camera eases toward its target framing instead of snapping.
+        // Null camera (mission spectator scene) keeps the fixed framing.
+        private void UpdateFollowCamera(float dt)
         {
             if (followCamera == null || _markers.Count == 0)
             {
@@ -434,6 +450,7 @@ namespace Armada.Client.Playback
             var first = true;
             var min = Vector3.zero;
             var max = Vector3.zero;
+            var anyAfloat = false;
             foreach (var marker in _markers.Values)
             {
                 if (marker.Transform == null)
@@ -441,17 +458,25 @@ namespace Armada.Client.Playback
                     continue;
                 }
 
-                var position = marker.Transform.position;
-                if (first)
+                // Sunk wrecks stay on the sea but no longer drive framing;
+                // if everything is sunk, frame the wreckage instead.
+                if (marker.View != null && marker.View.IsSunk)
                 {
-                    min = position;
-                    max = position;
-                    first = false;
+                    continue;
                 }
-                else
+
+                anyAfloat = true;
+                Accumulate(marker.Transform.position, ref first, ref min, ref max);
+            }
+
+            if (!anyAfloat)
+            {
+                foreach (var marker in _markers.Values)
                 {
-                    min = Vector3.Min(min, position);
-                    max = Vector3.Max(max, position);
+                    if (marker.Transform != null)
+                    {
+                        Accumulate(marker.Transform.position, ref first, ref min, ref max);
+                    }
                 }
             }
 
@@ -461,15 +486,55 @@ namespace Armada.Client.Playback
             }
 
             var center = (min + max) * 0.5f;
-            var cameraTransform = followCamera.transform;
-            cameraTransform.position = new Vector3(center.x, cameraTransform.position.y, center.z);
 
             // Screen-up for the top-down camera is world +z; world x maps to
             // screen x, scaled by the aspect ratio.
             var halfZ = (max.z - min.z) * 0.5f + followPadding;
             var aspect = followCamera.aspect > 0f ? followCamera.aspect : 1f;
             var halfXAsSize = ((max.x - min.x) * 0.5f + followPadding) / aspect;
-            followCamera.orthographicSize = Mathf.Max(followMinSize, halfZ, halfXAsSize);
+            var targetSize = Mathf.Max(followMinSize, halfZ, halfXAsSize);
+
+            // Exponential ease: framerate-independent for any fixed tick and
+            // deterministic for the capture harness.
+            var blend = followSmoothingSeconds <= 0f
+                ? 1f
+                : 1f - Mathf.Exp(-dt / followSmoothingSeconds);
+
+            var cameraTransform = followCamera.transform;
+            var current = cameraTransform.position;
+            var target = new Vector3(center.x, current.y, center.z);
+            var easedPosition = Vector3.Lerp(current, target, blend);
+            var easedSize = Mathf.Lerp(followCamera.orthographicSize, targetSize, blend);
+
+            // Containment is a hard guarantee, easing is not (Codex P1 on
+            // #90): whatever the eased center is this tick, the size expands
+            // instantly to keep every framed position inside the view, so a
+            // fast ship can never outrun the lagging frame. Inward
+            // tightening keeps the smooth ease.
+            var halfZNeeded = Mathf.Max(
+                max.z + followPadding - easedPosition.z,
+                easedPosition.z - (min.z - followPadding));
+            var halfXNeeded = Mathf.Max(
+                max.x + followPadding - easedPosition.x,
+                easedPosition.x - (min.x - followPadding)) / aspect;
+
+            cameraTransform.position = easedPosition;
+            followCamera.orthographicSize = Mathf.Max(easedSize, halfZNeeded, halfXNeeded);
+        }
+
+        private static void Accumulate(Vector3 position, ref bool first, ref Vector3 min, ref Vector3 max)
+        {
+            if (first)
+            {
+                min = position;
+                max = position;
+                first = false;
+            }
+            else
+            {
+                min = Vector3.Min(min, position);
+                max = Vector3.Max(max, position);
+            }
         }
 
         private void BeginStep(PlaybackStep step)

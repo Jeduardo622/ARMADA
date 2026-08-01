@@ -262,9 +262,13 @@ gaps, not build work.
 - **W2** view abstraction: every "must render" row above becomes a
   binding point; bar clearance derives from view bounds (replaces the
   hardcoded 1.5 enemy-capsule top noted in `spectator-tuning.md`).
-- **W3** camera/composition: fix the ~90%-empty opening frame
-  (`LINE_SEPARATION` 220 at 0.1 world scale vs ortho size 8.5); preserve
-  the follow camera's never-tighter-than-authored invariant.
+- **W3** camera/composition (**applied**): the wide opening is the honest
+  all-ships deployment frame — the real fix is that the follow camera now
+  tightens toward the living ships as the fight concentrates (floor 5,
+  smoothed easing, wrecks excluded). The never-tighter-than-authored
+  invariant was deliberately replaced with the floor: under the D1-A
+  curve the endgame is close-range, and the old invariant kept it tiny.
+  GDD fairness holds — framing always contains every living ship.
 - **W4** HUD information architecture: structure only, skinnable to §1.
 - **W5** pipeline + measurable perf budgets + Addressables policy.
 - **W6** asset pipeline conventions (folders, naming, import presets,
