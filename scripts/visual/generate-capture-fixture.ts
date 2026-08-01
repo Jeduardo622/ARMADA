@@ -110,6 +110,7 @@ const fixture = {
   scenario: PVP_SCENARIO_CODE,
   seed: PVP_DEFAULT_SEED,
   turnLimit: PVP_TURN_LIMIT,
+  wind: createPvpSkirmishState().wind,
   description:
     'Pinned focus-fire-vs-split fixture battle (tests/pvpScenario.test.ts): side A win at turn 6.',
   shipsAtStart,

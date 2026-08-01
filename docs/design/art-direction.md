@@ -201,7 +201,7 @@ visual today. "Must render" = required before art (binding point in W2/W4).
 | Heading | `ship.heading`, maneuver events | yes | applied but invisible (§3.2) | **yes** | Bow cue + model silhouette contract. |
 | Speed | `ship.speed`, maneuver/movement events | yes | no | **yes** | Sail-trim visual hook; HUD numeric at minimum. Movement events carry `effectiveSpeed` (wind-adjusted). |
 | Sail trim (ordered speed delta) | order surface | yes (local) | text blob only | yes (HUD) | W4 order panel. |
-| Wind direction/speed | `state.wind` | yes | **no** | **yes** | GDD compass; world-space indicator + HUD. Mechanically live under `windMovement`/`windTurnRate`. |
+| Wind direction/speed | `state.wind` | yes | yes — centroid-anchored downwind arrow, speed-scaled (W2 s3) | yes | Pre-art stand-in for the GDD compass; HUD numeric form is W4 scope. |
 | Hull (hp) | ship state, `targetRemaining` | yes | yes (green bar) | yes | Bars re-skin later (GDD hull-shaped bars). |
 | Sail (rigging) | ship state | yes | yes (yellow bar) | yes | |
 | Crew | ship state | yes | **no** | yes (HUD) | Live for boarding math; cosmetic in PvP v1. Bar or HUD stat; binding point required. |
@@ -212,12 +212,12 @@ visual today. "Must render" = required before art (binding point in W2/W4).
 | Rake state (`bow`/`stern`) | broadside event `rake` | yes (wire model + playback mapping fixed, W2 slice 2) | yes — victim co-flash + HUD callout | yes | Pre-art flourish; a real effect replaces it via the view seam. |
 | Ram / collision | ram events | yes | white flash | yes | Keep; needs contact-point binding. |
 | Boarding | boarding events + `cooldowns.boarding` | yes | yes — own violet flash (W2 slice 2) | yes | Distinct from ramming at last; portraits/animations are art scope. |
-| Status: fire | `status.onFire` + counters, status events | yes | **no** | **yes** | Mechanically live (`statusEffects` missions). Particle/tint slot. |
-| Status: slow | `status.slowed` + counters | yes | **no** | **yes** | Shredded-sail visual pairs with sail bar. |
-| Sinking / death | hp = 0, summary `sunk` | yes | marker vanishes | **yes** | Needs a real sink state (GDD: stylized sinking); today ships pop out of existence. |
+| Status: fire | `status.onFire` + counters, status events | yes | yes — ember-warmed resting tint + ABLAZE narration (W2 s3) | yes | Particle effect replaces the tint via the view seam. |
+| Status: slow | `status.slowed` + counters | yes | yes — dimmed resting tint + narration (W2 s3) | yes | Shredded-sail visual is art scope via the view seam. |
+| Sinking / death | hp = 0, applied remaining blocks | yes | yes — submerged, deep-sea tint, bars hidden, flash-proof (W2 s3) | yes | One mechanism for every kill path; a stylized sinking animation replaces it via the view seam. |
 | Turn number / limit | state.turn, scenario | yes | HUD narration text | yes | W4 IA slot. |
-| Obstacles (islands) | `state.obstacles` | yes | **no** | **yes** | Impassable terrain that is invisible — actively misleading once ships route around nothing. Board-view binding point. |
-| Slow zones (debris) | `state.slowZones` | yes | **no** | **yes** | Same; hazard readability. |
+| Obstacles (islands) | `state.obstacles` | yes | yes — dark cylinders via the BeginTurns board context (W2 s3) | yes | Rock/island art replaces the primitive via the same context. |
+| Slow zones (debris) | `state.slowZones` | yes | yes — pale discs via the BeginTurns board context (W2 s3) | yes | Debris art replaces the primitive via the same context. |
 | Range bands | derived (range/50 penalty) | derivable | no | yes (overlay) | Chalk/ink range rings on the order surface (GDD cone/overlay language). |
 | Upgrades (cannon/sail/hull tiers) | mission requests | yes (missions) | no | no | Meta-progression; not a battle visual. Documented gap. |
 | Damage scale / accuracy bonus (boss tuning) | modifiers | yes | no | no | Balance plumbing, not player-facing state. |

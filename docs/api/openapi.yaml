@@ -605,7 +605,7 @@ components:
             slowedByHazard:
               type: boolean
         - type: object
-          required: [type, shipId, status]
+          required: [type, shipId, status, remaining]
           properties:
             type:
               type: string
@@ -614,6 +614,8 @@ components:
               type: string
             status:
               $ref: '#/components/schemas/SimShipStatus'
+            remaining:
+              $ref: '#/components/schemas/SimRemaining'
         - type: object
           required:
             [type, shipId, targetShipId, effectiveSpeed, hullDamage, selfHullDamage, targetRemaining, rammerRemaining]

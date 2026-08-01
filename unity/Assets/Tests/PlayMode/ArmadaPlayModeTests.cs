@@ -1319,6 +1319,91 @@ namespace Armada.Client.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator SpectatorRenderer_SinksShipsRendersStatusAndBoardFeatures()
+        {
+            // W2 slice 3 contract: a killing blow sinks the view (submerged,
+            // sunk tint, bars hidden, later flashes ignored); status events
+            // warm the resting tint; obstacles/slow zones and the wind arrow
+            // spawn from the optional board context.
+            var gameObject = new GameObject("state-visuals-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 },
+                        new SimShip { Id = "b", Side = "enemy", Position = new SimVector2 { X = 100, Y = 0 }, Heading = 180, Speed = 3, Hp = 20, Sail = 110, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>
+                    {
+                        new Mission01TurnRecord
+                        {
+                            Turn = 1,
+                            Events = new List<SimEvent>
+                            {
+                                new SimEvent { Type = "status", ShipId = "a", Status = new SimShipStatus { OnFire = true } },
+                                new SimEvent { Type = "broadside", ShipId = "a", TargetShipId = "b", Hit = true, TargetRemaining = new SimRemaining { Hp = 0, Sail = 110, Crew = 50 } }
+                            }
+                        }
+                    },
+                    turnLimit: 1,
+                    introLine: "state visuals test",
+                    completionLine: "done",
+                    obstacles: new List<SimObstacle> { new SimObstacle { Position = new SimVector2 { X = 50, Y = 0 }, Radius = 20 } },
+                    slowZones: new List<SimSlowZone> { new SimSlowZone { Position = new SimVector2 { X = 70, Y = 10 }, Radius = 15, SpeedPenalty = 2 } },
+                    wind: new SimWind { Direction = 0, Speed = 4 });
+
+                // Board features spawned at sim positions scaled to world.
+                var rock = spectator.transform.Find("obstacle-50-0");
+                var debris = spectator.transform.Find("slow-zone-70-10");
+                Assert.That(rock, Is.Not.Null);
+                Assert.That(debris, Is.Not.Null);
+                Assert.That(rock.position.x, Is.EqualTo(5f).Within(0.001f));
+                Assert.That(debris.position.z, Is.EqualTo(1f).Within(0.001f));
+
+                // Wind arrow exists, points downwind (heading 0 → yaw 90) and
+                // anchors near the fleet centroid plus the serialized offset.
+                var wind = spectator.transform.Find("wind-indicator");
+                Assert.That(wind, Is.Not.Null);
+                Assert.That(wind.rotation.eulerAngles.y, Is.EqualTo(90f).Within(0.01f));
+
+                var victimView = spectator.transform.Find("marker-b").GetComponent<Armada.Client.Playback.ShipView>();
+                var victimRenderer = victimView.GetComponent<Renderer>();
+
+                spectator.Tick(0.1f);  // banner begins
+                spectator.Tick(0.6f);  // banner ends
+                spectator.Tick(0.1f);  // status step: ship a ablaze
+                Assert.That(spectator.HudText, Does.Contain("ABLAZE"));
+                var attackerView = spectator.transform.Find("marker-a").GetComponent<Armada.Client.Playback.ShipView>();
+                Assert.That(attackerView.RestingColor, Is.Not.EqualTo(new Color(0.20f, 0.75f, 0.35f)));
+
+                spectator.Tick(0.3f);  // status step ends
+                spectator.Tick(0.1f);  // killing broadside begins
+                Assert.That(spectator.HudText, Does.Contain("SUNK!"));
+                spectator.Tick(0.5f);  // flash completes; readouts update
+
+                Assert.That(victimView.IsSunk, Is.True);
+                // Submerged below the 0.5 marker height and resting at the
+                // deep-sea tint; bars hidden.
+                Assert.That(victimView.transform.position.y, Is.LessThan(0.5f));
+                Assert.That(victimView.RestingColor, Is.EqualTo(new Color(0.10f, 0.16f, 0.24f)));
+                Assert.That(spectator.transform.Find("hull-bar-b").gameObject.activeSelf, Is.False);
+                var sunkColor = victimRenderer.material.color;
+
+                // A later flash on a sunk ship is ignored.
+                spectator.Tick(0.1f);
+                Assert.That(victimRenderer.material.color, Is.EqualTo(sunkColor));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+            yield break;
+        }
+
+        [UnityTest]
         public IEnumerator SpectatorRenderer_RakeFlourishAndMissDimReadOnTheBoard()
         {
             // W2 slice 2 feedback contract: a raked hit narrates the rake and

@@ -216,7 +216,12 @@ function tickShipStatus(ship: ShipState, events: SimEvent[]) {
     changed = true;
   }
   if (changed) {
-    events.push({ type: 'status', shipId: ship.id, status: { ...status } });
+    events.push({
+      type: 'status',
+      shipId: ship.id,
+      status: { ...status },
+      remaining: { hp: ship.hp, sail: ship.sail, crew: ship.crew }
+    });
   }
 }
 
@@ -699,7 +704,12 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
             ignitionRoll < FIRE_IGNITION_CHANCE &&
             refreshFire(target)
           ) {
-            events.push({ type: 'status', shipId: target.id, status: { ...target.status } });
+            events.push({
+              type: 'status',
+              shipId: target.id,
+              status: { ...target.status },
+              remaining: { hp: target.hp, sail: target.sail, crew: target.crew }
+            });
           }
           const startSail = sailAtTurnStart?.get(target.id) ?? target.sail;
           if (
@@ -708,7 +718,12 @@ export function resolveSimPreview(input: SimPreviewRequest): SimPreviewResult {
             target.sail < startSail * SLOW_SAIL_FRACTION &&
             refreshSlow(target)
           ) {
-            events.push({ type: 'status', shipId: target.id, status: { ...target.status } });
+            events.push({
+              type: 'status',
+              shipId: target.id,
+              status: { ...target.status },
+              remaining: { hp: target.hp, sail: target.sail, crew: target.crew }
+            });
           }
         }
       }

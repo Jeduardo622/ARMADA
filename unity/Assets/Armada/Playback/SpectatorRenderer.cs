@@ -65,6 +65,15 @@ namespace Armada.Client.Playback
         [Tooltip("Never zoom tighter than the authored opening framing.")]
         [SerializeField] private float followMinSize = 8.5f;
 
+        [Header("Board features & wind (design-tunable placeholders)")]
+        [Tooltip("Impassable terrain (rocks/islands): dark cylinders scaled by sim radius.")]
+        [SerializeField] private Color obstacleColor = new Color(0.25f, 0.22f, 0.18f);
+        [Tooltip("Hazard slow zones (debris): pale translucent discs scaled by sim radius.")]
+        [SerializeField] private Color slowZoneColor = new Color(0.55f, 0.62f, 0.60f, 0.5f);
+        [Tooltip("World offset of the wind arrow from the fleet centroid; re-anchored every tick so the follow camera never loses it.")]
+        [SerializeField] private Vector3 windIndicatorOffset = new Vector3(0f, 0.5f, -4.5f);
+        [SerializeField] private Color windIndicatorColor = new Color(0.85f, 0.9f, 1.0f, 0.9f);
+
         [Header("View provider (optional; primitives when null)")]
         [Tooltip("Factory for ship visuals. Null adds the primitive provider at first spawn; an art-backed provider replaces it without a renderer change (W2).")]
         [SerializeField] private ShipViewProvider shipViewProvider;
@@ -84,6 +93,9 @@ namespace Armada.Client.Playback
         }
 
         private readonly Dictionary<string, Marker> _markers = new();
+        private readonly List<GameObject> _boardFeatures = new();
+        private Transform _windArrow;
+        private SimWind _wind;
         private TurnPlayback _playback;
         private Mission10Outcome _outcome;
         private int _turnLimit;
@@ -164,13 +176,14 @@ namespace Armada.Client.Playback
         /// </summary>
         public void BeginOutcome(Mission10Outcome outcome)
         {
-            var ships = Mission10Scenario.BuildExpectedStart(outcome.Seed).State.Ships;
+            var start = Mission10Scenario.BuildExpectedStart(outcome.Seed).State;
             BeginTurns(
-                ships,
+                start.Ships,
                 outcome.Turns,
                 outcome.TurnLimit,
                 $"Spectating {outcome.MissionCode} (seed {outcome.Seed})...",
-                completionLine: null);
+                completionLine: null,
+                wind: start.Wind);
             _outcome = outcome;
         }
 
@@ -190,9 +203,13 @@ namespace Armada.Client.Playback
             int turnLimit,
             string introLine,
             string completionLine,
-            IReadOnlyList<SimShip> baselineShips = null)
+            IReadOnlyList<SimShip> baselineShips = null,
+            IReadOnlyList<SimObstacle> obstacles = null,
+            IReadOnlyList<SimSlowZone> slowZones = null,
+            SimWind wind = null)
         {
             ClearMarkers();
+            SpawnBoardFeatures(obstacles, slowZones);
             _outcome = null;
             _turnLimit = turnLimit;
             _completionLine = completionLine;
@@ -201,6 +218,9 @@ namespace Armada.Client.Playback
             IsFinished = false;
 
             SpawnMarkers(shipsAtStart, baselineShips);
+            // After the markers: the arrow anchors to the fleet centroid,
+            // which is empty until they exist (Codex P2 on #89).
+            SetWind(wind);
 
             _playback = new TurnPlayback(shipsAtStart, turns);
             SetHud(introLine);
@@ -219,9 +239,13 @@ namespace Armada.Client.Playback
         public void ShowBoard(
             IReadOnlyList<SimShip> ships,
             string hudLine,
-            IReadOnlyList<SimShip> baselineShips = null)
+            IReadOnlyList<SimShip> baselineShips = null,
+            IReadOnlyList<SimObstacle> obstacles = null,
+            IReadOnlyList<SimSlowZone> slowZones = null,
+            SimWind wind = null)
         {
             ClearMarkers();
+            SpawnBoardFeatures(obstacles, slowZones);
             _outcome = null;
             _playback = null;
             _currentStep = null;
@@ -231,6 +255,9 @@ namespace Armada.Client.Playback
             IsFinished = true;
 
             SpawnMarkers(ships, baselineShips);
+            // After the markers, for the same anchoring reason as BeginTurns;
+            // ShowBoard has no tick loop to correct a stale position later.
+            SetWind(wind);
             SetHud(hudLine);
         }
 
@@ -482,14 +509,14 @@ namespace Armada.Client.Playback
                         Flash(step.TargetShipId, BroadsideFlashColor(step));
                     }
                     SetHud(step.Hit
-                        ? $"T{step.Turn} {step.ShipId} => {step.TargetShipId}: {(step.ChainShot ? "CHAIN SHOT" : "round shot")}{RakeSuffix(step)} hit (hull -{step.AppliedHull}, sail -{step.AppliedSail}, crew -{step.AppliedCrew})"
+                        ? $"T{step.Turn} {step.ShipId} => {step.TargetShipId}: {(step.ChainShot ? "CHAIN SHOT" : "round shot")}{RakeSuffix(step)} hit (hull -{step.AppliedHull}, sail -{step.AppliedSail}, crew -{step.AppliedCrew}){(step.TargetSunk ? " — SUNK!" : string.Empty)}"
                         : $"T{step.Turn} {step.ShipId} => {step.TargetShipId}: {(step.ChainShot ? "CHAIN SHOT" : "round shot")} miss");
                     break;
                 case PlaybackStepKind.Ram:
                     _stepDuration = flashSeconds;
                     Flash(step.ShipId, ramFlashColor);
                     Flash(step.TargetShipId, ramFlashColor);
-                    SetHud($"T{step.Turn} {step.ShipId} rams {step.TargetShipId} (hull -{step.AppliedHull}, recoil -{step.SelfAppliedHull})");
+                    SetHud($"T{step.Turn} {step.ShipId} rams {step.TargetShipId} (hull -{step.AppliedHull}, recoil -{step.SelfAppliedHull}){(step.TargetSunk ? " — SUNK!" : string.Empty)}");
                     break;
                 case PlaybackStepKind.Boarding:
                     _stepDuration = flashSeconds;
@@ -498,6 +525,15 @@ namespace Armada.Client.Playback
                     break;
                 case PlaybackStepKind.Status:
                     _stepDuration = maneuverSeconds;
+                    if (TryGetMarker(step.ShipId, out var statused) && statused.View != null)
+                    {
+                        statused.View.SetStatus(step.OnFire, step.Slowed);
+                        SetHud(step.OnFire
+                            ? $"T{step.Turn} {step.ShipId} is ABLAZE{(step.AppliedHull > 0 ? $" (burns hull -{step.AppliedHull})" : string.Empty)}"
+                            : step.Slowed
+                                ? $"T{step.Turn} {step.ShipId} is slowed, rigging fouled"
+                                : $"T{step.Turn} {step.ShipId} recovers");
+                    }
                     break;
                 case PlaybackStepKind.RunComplete:
                     _stepDuration = 0f;
@@ -659,10 +695,38 @@ namespace Armada.Client.Playback
                 SailBar = SpawnBar($"sail-bar-{ship.Id}", sailBarColor)
             };
             _markers[ship.Id] = marker;
+
+            // Snapshot-only boards (mission 10 undo) can contain ships that
+            // are already sunk; there is no playback to sink them later
+            // (Codex P2 on #89).
+            if (ship.Hp <= 0)
+            {
+                SinkMarker(marker);
+                return;
+            }
+
             PositionBars(
                 marker,
                 Mathf.Clamp01(ship.Hp / (float)marker.MaxHull),
                 Mathf.Clamp01(ship.Sail / (float)marker.MaxSail));
+        }
+
+        private static void SinkMarker(Marker marker)
+        {
+            if (marker.View != null)
+            {
+                marker.View.SetSunk();
+            }
+
+            if (marker.HullBar != null)
+            {
+                marker.HullBar.gameObject.SetActive(false);
+            }
+
+            if (marker.SailBar != null)
+            {
+                marker.SailBar.gameObject.SetActive(false);
+            }
         }
 
         // Bars parent to the renderer, not the marker, so heading rotations
@@ -694,11 +758,26 @@ namespace Armada.Client.Playback
                     continue;
                 }
 
+                // One sink mechanism for every kill path (broadside, ram
+                // victim, ram recoil, fire DoT): the authoritative remaining
+                // block reaching zero hull sinks the view and hides its bars.
+                if (remaining.Hp <= 0 && marker.View != null && !marker.View.IsSunk)
+                {
+                    SinkMarker(marker);
+                }
+
+                if (marker.View != null && marker.View.IsSunk)
+                {
+                    continue;
+                }
+
                 PositionBars(
                     marker,
                     Mathf.Clamp01(remaining.Hp / (float)marker.MaxHull),
                     Mathf.Clamp01(remaining.Sail / (float)marker.MaxSail));
             }
+
+            AnchorWindIndicator();
         }
 
         private void PositionBars(Marker marker, float hullFraction, float sailFraction)
@@ -765,6 +844,149 @@ namespace Armada.Client.Playback
             _markers.Clear();
         }
 
+        // Board features (W2 slice 3): impassable rocks and debris slow zones
+        // were mechanically real but invisible — ships routed around nothing.
+        // Pre-art defaults: dark cylinder per obstacle, pale flat disc per
+        // slow zone, both scaled by the sim radius.
+        private void SpawnBoardFeatures(IReadOnlyList<SimObstacle> obstacles, IReadOnlyList<SimSlowZone> slowZones)
+        {
+            foreach (var feature in _boardFeatures)
+            {
+                if (feature != null)
+                {
+                    Destroy(feature);
+                }
+            }
+
+            _boardFeatures.Clear();
+
+            if (obstacles != null)
+            {
+                foreach (var obstacle in obstacles)
+                {
+                    if (obstacle?.Position == null)
+                    {
+                        continue;
+                    }
+
+                    var rock = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    rock.name = $"obstacle-{obstacle.Position.X}-{obstacle.Position.Y}";
+                    rock.transform.SetParent(transform, worldPositionStays: false);
+                    var radius = obstacle.Radius * worldUnitsPerSimUnit;
+                    rock.transform.position = new Vector3(
+                        obstacle.Position.X * worldUnitsPerSimUnit, 0.2f, obstacle.Position.Y * worldUnitsPerSimUnit);
+                    rock.transform.localScale = new Vector3(radius * 2f, 0.4f, radius * 2f);
+                    TintFeature(rock, obstacleColor);
+                    _boardFeatures.Add(rock);
+                }
+            }
+
+            if (slowZones != null)
+            {
+                foreach (var zone in slowZones)
+                {
+                    if (zone?.Position == null)
+                    {
+                        continue;
+                    }
+
+                    var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    disc.name = $"slow-zone-{zone.Position.X}-{zone.Position.Y}";
+                    disc.transform.SetParent(transform, worldPositionStays: false);
+                    var radius = zone.Radius * worldUnitsPerSimUnit;
+                    disc.transform.position = new Vector3(
+                        zone.Position.X * worldUnitsPerSimUnit, 0.02f, zone.Position.Y * worldUnitsPerSimUnit);
+                    disc.transform.localScale = new Vector3(radius * 2f, 0.02f, radius * 2f);
+                    TintFeature(disc, slowZoneColor);
+                    _boardFeatures.Add(disc);
+                }
+            }
+        }
+
+        private static void TintFeature(GameObject feature, Color color)
+        {
+            var featureRenderer = feature.GetComponent<Renderer>();
+            if (featureRenderer != null)
+            {
+                featureRenderer.material.color = color;
+            }
+        }
+
+        /// <summary>
+        /// Shows (or hides, when null) the wind indicator: a flat arrow that
+        /// re-anchors to the fleet centroid each tick and points DOWNWIND —
+        /// where the wind pushes — using the same heading→yaw mapping as the
+        /// ships. Wind was mechanically live and never rendered (W1 audit).
+        /// </summary>
+        public void SetWind(SimWind wind)
+        {
+            _wind = wind;
+            if (wind == null)
+            {
+                if (_windArrow != null)
+                {
+                    Destroy(_windArrow.gameObject);
+                    _windArrow = null;
+                }
+
+                return;
+            }
+
+            if (_windArrow == null)
+            {
+                var root = new GameObject("wind-indicator");
+                root.transform.SetParent(transform, worldPositionStays: false);
+
+                var shaft = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                shaft.name = "shaft";
+                shaft.transform.SetParent(root.transform, worldPositionStays: false);
+                shaft.transform.localPosition = new Vector3(0f, 0f, 0f);
+                shaft.transform.localScale = new Vector3(0.12f, 0.05f, 1.2f);
+                TintFeature(shaft, windIndicatorColor);
+
+                var head = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                head.name = "head";
+                head.transform.SetParent(root.transform, worldPositionStays: false);
+                head.transform.localPosition = new Vector3(0f, 0f, 0.7f);
+                head.transform.localScale = new Vector3(0.35f, 0.05f, 0.35f);
+                TintFeature(head, windIndicatorColor);
+
+                _windArrow = root.transform;
+            }
+
+            _windArrow.rotation = HeadingToRotation(wind.Direction);
+            // Speed reads as shaft length: ±2 effective-speed winds are the
+            // mission convention, so scale gently around 1.
+            _windArrow.localScale = new Vector3(1f, 1f, 0.6f + wind.Speed * 0.15f);
+            AnchorWindIndicator();
+        }
+
+        private void AnchorWindIndicator()
+        {
+            if (_windArrow == null || _markers.Count == 0)
+            {
+                return;
+            }
+
+            var centroid = Vector3.zero;
+            var count = 0;
+            foreach (var marker in _markers.Values)
+            {
+                if (marker.Transform != null)
+                {
+                    centroid += marker.Transform.position;
+                    count++;
+                }
+            }
+
+            if (count == 0)
+            {
+                return;
+            }
+
+            _windArrow.position = centroid / count + windIndicatorOffset;
+        }
+
         private Vector3 ToWorld(int simX, int simY)
         {
             return new Vector3(simX * worldUnitsPerSimUnit, markerHeight, simY * worldUnitsPerSimUnit);
@@ -778,6 +1000,12 @@ namespace Armada.Client.Playback
 
         private void Flash(string shipId, Color color)
         {
+            if (shipId != null && _markers.TryGetValue(shipId, out var sunkCheck)
+                && sunkCheck.View != null && sunkCheck.View.IsSunk)
+            {
+                return;
+            }
+
             if (TryGetMarker(shipId, out var marker) && marker.Renderer != null)
             {
                 marker.Renderer.material.color = color;
@@ -788,7 +1016,7 @@ namespace Armada.Client.Playback
         {
             if (TryGetMarker(shipId, out var marker) && marker.Renderer != null)
             {
-                marker.Renderer.material.color = Color.Lerp(color, marker.BaseColor, progress);
+                marker.Renderer.material.color = Color.Lerp(color, RestingColorOf(marker), progress);
             }
         }
 
@@ -796,8 +1024,15 @@ namespace Armada.Client.Playback
         {
             if (TryGetMarker(shipId, out var marker) && marker.Renderer != null)
             {
-                marker.Renderer.material.color = marker.BaseColor;
+                marker.Renderer.material.color = RestingColorOf(marker);
             }
+        }
+
+        // Flashes settle back to the view's status/sunk-aware resting color,
+        // not the raw side color (W2 slice 3).
+        private static Color RestingColorOf(Marker marker)
+        {
+            return marker.View != null ? marker.View.RestingColor : marker.BaseColor;
         }
 
         private void SetHud(string message)

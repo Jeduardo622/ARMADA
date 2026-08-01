@@ -1,8 +1,8 @@
 # Spectator Demo Design Tuning
 
-> **Status: Review REOPENED** (W2 slice 2: the attack-feedback rows in
-> Colors below; the W2 view-seam reopening was signed off via the merge
-> of PR #87 on 2026-07-29). Prior status: Reviewed — applied values approved
+> **Status: Review REOPENED** (W2 slice 3: the sink/status/board-feature/
+> wind rows below; the slice-2 feedback reopening was signed off via the
+> merge of PR #88). Prior status: Reviewed — applied values approved
 > by @Jeduardo622 via the PR #51 merge on 2026-07-21, drafted following
 > the Mission 07 precedent (see the QA notes in
 > `docs/content/missions/mission-07-burning-seas.md`). Future value
@@ -45,6 +45,11 @@ change here (see Regeneration below).
 | `boardingFlashColor` | (0.75, 0.40, 1.00) (**new, W2**) | keep | Boarding was visually identical to a ram before W2 slice 2; violet is distinct from white ram, orange round shot, and cyan chain. |
 | Miss feedback (derived, hard-coded) | hit color pulled 60% toward gray (**new, W2**) | keep | Misses read muted instead of triumphant - the pre-art stand-in for the GDD's splash-on-miss. |
 | Rake flourish (derived, hard-coded) | victim flashes the shot color too; HUD appends "BOW/STERN RAKE" (**new, W2**) | keep | The showcase tactic reads on the board, not just in the narration. |
+| Sink presentation (hard-coded) | deep-sea tint (0.10, 0.16, 0.24), hull settles 0.35 below the waterline, bars hide, flashes stop (**new, W2 s3**) | keep | Sunk ships previously persisted in full color with empty bars; one mechanism covers every kill path via the applied remaining blocks. |
+| Status tints (hard-coded) | fire warms the hull 45% toward ember (1.0, 0.45, 0.1); slow dims 35% toward gray (**new, W2 s3**) | keep | modifiers.statusEffects were mechanically live and invisible; HUD narrates ABLAZE/slowed/recovers. |
+| `obstacleColor` | (0.25, 0.22, 0.18) (**new, W2 s3**) | keep | Impassable rocks render as dark squat cylinders scaled by sim radius — ships previously routed around invisible terrain. |
+| `slowZoneColor` | (0.55, 0.62, 0.60, 0.5) (**new, W2 s3**) | keep | Debris fields render as pale flat discs under the ships. |
+| `windIndicatorOffset` / `windIndicatorColor` | (0, 0.5, −4.5) / (0.85, 0.9, 1.0, 0.9) (**new, W2 s3**) | keep | The wind arrow re-anchors to the fleet centroid every tick (the follow camera never loses it), points downwind via the ships' own heading→yaw mapping, and its shaft length scales gently with wind speed. |
 
 ### Playback control bindings
 

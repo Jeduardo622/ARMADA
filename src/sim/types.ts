@@ -243,6 +243,14 @@ export type SimEvent =
       type: 'status';
       shipId: string;
       status: ShipStatus;
+      // Authoritative post-tick block (targetRemaining precedent): fire DoT
+      // applies hull damage that no other event reports, so without this the
+      // client cannot track a burning ship's hull (Codex P2 on PR #89).
+      remaining: {
+        hp: number;
+        sail: number;
+        crew: number;
+      };
     }
   | {
       type: 'ram';

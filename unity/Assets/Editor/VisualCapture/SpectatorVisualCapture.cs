@@ -64,6 +64,7 @@ public static class SpectatorVisualCapture
         public int Seed { get; set; }
         public int TurnLimit { get; set; }
         public string Description { get; set; }
+        public SimWind Wind { get; set; }
         public List<SimShip> ShipsAtStart { get; set; }
         public List<Mission01TurnRecord> Turns { get; set; }
     }
@@ -145,7 +146,8 @@ public static class SpectatorVisualCapture
             fixture.Turns,
             fixture.TurnLimit,
             introLine: $"Capturing {fixture.Scenario} (seed {fixture.Seed})...",
-            completionLine: "Capture complete");
+            completionLine: "Capture complete",
+            wind: fixture.Wind);
 
         var manifest = new CaptureManifest
         {

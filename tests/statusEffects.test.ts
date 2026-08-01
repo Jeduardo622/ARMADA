@@ -111,7 +111,12 @@ describe('engine fire effect (modifiers.statusEffects)', () => {
     expect(attacker.hp).toBe(120 - 5);
     expect(attacker.status).toEqual({ onFire: true, fireTurnsRemaining: 1 });
     expect(statusEvents(result)).toEqual([
-      { type: 'status', shipId: ATTACKER_ID, status: { onFire: true, fireTurnsRemaining: 1 } }
+      {
+        type: 'status',
+        shipId: ATTACKER_ID,
+        status: { onFire: true, fireTurnsRemaining: 1 },
+        remaining: { hp: 115, sail: 80, crew: 50 }
+      }
     ]);
   });
 
@@ -135,7 +140,16 @@ describe('engine fire effect (modifiers.statusEffects)', () => {
     expect(broadsideEvent(ignited).hit).toBe(true);
     expect(shipIn(ignited, TARGET_ID).status).toEqual({ onFire: true, fireTurnsRemaining: 3 });
     expect(statusEvents(ignited)).toEqual([
-      { type: 'status', shipId: TARGET_ID, status: { onFire: true, fireTurnsRemaining: 3 } }
+      {
+        type: 'status',
+        shipId: TARGET_ID,
+        status: { onFire: true, fireTurnsRemaining: 3 },
+        remaining: {
+          hp: shipIn(ignited, TARGET_ID).hp,
+          sail: shipIn(ignited, TARGET_ID).sail,
+          crew: shipIn(ignited, TARGET_ID).crew
+        }
+      }
     ]);
 
     const spared = resolveSimPreview(
@@ -172,7 +186,16 @@ describe('engine slow effect (modifiers.statusEffects)', () => {
     expect(broadside.targetRemaining.sail).toBeLessThan(10);
     expect(shipIn(result, TARGET_ID).status).toEqual({ slowed: true, slowTurnsRemaining: 2 });
     expect(statusEvents(result)).toEqual([
-      { type: 'status', shipId: TARGET_ID, status: { slowed: true, slowTurnsRemaining: 2 } }
+      {
+        type: 'status',
+        shipId: TARGET_ID,
+        status: { slowed: true, slowTurnsRemaining: 2 },
+        remaining: {
+          hp: shipIn(result, TARGET_ID).hp,
+          sail: shipIn(result, TARGET_ID).sail,
+          crew: shipIn(result, TARGET_ID).crew
+        }
+      }
     ]);
   });
 
@@ -275,7 +298,18 @@ describe('engine status effect durations', () => {
     // Expiry turn: flags clear before any phase runs, and no further DoT lands.
     expect(afterSecond.hp).toBe(120 - 5);
     expect(afterSecond.status).toEqual({});
-    expect(statusEvents(second)).toEqual([{ type: 'status', shipId: ATTACKER_ID, status: {} }]);
+    expect(statusEvents(second)).toEqual([
+      {
+        type: 'status',
+        shipId: ATTACKER_ID,
+        status: {},
+        remaining: {
+          hp: shipIn(second, ATTACKER_ID).hp,
+          sail: shipIn(second, ATTACKER_ID).sail,
+          crew: shipIn(second, ATTACKER_ID).crew
+        }
+      }
+    ]);
 
     const third = resolveSimPreview({
       schemaVersion: 1,
