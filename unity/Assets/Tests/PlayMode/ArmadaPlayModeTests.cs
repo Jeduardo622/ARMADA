@@ -1319,6 +1319,72 @@ namespace Armada.Client.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator FollowCamera_NeverLetsALivingShipOutrunTheFrame()
+        {
+            // Containment guarantee under easing (Codex P1 on #90): during a
+            // long outward move, every tick's frame must still contain the
+            // moving ship plus padding, even while the center lags behind.
+            var spectatorObject = new GameObject("follow-containment-test");
+            spectatorObject.SetActive(false);
+            var cameraObject = new GameObject("follow-containment-camera");
+            cameraObject.SetActive(false);
+            try
+            {
+                var spectator = spectatorObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                var followCamera = cameraObject.AddComponent<Camera>();
+                followCamera.orthographic = true;
+                followCamera.orthographicSize = 8.5f;
+                followCamera.aspect = 16f / 9f;
+                followCamera.transform.position = new Vector3(11f, 20f, 0f);
+                typeof(Armada.Client.Playback.SpectatorRenderer)
+                    .GetField("followCamera", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(spectator, followCamera);
+
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "anchor", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 },
+                        new SimShip { Id = "runner", Side = "enemy", Position = new SimVector2 { X = 20, Y = 0 }, Heading = 0, Speed = 10, Hp = 140, Sail = 110, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>
+                    {
+                        new Mission01TurnRecord
+                        {
+                            Turn = 1,
+                            Events = new List<SimEvent>
+                            {
+                                new SimEvent { Type = "movement", ShipId = "runner", Position = new SimVector2 { X = 400, Y = 0 } }
+                            }
+                        }
+                    },
+                    turnLimit: 1,
+                    introLine: "containment test",
+                    completionLine: "done");
+
+                for (var tick = 0; tick < 80; tick++)
+                {
+                    spectator.Tick(0.1f);
+                    if (!spectator.TryGetMarkerPosition("runner", out var runner))
+                    {
+                        continue;
+                    }
+
+                    var halfWidth = followCamera.orthographicSize * followCamera.aspect;
+                    var left = followCamera.transform.position.x - halfWidth;
+                    var right = followCamera.transform.position.x + halfWidth;
+                    Assert.That(runner.x, Is.GreaterThanOrEqualTo(left).And.LessThanOrEqualTo(right),
+                        $"runner escaped the frame at tick {tick}");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(spectatorObject);
+                UnityEngine.Object.Destroy(cameraObject);
+            }
+            yield break;
+        }
+
+        [UnityTest]
         public IEnumerator FollowCamera_TightensOnLivingShipsAndIgnoresWrecks()
         {
             // W3 composition contract: the camera converges toward the living

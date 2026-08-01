@@ -385,11 +385,16 @@ namespace Armada.Client.Playback
         /// </summary>
         public void Tick(float dt)
         {
-            // The camera settles independently of playback state (W3): it
-            // keeps easing toward its target framing after the battle ends
-            // (settling on the survivors) and while paused.
+            // Playback advances first, camera second: the frame must fit the
+            // positions the step animation just produced (Codex P1 on #90),
+            // and the camera keeps settling after the battle ends or while
+            // paused because this tail runs on every tick.
+            TickPlayback(dt);
             UpdateFollowCamera(dt * SpeedMultiplier);
+        }
 
+        private void TickPlayback(float dt)
+        {
             if (_playback == null || IsFinished)
             {
                 return;
@@ -426,6 +431,7 @@ namespace Armada.Client.Playback
 
             UpdateReadouts();
         }
+
 
         // Keeps every LIVING marker inside the (orthographic, top-down) view
         // once windMovement lets ships sail beyond the authored opening
@@ -497,9 +503,23 @@ namespace Armada.Client.Playback
             var cameraTransform = followCamera.transform;
             var current = cameraTransform.position;
             var target = new Vector3(center.x, current.y, center.z);
-            cameraTransform.position = Vector3.Lerp(current, target, blend);
-            followCamera.orthographicSize =
-                Mathf.Lerp(followCamera.orthographicSize, targetSize, blend);
+            var easedPosition = Vector3.Lerp(current, target, blend);
+            var easedSize = Mathf.Lerp(followCamera.orthographicSize, targetSize, blend);
+
+            // Containment is a hard guarantee, easing is not (Codex P1 on
+            // #90): whatever the eased center is this tick, the size expands
+            // instantly to keep every framed position inside the view, so a
+            // fast ship can never outrun the lagging frame. Inward
+            // tightening keeps the smooth ease.
+            var halfZNeeded = Mathf.Max(
+                max.z + followPadding - easedPosition.z,
+                easedPosition.z - (min.z - followPadding));
+            var halfXNeeded = Mathf.Max(
+                max.x + followPadding - easedPosition.x,
+                easedPosition.x - (min.x - followPadding)) / aspect;
+
+            cameraTransform.position = easedPosition;
+            followCamera.orthographicSize = Mathf.Max(easedSize, halfZNeeded, halfXNeeded);
         }
 
         private static void Accumulate(Vector3 position, ref bool first, ref Vector3 min, ref Vector3 max)
