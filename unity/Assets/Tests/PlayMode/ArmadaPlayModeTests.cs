@@ -1319,6 +1319,71 @@ namespace Armada.Client.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator FollowCamera_TightensOnLivingShipsAndIgnoresWrecks()
+        {
+            // W3 composition contract: the camera converges toward the living
+            // ships' framing, may tighten to the followMinSize floor (5, not
+            // the authored 8.5 opening), and a distant wreck no longer pins
+            // the frame open.
+            var spectatorObject = new GameObject("follow-camera-w3-test");
+            spectatorObject.SetActive(false);
+            var cameraObject = new GameObject("follow-camera-w3-camera");
+            cameraObject.SetActive(false);
+            try
+            {
+                var spectator = spectatorObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                var followCamera = cameraObject.AddComponent<Camera>();
+                followCamera.orthographic = true;
+                followCamera.orthographicSize = 8.5f;
+                followCamera.aspect = 16f / 9f;
+                followCamera.transform.position = new Vector3(11f, 20f, 0f);
+                typeof(Armada.Client.Playback.SpectatorRenderer)
+                    .GetField("followCamera", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(spectator, followCamera);
+
+                // Two living ships two sim units apart mid-board, plus a
+                // wreck (hp 0 at spawn) far east that must not affect
+                // framing.
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "alive-a", Side = "player", Position = new SimVector2 { X = 100, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 },
+                        new SimShip { Id = "alive-b", Side = "enemy", Position = new SimVector2 { X = 120, Y = 0 }, Heading = 180, Speed = 3, Hp = 140, Sail = 110, Crew = 50 },
+                        new SimShip { Id = "wreck", Side = "enemy", Position = new SimVector2 { X = 400, Y = 0 }, Heading = 180, Speed = 0, Hp = 0, Sail = 0, Crew = 0 }
+                    },
+                    new List<Mission01TurnRecord>
+                    {
+                        new Mission01TurnRecord { Turn = 1, Events = new List<SimEvent>() }
+                    },
+                    turnLimit: 1,
+                    introLine: "camera test",
+                    completionLine: "done");
+
+                // Enough fixed ticks for the exponential ease to converge.
+                for (var tick = 0; tick < 60 && !spectator.IsFinished; tick++)
+                {
+                    spectator.Tick(0.5f);
+                }
+                for (var tick = 0; tick < 60; tick++)
+                {
+                    spectator.Tick(0.5f);
+                }
+
+                // Living pair spans world x 10..12: center 11, tiny extents →
+                // the floor (5) wins, far below the old 8.5 invariant; the
+                // wreck at world x 40 is ignored.
+                Assert.That(followCamera.orthographicSize, Is.EqualTo(5f).Within(0.05f));
+                Assert.That(followCamera.transform.position.x, Is.EqualTo(11f).Within(0.1f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(spectatorObject);
+                UnityEngine.Object.Destroy(cameraObject);
+            }
+            yield break;
+        }
+
+        [UnityTest]
         public IEnumerator SpectatorRenderer_SinksShipsRendersStatusAndBoardFeatures()
         {
             // W2 slice 3 contract: a killing blow sinks the view (submerged,
