@@ -46,6 +46,8 @@ namespace Armada.Client.UI
 
         [Header("UI Wiring (optional)")]
         [SerializeField] private TMP_Text orderLabel;
+        [Tooltip("Structured per-ship order rows (W4 HUD IA); optional — null keeps the legacy text blob.")]
+        [SerializeField] private OrderPanelView orderPanel;
         [SerializeField] private TMP_Text statusLabel;
 
         private Mission10Flow _flow;
@@ -353,8 +355,19 @@ namespace Armada.Client.UI
         {
             if (_session != null)
             {
-                SetOrderText(_session.Describe()
-                    + "\nNext Ship | Turn +/- | Speed +/- | Target | Ammo | Confirm Turn | Undo Turn");
+                if (orderPanel != null)
+                {
+                    orderPanel.Render(_session);
+                    // The rows carry the orders; the label keeps only the
+                    // headline and hints (Codex P2 on #91).
+                    SetOrderText(_session.Headline
+                        + "\nNext Ship | Turn +/- | Speed +/- | Target | Ammo | Confirm Turn | Undo Turn");
+                }
+                else
+                {
+                    SetOrderText(_session.Describe()
+                        + "\nNext Ship | Turn +/- | Speed +/- | Target | Ammo | Confirm Turn | Undo Turn");
+                }
             }
         }
 
@@ -370,6 +383,10 @@ namespace Armada.Client.UI
 
         private void SetOrderText(string message)
         {
+            if (orderPanel != null && _session == null)
+            {
+                orderPanel.Clear();
+            }
             if (orderLabel != null)
             {
                 orderLabel.text = message;

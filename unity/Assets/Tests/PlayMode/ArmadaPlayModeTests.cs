@@ -1385,6 +1385,53 @@ namespace Armada.Client.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator OrderPanelView_RendersOneStructuredRowPerDraftWithActiveCursor()
+        {
+            // W4 HUD IA: the panel replaces the Describe() blob with one row
+            // per ship draft; the cursor and emphasis follow the active ship
+            // and Clear hides every row.
+            var gameObject = new GameObject("order-panel-test", typeof(RectTransform));
+            gameObject.SetActive(false);
+            try
+            {
+                var panel = gameObject.AddComponent<Armada.Client.UI.OrderPanelView>();
+                var session = new Armada.Client.Services.PvpOrderSession(
+                    "A",
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "alpha-frigate-a", Side = "player", Hp = 120, Sail = 80, Crew = 50 },
+                        new SimShip { Id = "alpha-frigate-b", Side = "player", Hp = 120, Sail = 80, Crew = 50 }
+                    },
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "bravo-frigate-a", Side = "enemy", Hp = 120, Sail = 80, Crew = 50 }
+                    });
+                session.CycleTarget();
+                session.AdjustTurn(1);
+
+                panel.Render(session);
+                Assert.That(panel.VisibleRowCount, Is.EqualTo(2));
+                Assert.That(panel.RowCaption(0), Does.Contain("▶").And.Contain("alpha-frigate-a"));
+                Assert.That(panel.RowCaption(0), Does.Contain("+15"));
+                Assert.That(panel.RowCaption(0), Does.Contain("fire round at bravo-frigate-a"));
+                Assert.That(panel.RowCaption(1), Does.Not.Contain("▶"));
+                Assert.That(panel.RowCaption(1), Does.Contain("hold fire"));
+
+                session.NextShip();
+                panel.Render(session);
+                Assert.That(panel.RowCaption(1), Does.Contain("▶"));
+
+                panel.Clear();
+                Assert.That(panel.VisibleRowCount, Is.Zero);
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+            yield break;
+        }
+
+        [UnityTest]
         public IEnumerator FollowCamera_TightensOnLivingShipsAndIgnoresWrecks()
         {
             // W3 composition contract: the camera converges toward the living
