@@ -245,7 +245,7 @@ writeContactSheet(outDir, manifest);
 
 if (args.mode === 'sequence') {
   // Sequence output is for human review only; no baselines, no diff.
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }
 
 // Draw-call budget gate (docs/perf-budgets.md: < 1.5k mid-fight); stats
@@ -262,7 +262,7 @@ for (const line of stats) {
 const { clean, baselineDir } = diffAgainstBaselines(args, outDir, manifest);
 if (args.update) {
   updateBaselines(outDir, manifest, baselineDir);
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }
 if (!clean) {
   console.error('[visual-capture] visual regression detected (or baselines missing); ');

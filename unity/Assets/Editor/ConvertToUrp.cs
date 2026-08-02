@@ -45,8 +45,13 @@ public static class ConvertToUrp
         }
 
         // Flat-tinted primitives need no HDR/post; keep the mobile budget lean.
+        // SetDirty is load-bearing: without it SaveAssets does not persist
+        // these property writes and builds load the asset with HDR still on
+        // (Codex P2 on the conversion PR).
         pipeline.supportsHDR = false;
         pipeline.msaaSampleCount = 1;
+        EditorUtility.SetDirty(pipeline);
+        EditorUtility.SetDirty(rendererData);
 
         GraphicsSettings.defaultRenderPipeline = pipeline;
         QualitySettings.renderPipeline = pipeline;
