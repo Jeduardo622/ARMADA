@@ -124,6 +124,18 @@ namespace Armada.Client.Playback
             }
         }
 
+        /// <summary>
+        /// Uniformly scales the view (the m06 reinforcement renders the
+        /// capital model at 1.2 hull length instead of 2.2), keeping
+        /// <see cref="TopClearance"/> honest: the reported top scales with
+        /// the geometry so readout bars stay anchored to the real masthead.
+        /// </summary>
+        public void ApplyUniformScale(float scale)
+        {
+            transform.localScale *= scale;
+            topClearance *= scale;
+        }
+
         /// <summary>Wires the view; called by providers when building views in code.</summary>
         public void Configure(Renderer tint, Renderer accent, float clearance)
         {

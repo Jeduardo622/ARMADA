@@ -91,6 +91,7 @@ public static class SpectatorDemoSceneBuilder
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
         var spectator = spectatorObject.GetComponent<SpectatorRenderer>();
         SetReference(spectator, "hudLabel", hudLabel);
+        ShipViewProviderWiring.Attach(spectator);
 
         // On-screen playback controls (D2-B touch controls): pause/step/speed
         // buttons calling the same renderer API as the keyboard bindings.

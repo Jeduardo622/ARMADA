@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["src", "prisma/seed.ts", "tests", "scripts/visual", "vitest.config.ts"],
+  "include": ["src", "prisma/seed.ts", "tests", "scripts/balance", "scripts/visual", "vitest.config.ts"],
   "exclude": ["dist", "node_modules"]
 }
 

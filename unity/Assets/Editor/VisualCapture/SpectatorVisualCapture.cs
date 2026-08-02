@@ -262,6 +262,9 @@ public static class SpectatorVisualCapture
         var property = serialized.FindProperty("followCamera");
         property.objectReferenceValue = camera;
         serialized.ApplyModifiedPropertiesWithoutUndo();
+        // Same view provider as the generated scenes (greybox prefabs with
+        // primitive fallback), so captures show what the scenes show.
+        ShipViewProviderWiring.Attach(spectator);
         return spectator;
     }
 
