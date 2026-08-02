@@ -14,14 +14,16 @@
 > economy constants. Value changes update the matching table **and this
 > status** in the same PR; a design pass graduates it to Reviewed.
 
-> **Measurement-era note (2026-07-28):** every sweep number in this
-> document was measured under the legacy bow-on accuracy curve. The
-> D1-A broadside-arc inversion (`docs/design/art-direction.md` §3.1)
-> reshaped hit chances for all scripted play; no applied mission value
-> changed with it, and its own fixture re-derivations live in the mission
-> test suites, but the win-rate/damage sweep figures below are historical
-> until this document's sweeps are re-run — a named follow-up of the
-> D1-A slice.
+> **Measurement basis (2026-08-02):** the sweep table under "Current
+> measurements" was re-run under the **D1-A broadside-arc accuracy
+> curve** (`docs/design/art-direction.md` §3.1) with the same
+> methodology as the original arc (200 seeds, seeds 1–200, canonical
+> strategies + passive baseline), now reproducible via
+> `npx tsx scripts/balance/sweep-missions.ts`. The per-knob derivation
+> narratives in the mission sections below remain the **legacy-curve
+> apply-time record** — they are the rationale each slice was applied
+> under, kept verbatim as history; the table below is the measurement
+> of record for current play.
 
 Motivation (tracked as an open design knob since the mission arc shipped):
 in missions 03, 05, and 06 the enemy never ended a mission across the
@@ -60,9 +62,13 @@ against `runMissionLoop` re-wired with the proposed constants
 Caveats: the canonical strategies never turn (they advance and heave to
 on script, firing along the approach line), so a real player's ceiling
 is higher than these win rates; and 200 seeds puts roughly ±3 percentage points of noise on any
-rate, so differences that small are treated as flat. The probes are
-throwaway harness runs, not committed tests; each implementing PR
-re-derives its own pinned fixtures.
+rate, so differences that small are treated as flat. The original arc's
+probes were throwaway harness runs; the 2026-08-02 re-sweep committed
+the harness as `scripts/balance/sweep-missions.ts` (run with
+`npx tsx scripts/balance/sweep-missions.ts`), which copies the canonical
+strategy order arrays verbatim from the pinned vitest suites. It is a
+measurement tool, not a test; each implementing PR still re-derives its
+own pinned fixtures.
 
 **Design targets** used throughout:
 
@@ -151,14 +157,34 @@ first waved off as hull-only — see the first bullet):
   repeats the values in its objectives, player-constraints, and
   "Tuning knobs" lines.
 
-## Baseline (current values, 200-seed sweeps)
+## Current measurements (D1-A broadside curve, 200-seed sweeps, 2026-08-02)
+
+Re-measured under the D1-A broadside-arc accuracy curve with all applied
+slice values in place (no mission value changed for this re-sweep). The
+"legacy" figures in each Notes cell are the post-slice numbers under the
+old bow-on curve, kept for comparability; the pre-slice baselines and the
+apply-time derivation record live in the mission sections below.
 
 | Mission | Canonical win rate | Loss reasons observed | Passive wipes | Notes |
 | --- | --- | --- | --- | --- |
-| 03 | 67.0% | timeout only | 0 / 200 | Passive fleets never lose meaningfully more than one ship's worth of hull (max recorded fleet damage fraction 0.50). Pre-slice baseline; the applied slice's re-derivation sweep confirmed the proposal exactly: canonical 163/200 (81.5%), average win turn 10.0, loss mix timeout 34 + sunk 3, passive wipes 71/200 with 199/200 passive runs losing at least one ship. |
-| 04 | 33.5% (boarding), 16.5% (gunnery) | timeout, sunk, flanked | 86 / 200 | The only mission where enemies already finish fights — and it overshot into frustration. Pre-slice baseline; the applied slice's re-derivation sweep confirmed the proposal exactly: canonical boarding 110/200 (55.0%), gunnery unchanged at 16.5%, passive wipes unchanged at 86/200. |
-| 05 | 44.0% | timeout only | 0 / 200 | Canonical runs take 6% average fleet damage — enemy guns effectively never bear. Pre-slice baseline; the applied slice's re-derivation sweep confirmed every proposal number that gates a design target (canonical 106/200 (53.0%), average win turn 8.52, passive runs losing a ship 197/200 at 1.3 of 3 ships, passive fleet damage 33% → 59%, and both rejected-alternative probes: 42% at 200/180, 52% at flagship HP 1.0) and corrected one that gates nothing (the pre-slice passive runs-losing-a-ship count is 106/200, not the "one-third" drafted — see the spawn row). Post-slice: canonical loss mix still timeout only, passive wipes still 0/200 — the weakest of the three closures. |
-| 06 | 72.0% (swat-mid), 8.0% (boss-only) | timeout only | 0 / 200 | Passive fleets take 65% average damage but are never wiped in 14 turns. Pre-slice baseline; the applied slice's re-derivation sweep confirmed every proposal number that gates a design target (canonical 143/200 (71.5%), average win turn 7.93, `noShipLost` kept in 128/143 wins, passive wipes 12/200 with average 1.89 of 3 ships lost) and corrected one that gates nothing (the baseline count of canonical runs losing at least one ship is 35/200, not the ~17 drafted — see the boss-damage row). Post-slice canonical loss mix: timeout 57, sunk 0 — unlike mission 03, the retune adds enemy lethality to sloppy play without letting the boss finish a competent siege. |
+| 03 | 80.0% (160/200) | timeout 37, sunk 3 | 75 / 200 | Average win turn 9.91 (histogram 8:9, 9:55, 10:53, 11:28, 12:15); ≤9 turn bonus hit in 64/160 wins (40%), matching the one-third stretch target. Passive: 200/200 runs lose at least one ship (average 1.38 of 2), average passive fleet damage 85%. Nearly unchanged from legacy (81.5%, timeout 34 + sunk 3, wipes 71/200) — the mission 03 geometry survives the curve inversion, and passive wipes actually rose. |
+| 04 | 46.0% (boarding, 92/200), 15.5% (gunnery, 31/200) | boarding: timeout 90, sunk 18; passive adds flanked | 69 / 200 | Boarding wins average turn 7.04; every boarding win lands a successful boarding and keeps `noShipLost`. Legacy: 55.0% / 16.5%, wipes 86/200. The boarding win rate fell 9 points below design target 1's 55% floor — see the D1-A deviations note below. |
+| 05 | 43.5% (87/200) | timeout only (113) | 0 / 200 | Average win turn 8.61; `sankFlagshipFirst` in all 87 wins; ≤9 bonus in 79/87 (91%, still near-automatic). Passive: 198/200 runs lose at least one ship (average 1.23 of 3), average passive fleet damage 57%, wipes still 0/200 with a timeout-only loss mix — the known residual is unchanged in kind. Legacy: 53.0%, 197/200 passive losing a ship, 59% passive damage. Fell 11.5 points below the 55% floor — see the D1-A deviations note below. |
+| 06 | 53.0% (swat-mid, 106/200), 2.0% (boss-only, 4/200) | timeout only (94) | 8 / 200 | Average win turn 9.08; `noShipLost` kept in 85/106 wins; canonical runs losing at least one ship 97/200. Passive: average 1.78 of 3 ships lost, average passive fleet damage 75%, loss mix timeout 192 + sunk 8. Legacy: 71.5% / 8.0%, wipes 12/200, `noShipLost` in 128/143. The largest D1-A shift in the arc (−18.5 points) — see the D1-A deviations note below. |
+
+**D1-A deviations (open knob, measured 2026-08-02, no values changed
+here):** under the broadside-arc curve the canonical scripted strategies —
+which advance and fire along the approach line, i.e. mostly bow-on —
+lose accuracy by construction, so missions 04 (46.0%), 05 (43.5%) and 06
+(53.0%) now sit below design target 1's 55% floor while mission 03
+(80.0%) holds. Two readings are possible and deciding between them is a
+design call, not a sweep artifact: (a) the canonical scripts understate
+real play more than before, because a real player can now turn to
+present a beam and claw the lost accuracy back — the very behavior D1-A
+exists to teach — so the floor should be judged against beam-aware
+scripts; or (b) the missions genuinely got harder and want a value
+retune. Any retune is a new rollout slice with its own apply-time
+re-derivation; nothing in this re-sweep changes an applied value.
 
 ## Mission 03 "Raking Shot" (`src/sim/mission03.ts`)
 
