@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: ships
+  m_EditorClassIdentifier: 
+  m_GroupName: ships
+  m_Data:
+    m_SerializedData: []
+  m_GUID: 7eb91e3b794a7e4438f5a6ba221bbc9d
+  m_SerializeEntries:
+  - m_GUID: 2ee23bdac87daa248bceac5e65627c77
+    m_Address: ships/shp-sloop--crimson
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 75a40a6c5cfb8d640a980d102dba41c7
+    m_Address: ships/shp-capital--crimson
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7669f5ceea56d704e8645d18a4e661d9
+    m_Address: ships/shp-clipper--crimson
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7a5a7ab7dfec5d94e8115b07b2b2780e
+    m_Address: ships/shp-capital--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 82b82967202623d4c820cbe4b108a5ad
+    m_Address: ships/shp-sloop--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a4730b01e3d977549a58f3b35221d8bd
+    m_Address: ships/shp-brig--crimson
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: adf67298c255c814b8a31ec3e1bb95f8
+    m_Address: ships/shp-frigate--crimson
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ca0f789be1e69fb40a9bb16d06682a8d
+    m_Address: ships/shp-brig--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e767736863659e64db509ecc0c007f5b
+    m_Address: ships/shp-frigate--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fb52c44fd6a34e84cbd19c5a47e38442
+    m_Address: ships/shp-clipper--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: f516daebd7d910b49b46a741fe2bbc80, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 092cf174f223d4e4a967c30c2d6408f5, type: 2}
+    - {fileID: 11400000, guid: ef4f1852e21f4664880ea494346d659a, type: 2}
