@@ -1,7 +1,8 @@
 # Art Direction & Art-Readiness Spec
 
-> **Status: Draft — D1 and D2 decided by @Jeduardo622 on 2026-07-28;
-> D3 open pending the W5 evidence brief.** Authored following the
+> **Status: Draft — all three W0 decisions made (D1/D2 2026-07-28,
+> D3 2026-08-01); graduates to Reviewed when the URP conversion slice
+> and Deliverable 4 land.** Authored following the
 > `docs/design/spectator-tuning.md` precedent (spec drafted alongside the
 > work, reviewed via PR merge; base content merged via PR #79).
 > **D1 firing arcs → option A**: rebalance the sim to reward broadsides
@@ -249,7 +250,7 @@ remains the accessibility fallback.
 | --- | --- | --- | --- | --- |
 | D1 | Firing arcs: reconcile engine accuracy vs GDD broadsides | A rebalance sim / B document divergence / C staged opt-in modifier | C | **DECIDED: A** — @Jeduardo622, 2026-07-28 (rebalance chosen over the recommendation; blast radius accepted) |
 | D2 | Platform target for art specs | A desktop-first + portability constraints / B mobile-first rebuild | A | **DECIDED: B** — @Jeduardo622, 2026-07-28 (mobile-first per GDD chosen over the recommendation) |
-| D3 | Render pipeline | URP vs built-in (evidence lands with W5 slice) | URP (provisional) | **OPEN — human, after W5 brief** |
+| D3 | Render pipeline | URP vs built-in — evidence in `docs/design/render-pipeline.md` | URP, converted now | **DECIDED: URP** — @Jeduardo622, 2026-08-01 (conversion is the next slice) |
 
 Decisions already taken inside this spec (reversible, engineering-level,
 no shipped-behaviour change): heading gets a bow cue + silhouette
