@@ -25,17 +25,23 @@
 > under, kept verbatim as history; the table below is the measurement
 > of record for current play.
 
-Motivation (tracked as an open design knob since the mission arc shipped):
-in missions 03, 05, and 06 the enemy never ended a mission across the
-baseline 200-seed sweeps below — every observed loss is a timeout, and no
-passive run was ever wiped. (All three are now addressed by their applied
-slices below, but to three different depths. Mission 03 is fully closed:
-3 canonical losses to sinking **and** 71/200 passive wipes. Mission 06's
-closure is passive-only — 12/200 passive wipes, with its canonical loss
-mix still timeout-only, since a competent siege kills the boss before its
-output compounds. Mission 05 is closed only in part: passive fleets now
-lose at least one ship in 197/200 runs, up from 106/200, but **no passive
-run is wiped and the loss mix stays timeout-only**, because pushing the
+Motivation (tracked as an open design knob since the mission arc
+shipped; **this paragraph, like the mission sections, is the
+legacy-curve apply-time record** — every count in it was measured under
+the old bow-on curve, and the D1-A figures live in the Current
+measurements table below): in missions 03, 05, and 06 the enemy never
+ended a mission across the arc's original pre-slice 200-seed sweeps —
+every observed loss was a timeout, and no passive run was ever wiped.
+(All three were then addressed by their applied slices, but to three
+different depths, measured at apply time under the legacy curve.
+Mission 03 was fully closed: 3 canonical losses to sinking **and**
+71/200 passive wipes (75/200 under D1-A). Mission 06's closure was
+passive-only — 12/200 passive wipes (8/200 under D1-A), with its
+canonical loss mix still timeout-only, since a competent siege kills
+the boss before its output compounds. Mission 05 was closed only in
+part: passive fleets lose at least one ship in 197/200 runs (198/200
+under D1-A), up from 106/200, but **no passive run is wiped and the
+loss mix stays timeout-only** under either curve, because pushing the
 line close enough to wipe costs more canonical win rate than design
 target 1 allows. Mission 05's remaining gap is the named `rangeFalloff`
 engine follow-up, not a mission value.)
