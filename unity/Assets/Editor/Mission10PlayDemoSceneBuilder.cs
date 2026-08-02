@@ -121,6 +121,7 @@ public static class Mission10PlayDemoSceneBuilder
         // A freely-manoeuvring player leaves the authored opening frame, so
         // the renderer re-frames this camera every tick.
         SetReference(spectator, "followCamera", camera);
+        ShipViewProviderWiring.Attach(spectator);
 
         // On-screen playback controls (D2-B touch controls): pause/step/speed
         // buttons calling the same renderer API as the keyboard bindings.

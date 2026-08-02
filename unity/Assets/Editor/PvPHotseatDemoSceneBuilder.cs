@@ -114,6 +114,7 @@ public static class PvPHotseatDemoSceneBuilder
         // Moving fleets must stay in view: the renderer re-frames this
         // camera every tick, never zooming tighter than the authored 8.5.
         SetReference(spectator, "followCamera", camera);
+        ShipViewProviderWiring.Attach(spectator);
 
         // On-screen playback controls (D2-B touch controls): pause/step/speed
         // buttons calling the same renderer API as the keyboard bindings.
