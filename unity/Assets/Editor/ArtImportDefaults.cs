@@ -30,6 +30,26 @@ public sealed class ArtImportDefaults : AssetPostprocessor
 
         importer.textureCompression = TextureImporterCompression.Compressed;
 
+        // Platform overrides take precedence over the default block, so an
+        // Android/iPhone override left at 4096/uncompressed would bypass the
+        // floor (Codex P2 on the W6 PR): clamp the mobile overrides too.
+        foreach (var platform in new[] { "Android", "iPhone" })
+        {
+            var settings = importer.GetPlatformTextureSettings(platform);
+            if (!settings.overridden)
+            {
+                continue;
+            }
+
+            if (settings.maxTextureSize > MaxTextureSize)
+            {
+                settings.maxTextureSize = MaxTextureSize;
+            }
+
+            settings.textureCompression = TextureImporterCompression.Compressed;
+            importer.SetPlatformTextureSettings(settings);
+        }
+
         if (assetPath.StartsWith(UiRoot))
         {
             importer.textureType = TextureImporterType.Sprite;
