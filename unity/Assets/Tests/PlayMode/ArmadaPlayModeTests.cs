@@ -2843,5 +2843,261 @@ namespace Armada.Client.Tests.PlayMode
                 UnityEngine.Object.Destroy(gameObject);
             }
         }
+
+        [Test]
+        public void ShipClassCatalog_MapsTheMissionVocabulary()
+        {
+            // The wire SimShip has no class field; the catalog derives class
+            // from the stable mission/PvP id vocabulary and must default —
+            // never fail — for anything it does not recognize.
+            ShipClass Classify(string id) =>
+                ShipClassCatalog.Classify(new SimShip { Id = id, Side = "enemy" });
+
+            Assert.That(Classify("enemy-frigate-a"), Is.EqualTo(ShipClass.Frigate));
+            Assert.That(Classify("alpha-frigate-b"), Is.EqualTo(ShipClass.Frigate));
+            Assert.That(Classify("enemy-escort-a"), Is.EqualTo(ShipClass.Frigate));
+            Assert.That(Classify("enemy-clipper-a"), Is.EqualTo(ShipClass.Clipper));
+            Assert.That(Classify("enemy-brig-b"), Is.EqualTo(ShipClass.Brig));
+            Assert.That(Classify("enemy-flagship"), Is.EqualTo(ShipClass.Capital));
+            Assert.That(Classify("enemy-dreadnought"), Is.EqualTo(ShipClass.Capital));
+            Assert.That(Classify("enemy-reinforcement"), Is.EqualTo(ShipClass.Capital));
+            Assert.That(Classify("player-sloop-a"), Is.EqualTo(ShipClass.Sloop));
+            Assert.That(Classify("enemy-aggressor"), Is.EqualTo(ShipClass.Sloop));
+            Assert.That(Classify("enemy-corvette-a"), Is.EqualTo(ShipClass.Sloop));
+            Assert.That(Classify("something-unmapped"), Is.EqualTo(ShipClass.Sloop));
+
+            Assert.That(
+                ShipClassCatalog.LiveryFor(new SimShip { Id = "x", Side = "player" }),
+                Is.EqualTo(ShipLivery.Aurorian));
+            Assert.That(
+                ShipClassCatalog.LiveryFor(new SimShip { Id = "x", Side = "enemy" }),
+                Is.EqualTo(ShipLivery.Crimson));
+
+            Assert.That(
+                ShipClassCatalog.ScaleFor(new SimShip { Id = "enemy-reinforcement", Side = "enemy" }),
+                Is.EqualTo(ShipClassCatalog.ReinforcementScale));
+            Assert.That(
+                ShipClassCatalog.ScaleFor(new SimShip { Id = "enemy-flagship", Side = "enemy" }),
+                Is.EqualTo(1f));
+        }
+
+#if UNITY_EDITOR
+        // Class × livery prefab paths, mirrored from ShipViewProviderWiring
+        // (editor assembly, unreachable from tests) — a rename there fails
+        // these tests loudly instead of silently un-wiring scenes.
+        private static readonly (string field, string path)[] GreyboxSlots =
+        {
+            ("sloopAurorian", "Assets/Art/Ships/Sloop/shp-sloop--aurorian.prefab"),
+            ("sloopCrimson", "Assets/Art/Ships/Sloop/shp-sloop--crimson.prefab"),
+            ("frigateAurorian", "Assets/Art/Ships/Frigate/shp-frigate--aurorian.prefab"),
+            ("frigateCrimson", "Assets/Art/Ships/Frigate/shp-frigate--crimson.prefab"),
+            ("clipperAurorian", "Assets/Art/Ships/Clipper/shp-clipper--aurorian.prefab"),
+            ("clipperCrimson", "Assets/Art/Ships/Clipper/shp-clipper--crimson.prefab"),
+            ("brigAurorian", "Assets/Art/Ships/Brig/shp-brig--aurorian.prefab"),
+            ("brigCrimson", "Assets/Art/Ships/Brig/shp-brig--crimson.prefab"),
+            ("capitalAurorian", "Assets/Art/Ships/Capital/shp-capital--aurorian.prefab"),
+            ("capitalCrimson", "Assets/Art/Ships/Capital/shp-capital--crimson.prefab")
+        };
+
+        private static Armada.Client.Playback.ShipView LoadShipPrefab(string path)
+        {
+            return UnityEditor.AssetDatabase.LoadAssetAtPath<Armada.Client.Playback.ShipView>(path);
+        }
+
+        private static PrefabShipViewProvider AddWiredPrefabProvider(GameObject host)
+        {
+            var provider = host.AddComponent<PrefabShipViewProvider>();
+            var serialized = new UnityEditor.SerializedObject(provider);
+            foreach (var (field, path) in GreyboxSlots)
+            {
+                var prefab = LoadShipPrefab(path);
+                Assert.That(prefab, Is.Not.Null, $"greybox prefab missing: {path}");
+                serialized.FindProperty(field).objectReferenceValue = prefab;
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            return provider;
+        }
+
+        [Test]
+        public void GreyboxPrefabs_HonorTheShipViewContract()
+        {
+            foreach (var (field, path) in GreyboxSlots)
+            {
+                var prefab = LoadShipPrefab(path);
+                Assert.That(prefab, Is.Not.Null, $"greybox prefab missing: {path}");
+
+                // Tint/accent split: hull is the tint surface, the rig the
+                // accent, and the trim renderer stays outside the contract so
+                // its authored livery survives runtime recoloring.
+                Assert.That(prefab.TintRenderer, Is.Not.Null, field);
+                Assert.That(prefab.TintRenderer.gameObject.name, Is.EqualTo("hull"), field);
+                Assert.That(prefab.transform.Find("rig"), Is.Not.Null, field);
+                Assert.That(prefab.transform.Find("trim"), Is.Not.Null, field);
+
+                // Honest TopClearance: the masthead, well above a bare hull.
+                Assert.That(prefab.TopClearance, Is.GreaterThan(0.5f), field);
+                Assert.That(prefab.TopClearance, Is.LessThan(2.5f), field);
+
+                // Directional silhouette: the hull tapers to a point on
+                // local +z (the bow) — nothing wide lives at the bow tip.
+                var hullMesh = prefab.TintRenderer.GetComponent<MeshFilter>().sharedMesh;
+                var maxZ = float.MinValue;
+                foreach (var vertex in hullMesh.vertices)
+                {
+                    maxZ = Mathf.Max(maxZ, vertex.z);
+                }
+
+                foreach (var vertex in hullMesh.vertices)
+                {
+                    if (vertex.z > maxZ - 0.01f)
+                    {
+                        Assert.That(Mathf.Abs(vertex.x), Is.LessThan(0.02f),
+                            $"{field}: bow tip must be a point, found width at z={vertex.z}");
+                    }
+                }
+            }
+
+            // Liveries are distinct where the contract allows: the authored
+            // trim material differs between factions.
+            var aurorian = LoadShipPrefab(GreyboxSlots[0].path);
+            var crimson = LoadShipPrefab(GreyboxSlots[1].path);
+            var aurorianTrim = aurorian.transform.Find("trim").GetComponent<Renderer>().sharedMaterial;
+            var crimsonTrim = crimson.transform.Find("trim").GetComponent<Renderer>().sharedMaterial;
+            Assert.That(aurorianTrim.color, Is.Not.EqualTo(crimsonTrim.color));
+
+            // Class scale ordering (art-needs §2): capital dwarfs frigate,
+            // frigate outsizes the sloop.
+            float HullLength(int slot)
+            {
+                var view = LoadShipPrefab(GreyboxSlots[slot].path);
+                return view.TintRenderer.GetComponent<MeshFilter>().sharedMesh.bounds.size.z;
+            }
+
+            Assert.That(HullLength(8), Is.GreaterThan(HullLength(2)));
+            Assert.That(HullLength(2), Is.GreaterThan(HullLength(0)));
+        }
+
+        [UnityTest]
+        public IEnumerator PrefabShipViewProvider_SpawnsClassLiveryPrefabsWithDerivedBars()
+        {
+            var gameObject = new GameObject("prefab-provider-test");
+            gameObject.SetActive(false);
+            try
+            {
+                AddWiredPrefabProvider(gameObject);
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 },
+                        new SimShip { Id = "enemy-clipper-a", Side = "enemy", Position = new SimVector2 { X = 100, Y = 0 }, Heading = 180, Speed = 3, Hp = 140, Sail = 110, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>(),
+                    turnLimit: 1,
+                    introLine: "prefab provider test",
+                    completionLine: "done");
+
+                var player = spectator.transform.Find("marker-player-sloop-a");
+                var enemy = spectator.transform.Find("marker-enemy-clipper-a");
+                Assert.That(player, Is.Not.Null);
+                Assert.That(enemy, Is.Not.Null);
+
+                // Prefab views, not primitives: the greybox rig is present
+                // and there is no primitive bow cue.
+                Assert.That(player.Find("rig"), Is.Not.Null);
+                Assert.That(player.Find("bow-cue"), Is.Null);
+
+                // The renderer still owns rotation: yaw = 90 − heading.
+                Assert.That(player.rotation.eulerAngles.y, Is.EqualTo(90f).Within(0.01f));
+                Assert.That(enemy.rotation.eulerAngles.y, Is.EqualTo(270f).Within(0.01f));
+
+                // The enemy clipper carries the Crimson trim material.
+                var trim = enemy.Find("trim").GetComponent<Renderer>().sharedMaterial;
+                var crimsonTrim = LoadShipPrefab(GreyboxSlots[5].path)
+                    .transform.Find("trim").GetComponent<Renderer>().sharedMaterial;
+                Assert.That(trim, Is.EqualTo(crimsonTrim));
+
+                // Bars derive from each prefab's honest TopClearance:
+                // markerHeight 0.5 + clearance + barClearance 0.4.
+                var sloopClearance = LoadShipPrefab(GreyboxSlots[0].path).TopClearance;
+                var clipperClearance = LoadShipPrefab(GreyboxSlots[5].path).TopClearance;
+                Assert.That(
+                    spectator.transform.Find("hull-bar-player-sloop-a").position.y,
+                    Is.EqualTo(0.5f + sloopClearance + 0.4f).Within(0.001f));
+                Assert.That(
+                    spectator.transform.Find("hull-bar-enemy-clipper-a").position.y,
+                    Is.EqualTo(0.5f + clipperClearance + 0.4f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+
+            yield break;
+        }
+
+        [UnityTest]
+        public IEnumerator PrefabShipViewProvider_FallsBackToPrimitivesWhenSlotsAreEmpty()
+        {
+            // A partially-arted project must always render: an unwired
+            // provider behaves exactly like the primitive default.
+            var gameObject = new GameObject("prefab-provider-fallback-test");
+            gameObject.SetActive(false);
+            try
+            {
+                gameObject.AddComponent<PrefabShipViewProvider>();
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>(),
+                    turnLimit: 1,
+                    introLine: "fallback test",
+                    completionLine: "done");
+
+                var marker = spectator.transform.Find("marker-player-sloop-a");
+                Assert.That(marker, Is.Not.Null);
+                Assert.That(marker.Find("bow-cue"), Is.Not.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+
+            yield break;
+        }
+
+        [Test]
+        public void PrefabShipViewProvider_ScalesTheReinforcementVariant()
+        {
+            // The m06 reinforcement renders the capital model at hull length
+            // 1.2 instead of 2.2, with TopClearance scaled to match so the
+            // readout bars stay anchored to the real masthead.
+            var gameObject = new GameObject("prefab-provider-scale-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var provider = AddWiredPrefabProvider(gameObject);
+                var capitalClearance = LoadShipPrefab(GreyboxSlots[9].path).TopClearance;
+                var view = provider.CreateShipView(
+                    new SimShip { Id = "enemy-reinforcement", Side = "enemy" },
+                    gameObject.transform);
+
+                Assert.That(
+                    view.transform.localScale.x,
+                    Is.EqualTo(ShipClassCatalog.ReinforcementScale).Within(0.001f));
+                Assert.That(
+                    view.TopClearance,
+                    Is.EqualTo(capitalClearance * ShipClassCatalog.ReinforcementScale).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+#endif
     }
 }

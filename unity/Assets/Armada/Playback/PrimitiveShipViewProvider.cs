@@ -20,6 +20,16 @@ namespace Armada.Client.Playback
 
         public override ShipView CreateShipView(SimShip ship, Transform parent)
         {
+            return BuildPrimitiveView(ship, parent);
+        }
+
+        /// <summary>
+        /// The primitive build, callable without a component instance so
+        /// prefab-backed providers can fall back to it per ship when a class
+        /// has no prefab wired yet (art-needs.md §1).
+        /// </summary>
+        internal static ShipView BuildPrimitiveView(SimShip ship, Transform parent)
+        {
             var isPlayer = ship.Side == "player";
             var body = GameObject.CreatePrimitive(isPlayer ? PrimitiveType.Cube : PrimitiveType.Capsule);
             body.name = $"marker-{ship.Id}";
