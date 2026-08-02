@@ -1,9 +1,14 @@
 # Render Pipeline Decision Brief (W5 / Decision D3)
 
-> **Status: DECIDED — URP, converted now** (@Jeduardo622, 2026-08-01,
-> in-session on this brief's recommendation). The conversion is the next
-> implementation slice, bounded per §3/§6. This brief also fixes the
-> Addressables policy and makes the perf budgets measurable.
+> **Status: decision made, RE-AFFIRMATION PENDING.** @Jeduardo622 chose
+> URP on 2026-08-01 against this brief's first revision, which
+> overstated one plank of the case (the Shader Graph point below, caught
+> in Codex review). The corrected brief stands for re-affirmation; the
+> conversion is the next implementation slice — a **Class C** change
+> (graphics settings are runtime configuration), presented for explicit
+> approval with route-task classification before any edit, per §3/§6.
+> This brief also fixes the Addressables policy and makes the perf
+> budgets measurable.
 
 ## 1. The choice
 
@@ -13,10 +18,14 @@ Built-in render pipeline (current) vs **URP 14** (available for Unity
 ## 2. Evidence
 
 **For URP:**
-- The GDD's painterly water (pp. 16–17: hand-painted wave strokes,
-  whitecaps, "artistic impression over photorealism") realistically
-  means Shader Graph, which is SRP-only. On built-in it means
-  hand-written HLSL — a specialist cost this team does not have.
+- The GDD's painterly water (pp. 16–17) realistically means Shader
+  Graph. **Correction from review:** Shader Graph 14 also has a
+  Built-In target, so built-in does not force hand-written HLSL — the
+  first revision's claim was wrong. The honest version: the Built-In
+  target is the less exercised path (fewer nodes guaranteed, less
+  community material to lean on), and Unity's investment is in the SRP
+  targets, so URP remains where the water work is best supported —
+  a lean, not a binary.
 - Mobile 30 fps mid-tier (D2-B): the SRP batcher and URP's
   mobile-tuned lighting are the modern path to the
   `docs/perf-budgets.md` draw-call budget; built-in receives no new
@@ -46,12 +55,16 @@ Built-in render pipeline (current) vs **URP 14** (available for Unity
 
 ## 3. Recommendation
 
-**URP, converted now, in one bounded Class B slice** (pipeline asset +
-renderer asset + graphics settings + shader swap in the code-created
-materials + scene regeneration + both harnesses re-baselined with
-determinism re-verified). Deciding built-in now means either giving up
-the GDD's water or paying the conversion after art lands, when it is
-strictly more expensive.
+**URP, converted now, in one bounded slice — Class C** (graphics
+settings are runtime configuration; the slice is presented for explicit
+human approval with its route-task classification, minimal diff,
+focused tests, rollback, and named risk before any edit — the
+orientation-lock precedent). Scope: pipeline asset + renderer asset +
+graphics settings + shader swap in the code-created materials + scene
+regeneration + both harnesses re-baselined with determinism
+re-verified. Staying on built-in remains workable for the water via
+Shader Graph's Built-In target; the case for converting is support
+maturity plus the uniquely cheap pre-art window, not necessity.
 
 ## 4. Addressables policy (fixed by this brief)
 
@@ -60,8 +73,12 @@ strictly more expensive.
 - **Art flows through Addressables**: ship-view prefabs, effect
   prefabs, UI skin atlases, and audio banks get Addressables groups
   (naming: `ships/`, `effects/`, `ui/`, `audio/` — W6 owns the full
-  convention), enabling the GDD p. 24 remote-content path without app
-  updates.
+  convention). **Scope honesty (from review):** grouping alone is local
+  packing. The GDD p. 24 remote-content path additionally needs
+  `AddressableAssetsData` (none exists yet — `AddressablesProfileSetup`
+  only creates profile variables/labels), a remote catalog with
+  `BuildRemoteCatalog`, and hosting — deployment-adjacent work that is
+  its own Class C follow-up, not implied by this policy.
 - **Scenes and code-created placeholder materials stay direct**: the
   generated scenes reference by path today and nothing pre-art needs
   remote delivery. The first Addressables consumer is the first
@@ -83,6 +100,15 @@ budgets stop being aspirational):
 - **< 800 MB runtime**: same device gate.
 - **Texture budgets**: enforced by W6 import presets at import time,
   not at runtime.
+- **Cold start < 12 s / mission load < 6 s**: device-matrix gates with
+  the fps/memory measurements — a stopwatch script in the first
+  on-device build checklist (off-machine per the arc boundary).
+- **Network payloads < 200 KB per mission start/end**: measurable
+  headless today — a backend test asserting response byte sizes for the
+  mission start/resolve/complete routes is the named follow-up (harness
+  scope, so it rides a separately classified slice).
+- **Weekly device-matrix QA runs**: a process gate, recorded in the
+  on-device build checklist rather than this repo's harness.
 
 ## 6. Rollback
 
