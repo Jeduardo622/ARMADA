@@ -1,9 +1,9 @@
 # Render Pipeline Decision Brief (W5 / Decision D3)
 
-> **Status: Presented — awaiting the D3 human decision**
-> (docs/design/art-direction.md §3.4). This brief is the evidence the
-> decision was deferred for. It also fixes the Addressables policy and
-> makes the perf budgets measurable.
+> **Status: DECIDED — URP, converted now** (@Jeduardo622, 2026-08-01,
+> in-session on this brief's recommendation). The conversion is the next
+> implementation slice, bounded per §3/§6. This brief also fixes the
+> Addressables policy and makes the perf budgets measurable.
 
 ## 1. The choice
 
