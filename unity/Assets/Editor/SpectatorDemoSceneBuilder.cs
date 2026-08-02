@@ -153,7 +153,7 @@ public static class SpectatorDemoSceneBuilder
         var material = AssetDatabase.LoadAssetAtPath<Material>(BoardMaterialPath);
         if (material == null)
         {
-            material = new Material(Shader.Find("Standard"))
+            material = new Material(Shader.Find("Universal Render Pipeline/Lit"))
             {
                 // Placeholder sea color pending art direction.
                 color = new Color(0.07f, 0.22f, 0.36f)

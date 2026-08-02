@@ -78,6 +78,9 @@ public static class SpectatorVisualCapture
         public string Mode { get; set; }
         public int TotalTicks { get; set; }
         public List<string> Frames { get; set; } = new List<string>();
+        // Per-frame rendering stats (brief §5): "frame:batches=N,setpass=M".
+        // The diff runner flags draw-call budget breaches from these.
+        public List<string> FrameStats { get; set; } = new List<string>();
     }
 
     [MenuItem("Assets/Armada/Capture Spectator Visual Frames")]
@@ -238,7 +241,7 @@ public static class SpectatorVisualCapture
         board.name = "Board";
         board.transform.position = new Vector3(11f, -0.55f, 0f);
         board.transform.localScale = new Vector3(140f, 1f, 120f);
-        board.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard"))
+        board.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"))
         {
             color = BoardColor
         };
@@ -288,6 +291,8 @@ public static class SpectatorVisualCapture
         var fileName = $"{name}.png";
         File.WriteAllBytes(Path.Combine(outDir, fileName), png);
         manifest.Frames.Add(fileName);
+        manifest.FrameStats.Add(
+            $"{name}:batches={UnityEditor.UnityStats.batches},setpass={UnityEditor.UnityStats.setPassCalls}");
     }
 
     private static void Fail(string reason)

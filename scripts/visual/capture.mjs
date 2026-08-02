@@ -245,13 +245,24 @@ writeContactSheet(outDir, manifest);
 
 if (args.mode === 'sequence') {
   // Sequence output is for human review only; no baselines, no diff.
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
+}
+
+// Draw-call budget gate (docs/perf-budgets.md: < 1.5k mid-fight); stats
+// come from the capture manifest's per-frame rendering statistics.
+const stats = manifest.FrameStats ?? manifest.frameStats ?? [];
+for (const line of stats) {
+  const match = /batches=(\d+)/.exec(line);
+  if (match && Number(match[1]) > 1500) {
+    console.error(`[visual-capture] draw-call budget breach: ${line}`);
+    process.exitCode = 1;
+  }
 }
 
 const { clean, baselineDir } = diffAgainstBaselines(args, outDir, manifest);
 if (args.update) {
   updateBaselines(outDir, manifest, baselineDir);
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }
 if (!clean) {
   console.error('[visual-capture] visual regression detected (or baselines missing); ');
