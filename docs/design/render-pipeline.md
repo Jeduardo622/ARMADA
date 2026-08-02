@@ -1,10 +1,10 @@
 # Render Pipeline Decision Brief (W5 / Decision D3)
 
-> **Status: decision made, RE-AFFIRMATION PENDING.** @Jeduardo622 chose
-> URP on 2026-08-01 against this brief's first revision, which
-> overstated one plank of the case (the Shader Graph point below, caught
-> in Codex review). The corrected brief stands for re-affirmation; the
-> conversion is the next implementation slice — a **Class C** change
+> **Status: DECIDED — URP, converted now.** @Jeduardo622 chose URP on
+> 2026-08-01 and **re-affirmed the choice the same day against this
+> corrected revision** (the first revision overstated the Shader Graph
+> point; caught in Codex review, corrected below, decision re-asked).
+> The conversion is the next implementation slice — a **Class C** change
 > (graphics settings are runtime configuration), presented for explicit
 > approval with route-task classification before any edit, per §3/§6.
 > This brief also fixes the Addressables policy and makes the perf
