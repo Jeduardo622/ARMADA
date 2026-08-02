@@ -2,63 +2,54 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildServer } from '../src/app.js';
 import {
   MISSION_01_CODE,
-  MISSION_01_DEFAULT_SEED,
   MISSION_01_ENEMY_SHIP_ID,
   MISSION_01_PLAYER_SHIP_ID,
   MISSION_01_TURN_LIMIT
 } from '../src/sim/mission01.js';
 import {
   MISSION_02_CODE,
-  MISSION_02_DEFAULT_SEED,
   MISSION_02_ENEMY_SHIP_IDS,
   MISSION_02_PLAYER_SHIP_IDS,
   MISSION_02_TURN_LIMIT
 } from '../src/sim/mission02.js';
 import {
   MISSION_03_CODE,
-  MISSION_03_DEFAULT_SEED,
   MISSION_03_ENEMY_SHIP_IDS,
   MISSION_03_PLAYER_SHIP_IDS,
   MISSION_03_TURN_LIMIT
 } from '../src/sim/mission03.js';
 import {
   MISSION_04_CODE,
-  MISSION_04_DEFAULT_SEED,
   MISSION_04_ENEMY_SHIP_IDS,
   MISSION_04_PLAYER_SHIP_IDS,
   MISSION_04_TURN_LIMIT
 } from '../src/sim/mission04.js';
 import {
   MISSION_05_CODE,
-  MISSION_05_DEFAULT_SEED,
   MISSION_05_ENEMY_SHIP_IDS,
   MISSION_05_PLAYER_SHIP_IDS,
   MISSION_05_TURN_LIMIT
 } from '../src/sim/mission05.js';
 import {
   MISSION_06_CODE,
-  MISSION_06_DEFAULT_SEED,
   MISSION_06_ENEMY_SHIP_IDS,
   MISSION_06_PLAYER_SHIP_IDS,
   MISSION_06_TURN_LIMIT
 } from '../src/sim/mission06.js';
 import {
   MISSION_07_CODE,
-  MISSION_07_DEFAULT_SEED,
   MISSION_07_ENEMY_SHIP_IDS,
   MISSION_07_PLAYER_SHIP_IDS,
   MISSION_07_TURN_LIMIT
 } from '../src/sim/mission07.js';
 import {
   MISSION_08_CODE,
-  MISSION_08_DEFAULT_SEED,
   MISSION_08_ENEMY_SHIP_IDS,
   MISSION_08_PLAYER_SHIP_IDS,
   MISSION_08_TURN_LIMIT
 } from '../src/sim/mission08.js';
 import {
   MISSION_09_CODE,
-  MISSION_09_DEFAULT_SEED,
   MISSION_09_ENEMY_SHIP_IDS,
   MISSION_09_PLAYER_SHIP_IDS,
   MISSION_09_TURN_LIMIT
@@ -172,15 +163,18 @@ type MissionFixture = {
   turns: SimOrder[][];
 };
 
-// Every runtime mission, resolved with its deterministic default seed and a
-// full-length broadside barrage. Mission 10 additionally uses pure chain shot:
-// chain never sinks anything, so the run is guaranteed to span the entire
-// turn limit — the largest resolve payload the mission can serve (the same
-// timeout fixture tests/mission10.test.ts pins at seed 63).
+// Every runtime mission, resolved with a full-length broadside barrage and a
+// pinned worst-case seed: each seed is the argmax of the serialized resolve
+// payload size over seeds 0-511 for this exact order fixture (deterministic
+// sweep, re-runnable by looping `seed` in the resolve request below), so the
+// assertion covers the densest event stream the fixture can produce rather
+// than an arbitrary default seed. Mission 10 additionally uses pure chain
+// shot: chain never sinks anything, so the run always spans the entire turn
+// limit.
 const missionFixtures: MissionFixture[] = [
   {
     code: MISSION_01_CODE,
-    seed: MISSION_01_DEFAULT_SEED,
+    seed: 121,
     turns: fullBroadsideTurns(
       [MISSION_01_PLAYER_SHIP_ID],
       MISSION_01_ENEMY_SHIP_ID,
@@ -189,7 +183,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_02_CODE,
-    seed: MISSION_02_DEFAULT_SEED,
+    seed: 72,
     turns: fullBroadsideTurns(
       MISSION_02_PLAYER_SHIP_IDS,
       MISSION_02_ENEMY_SHIP_IDS[0],
@@ -198,7 +192,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_03_CODE,
-    seed: MISSION_03_DEFAULT_SEED,
+    seed: 363,
     turns: fullBroadsideTurns(
       MISSION_03_PLAYER_SHIP_IDS,
       MISSION_03_ENEMY_SHIP_IDS[0],
@@ -207,7 +201,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_04_CODE,
-    seed: MISSION_04_DEFAULT_SEED,
+    seed: 177,
     turns: fullBroadsideTurns(
       MISSION_04_PLAYER_SHIP_IDS,
       MISSION_04_ENEMY_SHIP_IDS[0],
@@ -216,7 +210,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_05_CODE,
-    seed: MISSION_05_DEFAULT_SEED,
+    seed: 195,
     turns: fullBroadsideTurns(
       MISSION_05_PLAYER_SHIP_IDS,
       MISSION_05_ENEMY_SHIP_IDS[0],
@@ -225,7 +219,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_06_CODE,
-    seed: MISSION_06_DEFAULT_SEED,
+    seed: 192,
     turns: fullBroadsideTurns(
       MISSION_06_PLAYER_SHIP_IDS,
       MISSION_06_ENEMY_SHIP_IDS[0],
@@ -234,7 +228,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_07_CODE,
-    seed: MISSION_07_DEFAULT_SEED,
+    seed: 453,
     turns: fullBroadsideTurns(
       MISSION_07_PLAYER_SHIP_IDS,
       MISSION_07_ENEMY_SHIP_IDS[0],
@@ -243,7 +237,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_08_CODE,
-    seed: MISSION_08_DEFAULT_SEED,
+    seed: 192,
     turns: fullBroadsideTurns(
       MISSION_08_PLAYER_SHIP_IDS,
       MISSION_08_ENEMY_SHIP_IDS[0],
@@ -252,7 +246,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_09_CODE,
-    seed: MISSION_09_DEFAULT_SEED,
+    seed: 192,
     turns: fullBroadsideTurns(
       MISSION_09_PLAYER_SHIP_IDS,
       MISSION_09_ENEMY_SHIP_IDS[0],
@@ -261,9 +255,7 @@ const missionFixtures: MissionFixture[] = [
   },
   {
     code: MISSION_10_CODE,
-    // tests/mission10.test.ts pins seed 63 pure chain as the full-turn-limit
-    // timeout run; reusing it here maximizes the number of turn records.
-    seed: 63,
+    seed: 121,
     turns: fullBroadsideTurns(
       MISSION_10_PLAYER_SHIP_IDS,
       MISSION_10_ENEMY_SHIP_IDS[0],
