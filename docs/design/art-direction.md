@@ -249,7 +249,7 @@ remains the accessibility fallback.
 | --- | --- | --- | --- | --- |
 | D1 | Firing arcs: reconcile engine accuracy vs GDD broadsides | A rebalance sim / B document divergence / C staged opt-in modifier | C | **DECIDED: A** — @Jeduardo622, 2026-07-28 (rebalance chosen over the recommendation; blast radius accepted) |
 | D2 | Platform target for art specs | A desktop-first + portability constraints / B mobile-first rebuild | A | **DECIDED: B** — @Jeduardo622, 2026-07-28 (mobile-first per GDD chosen over the recommendation) |
-| D3 | Render pipeline | URP vs built-in (evidence lands with W5 slice) | URP (provisional) | **OPEN — human, after W5 brief** |
+| D3 | Render pipeline | URP vs built-in — evidence in `docs/design/render-pipeline.md` | **URP, converted now** (the pre-art window is uniquely cheap) | **OPEN — human; brief delivered** |
 
 Decisions already taken inside this spec (reversible, engineering-level,
 no shipped-behaviour change): heading gets a bow cue + silhouette
