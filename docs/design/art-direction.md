@@ -1,8 +1,11 @@
 # Art Direction & Art-Readiness Spec
 
-> **Status: Draft — all three W0 decisions made (D1/D2 2026-07-28,
-> D3 2026-08-01); graduates to Reviewed when the URP conversion slice
-> and Deliverable 4 land.** Authored following the
+> **Status: Reviewed upon the human merge of the Deliverable-4 PR.**
+> All three W0 decisions are made and implemented (D1 rebalance PR #82,
+> D2 mobile-first PRs #83–#86, D3 URP conversion PR #93); the art-needs
+> handoff (`docs/design/art-needs.md`) completes the arc's deliverables.
+> Future changes follow the reviewed-spec rule: update the affected
+> section and this status in the same PR. Authored following the
 > `docs/design/spectator-tuning.md` precedent (spec drafted alongside the
 > work, reviewed via PR merge; base content merged via PR #79).
 > **D1 firing arcs → option A**: rebalance the sim to reward broadsides
@@ -263,6 +266,8 @@ gaps, not build work.
 - **W2** view abstraction: every "must render" row above becomes a
   binding point; bar clearance derives from view bounds (replaces the
   hardcoded 1.5 enemy-capsule top noted in `spectator-tuning.md`).
+- **Deliverable 4** (**applied**): `docs/design/art-needs.md` — the
+  prioritized per-asset handoff with the full technical contract.
 - **W3** camera/composition (**applied**): the wide opening is the honest
   all-ships deployment frame — the real fix is that the follow camera now
   tightens toward the living ships as the fight concentrates (floor 5,
