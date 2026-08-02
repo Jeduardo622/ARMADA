@@ -248,15 +248,25 @@ if (args.mode === 'sequence') {
   process.exit(process.exitCode ?? 0);
 }
 
-// Draw-call budget gate (docs/perf-budgets.md: < 1.5k mid-fight); stats
-// come from the capture manifest's per-frame rendering statistics.
+// Draw-call budget gate (docs/perf-budgets.md: < 1.5k mid-fight). The
+// stat is the capture's own frustum-culled visible-submesh count
+// (`draws=` — an upper bound on draw submissions; profiler counters do
+// not collect for offscreen batchmode renders, render-pipeline.md §5).
 const stats = manifest.FrameStats ?? manifest.frameStats ?? [];
 for (const line of stats) {
-  const match = /batches=(\d+)/.exec(line);
+  const match = /draws=(\d+)/.exec(line);
   if (match && Number(match[1]) > 1500) {
     console.error(`[visual-capture] draw-call budget breach: ${line}`);
     process.exitCode = 1;
   }
+}
+
+// The gate is only as honest as its source: all-zero (or absent) draws
+// on every frame means the stat source broke again and the budget is
+// silently unenforced — fail loudly instead.
+if (stats.length > 0 && !stats.some((line) => /draws=[1-9]/.test(line))) {
+  console.error('[visual-capture] FrameStats report no non-zero draws; the draw-call gate has no real source');
+  process.exitCode = 1;
 }
 
 const { clean, baselineDir } = diffAgainstBaselines(args, outDir, manifest);
