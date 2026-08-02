@@ -2939,21 +2939,24 @@ namespace Armada.Client.Tests.PlayMode
                 Assert.That(prefab.TopClearance, Is.GreaterThan(0.5f), field);
                 Assert.That(prefab.TopClearance, Is.LessThan(2.5f), field);
 
-                // Directional silhouette: the hull tapers to a point on
-                // local +z (the bow) — nothing wide lives at the bow tip.
+                // Directional silhouette: the geometry at the far +z end (the
+                // bow — or the brig's protruding ram) is much narrower than
+                // the beam, so heading reads from the top-down camera.
                 var hullMesh = prefab.TintRenderer.GetComponent<MeshFilter>().sharedMesh;
                 var maxZ = float.MinValue;
+                var beam = 0f;
                 foreach (var vertex in hullMesh.vertices)
                 {
                     maxZ = Mathf.Max(maxZ, vertex.z);
+                    beam = Mathf.Max(beam, Mathf.Abs(vertex.x));
                 }
 
                 foreach (var vertex in hullMesh.vertices)
                 {
                     if (vertex.z > maxZ - 0.01f)
                     {
-                        Assert.That(Mathf.Abs(vertex.x), Is.LessThan(0.02f),
-                            $"{field}: bow tip must be a point, found width at z={vertex.z}");
+                        Assert.That(Mathf.Abs(vertex.x), Is.LessThan(beam * 0.5f),
+                            $"{field}: bow end must be far narrower than the beam, found width at z={vertex.z}");
                     }
                 }
             }
