@@ -297,7 +297,10 @@ gaps, not build work.
   Remaining W4 slices: portrait-aspect panel restructure (the documented
   overlap interim), HUD wind/turn numeric forms.
 - **W5** pipeline + measurable perf budgets + Addressables policy.
-- **W6** asset pipeline conventions (folders, naming, import presets,
-  GUID discipline for generated scenes, licensing ledger).
+- **W6** asset pipeline conventions (**applied**):
+  `docs/design/asset-pipeline.md` (folders, naming, enforced import
+  floors via `ArtImportDefaults`, URP material rules, GUID discipline)
+  and the live ledger `docs/asset-licenses.md` (seeded with the TMP
+  third-party entries, incl. the EmojiOne release-gating obligation).
 - **W7** visual-regression capture harness (promoted from
   `SpectatorCaptureSpike.cs`).
