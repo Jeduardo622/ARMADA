@@ -261,11 +261,12 @@ for (const line of stats) {
   }
 }
 
-// The gate is only as honest as its source: all-zero (or absent) draws
-// on every frame means the stat source broke again and the budget is
-// silently unenforced — fail loudly instead.
-if (stats.length > 0 && !stats.some((line) => /draws=[1-9]/.test(line))) {
-  console.error('[visual-capture] FrameStats report no non-zero draws; the draw-call gate has no real source');
+// The gate is only as honest as its source: a manifest with no stats at
+// all, or no non-zero draws on any frame, means the stat source broke
+// again and the budget is silently unenforced — fail loudly instead
+// (Codex P2 on this PR: an empty array must not skip the guard).
+if (!stats.some((line) => /draws=[1-9]/.test(line))) {
+  console.error('[visual-capture] FrameStats carry no non-zero draws; the draw-call gate has no real source');
   process.exitCode = 1;
 }
 
