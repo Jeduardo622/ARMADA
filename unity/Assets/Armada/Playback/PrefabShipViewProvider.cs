@@ -35,7 +35,7 @@ namespace Armada.Client.Playback
                 return PrimitiveShipViewProvider.BuildPrimitiveView(ship, parent);
             }
 
-            var view = Instantiate(prefab, parent, instantiateInWorldSpace: false);
+            var view = Instantiate<ShipView>(prefab, parent, false);
             view.gameObject.name = $"marker-{ship?.Id}";
             var scale = ShipClassCatalog.ScaleFor(ship);
             if (!Mathf.Approximately(scale, 1f))
