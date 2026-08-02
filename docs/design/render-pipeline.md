@@ -6,7 +6,8 @@
 > point; caught in Codex review, corrected below, decision re-asked).
 > The conversion is the next implementation slice — a **Class C** change
 > (graphics settings are runtime configuration), presented for explicit
-> approval with route-task classification before any edit, per §3/§6.
+> approval with route-task classification before any edit, per §3/§6 —
+> **conversion applied 2026-08-01** (route-task: Class C, unity_tooling).
 > This brief also fixes the Addressables policy and makes the perf
 > budgets measurable.
 
@@ -89,10 +90,13 @@ maturity plus the uniquely cheap pre-art window, not necessity.
 `docs/perf-budgets.md` targets, and how each becomes a number instead
 of a sentence (lands with the conversion slice; recorded here so the
 budgets stop being aspirational):
-- **Draw calls < 1.5k mid-fight**: the capture harness gains a stats
-  line per frame (batches/setpass from Unity's rendering statistics)
-  written into the capture manifest; the diff report flags budget
-  breaches like a visual mismatch.
+- **Draw calls < 1.5k mid-fight**: the capture harness writes a stats
+  line per frame into the capture manifest and the diff runner gates on
+  1.5k. **Known limitation (conversion slice):** `UnityStats` counters
+  do not populate for manual offscreen `Camera.Render()` in batchmode —
+  the plumbing and gate are live but read zero; switching the source to
+  `ProfilerRecorder` ("Batches Count") is the named follow-up before the
+  gate can fire.
 - **30 fps / p5 > 24 fps mid-tier**: not measurable headless on this
   workstation — requires the Android reference device; recorded as a
   device-matrix gate for the first on-device build (out of scope for
