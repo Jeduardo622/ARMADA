@@ -35,6 +35,12 @@ public static class AndroidLocalBuild
         PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
         PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
         PlayerSettings.productName = "Armada Dev";
+        // The checklist's mid-fight measurements point the client at a LAN
+        // backend over plain HTTP (Codex P1 on this PR: the project default
+        // NotAllowed blocks cleartext). AlwaysAllowed — rather than a
+        // Development build — keeps the release-config perf numbers
+        // representative; acceptable only because this APK never ships.
+        PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed;
 
         var output = Path.GetFullPath(
             Environment.GetEnvironmentVariable("ARMADA_APK_OUT")
