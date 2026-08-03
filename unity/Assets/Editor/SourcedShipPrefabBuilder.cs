@@ -104,18 +104,29 @@ public static class SourcedShipPrefabBuilder
                 -bounds.center.z);
             bounds = CombinedBounds(renderers);
 
-            // Hull = the largest non-sail/flag renderer; accent = a flag
-            // (masthead heading cue) with sails left textured (livery).
+            // Hull = the largest non-sail/flag renderer; every sail and
+            // flag is an accent surface (art-needs §2: sails/trim follow
+            // the accent recolor, so status dimming and sinking reach the
+            // whole rig — Codex P2 on PR #103). The accent tint multiplies
+            // the colormap, so the white-vs-pirate sail livery still reads.
             var hull = renderers
                 .Where(r => !IsSail(r.name) && !IsFlag(r.name))
                 .OrderByDescending(r => r.bounds.size.sqrMagnitude)
                 .FirstOrDefault() ?? renderers[0];
-            var flag = renderers.FirstOrDefault(r => IsFlag(r.name));
+            var accents = renderers.Where(r => IsSail(r.name) || IsFlag(r.name)).ToList();
 
             var view = root.AddComponent<ShipView>();
             var serialized = new SerializedObject(view);
             serialized.FindProperty("tintRenderer").objectReferenceValue = hull;
-            serialized.FindProperty("accentRenderer").objectReferenceValue = flag;
+            serialized.FindProperty("accentRenderer").objectReferenceValue =
+                accents.Count > 0 ? accents[0] : null;
+            var extras = serialized.FindProperty("extraAccentRenderers");
+            extras.arraySize = Mathf.Max(0, accents.Count - 1);
+            for (var i = 1; i < accents.Count; i++)
+            {
+                extras.GetArrayElementAtIndex(i - 1).objectReferenceValue = accents[i];
+            }
+
             serialized.FindProperty("topClearance").floatValue = bounds.max.y;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 

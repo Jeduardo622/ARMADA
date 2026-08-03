@@ -3345,6 +3345,24 @@ namespace Armada.Client.Tests.PlayMode
 
                     // Honest masthead clearance: matches the real top.
                     Assert.That(instance.TopClearance, Is.EqualTo(bounds.max.y).Within(0.01f), path);
+
+                    // Every sail and flag is on the accent path (Codex P2 on
+                    // PR #103): after sinking, the whole rig carries the
+                    // dimmed accent color — no renderer stays bright.
+                    instance.SetSunk();
+                    var sunkAccent = Color.Lerp(new Color(0.10f, 0.16f, 0.24f), Color.white, 0.15f);
+                    foreach (var renderer in renderers)
+                    {
+                        var name = renderer.name.ToLowerInvariant();
+                        if (!name.Contains("sail") && !name.Contains("flag"))
+                        {
+                            continue;
+                        }
+
+                        Assert.That(renderer.material.color.r, Is.EqualTo(sunkAccent.r).Within(0.001f), $"{path}: {renderer.name}");
+                        Assert.That(renderer.material.color.g, Is.EqualTo(sunkAccent.g).Within(0.001f), $"{path}: {renderer.name}");
+                        Assert.That(renderer.material.color.b, Is.EqualTo(sunkAccent.b).Within(0.001f), $"{path}: {renderer.name}");
+                    }
                 }
                 finally
                 {
