@@ -59,9 +59,18 @@ Shader "Armada/WaterPainterly"
                 return output;
             }
 
-            float Hash(float2 p)
+            // Integer LCG/xorshift hash on the (exactly representable)
+            // cell coordinates: bit-exact across GPUs and graphics
+            // backends, unlike sin-based hashes whose transcendental
+            // precision varies by implementation (Codex P2 on this PR).
+            float Hash(float2 cell)
             {
-                return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+                uint2 p = asuint((int2)cell + 0x2000);
+                uint h = p.x * 1664525u + p.y * 1013904223u;
+                h ^= h >> 16;
+                h *= 0x85EBCA6Bu;
+                h ^= h >> 13;
+                return (h & 0x00FFFFFFu) / 16777216.0;
             }
 
             // Smooth bilinear value noise; world-space input keeps the
