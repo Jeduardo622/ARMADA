@@ -57,31 +57,33 @@ try {
   );
 
   if ((result.status ?? 1) !== 0) {
+    // exitCode, not process.exit(): an immediate exit would skip the
+    // finally-block sandbox cleanup and strand the copied project in tmp.
     console.error(`[rebuild-scenes] Unity rebuild failed (exit ${result.status ?? 'unknown'}); see ${logPath}`);
-    process.exit(1);
-  }
-
-  // Copy the regenerated Assets/Scenes surface (scenes, config assets and
-  // every .meta) back into the repo, reporting what actually changed.
-  const sandboxScenes = resolve(sandbox.projectPath, 'Assets/Scenes');
-  const repoScenes = resolve(root, 'unity/Assets/Scenes');
-  const changed = [];
-  const created = [];
-  for (const name of readdirSync(sandboxScenes)) {
-    const from = join(sandboxScenes, name);
-    const to = join(repoScenes, name);
-    if (!existsSync(to)) {
-      copyFileSync(from, to);
-      created.push(name);
-    } else if (sha256(from) !== sha256(to)) {
-      copyFileSync(from, to);
-      changed.push(name);
+    process.exitCode = 1;
+  } else {
+    // Copy the regenerated Assets/Scenes surface (scenes, config assets and
+    // every .meta) back into the repo, reporting what actually changed.
+    const sandboxScenes = resolve(sandbox.projectPath, 'Assets/Scenes');
+    const repoScenes = resolve(root, 'unity/Assets/Scenes');
+    const changed = [];
+    const created = [];
+    for (const name of readdirSync(sandboxScenes)) {
+      const from = join(sandboxScenes, name);
+      const to = join(repoScenes, name);
+      if (!existsSync(to)) {
+        copyFileSync(from, to);
+        created.push(name);
+      } else if (sha256(from) !== sha256(to)) {
+        copyFileSync(from, to);
+        changed.push(name);
+      }
     }
+    console.log(
+      `[rebuild-scenes] done: ${changed.length} changed (${changed.join(', ') || 'none'}), ` +
+        `${created.length} created (${created.join(', ') || 'none'})`
+    );
   }
-  console.log(
-    `[rebuild-scenes] done: ${changed.length} changed (${changed.join(', ') || 'none'}), ` +
-      `${created.length} created (${created.join(', ') || 'none'})`
-  );
 } finally {
   sandbox.cleanup();
 }
