@@ -78,7 +78,8 @@ public static class SpectatorVisualCapture
         public string Mode { get; set; }
         public int TotalTicks { get; set; }
         public List<string> Frames { get; set; } = new List<string>();
-        // Per-frame rendering stats (brief §5): "frame:batches=N,setpass=M".
+        // Per-frame rendering stats (brief §5): "frame:draws=N" — visible
+        // renderer submeshes in the capture frustum (see CountVisibleDraws).
         // The diff runner flags draw-call budget breaches from these.
         public List<string> FrameStats { get; set; } = new List<string>();
     }
@@ -279,6 +280,8 @@ public static class SpectatorVisualCapture
         camera.Render();
         camera.targetTexture = null;
 
+        var draws = CountVisibleDraws(camera);
+
         var previous = RenderTexture.active;
         RenderTexture.active = target;
         readback.ReadPixels(new Rect(0f, 0f, Width, Height), 0, 0);
@@ -294,8 +297,42 @@ public static class SpectatorVisualCapture
         var fileName = $"{name}.png";
         File.WriteAllBytes(Path.Combine(outDir, fileName), png);
         manifest.Frames.Add(fileName);
-        manifest.FrameStats.Add(
-            $"{name}:batches={UnityEditor.UnityStats.batches},setpass={UnityEditor.UnityStats.setPassCalls}");
+        manifest.FrameStats.Add($"{name}:draws={draws}");
+    }
+
+    /// <summary>
+    /// The draw-call budget's stat source. Neither UnityStats nor
+    /// ProfilerRecorder render counters populate for manual offscreen
+    /// Camera.Render() in batchmode (verified: "Batches Count" reads 0 via
+    /// LastValue and CurrentValue, profiler forced on or off), so the
+    /// harness counts the render workload itself: enabled renderers whose
+    /// bounds intersect the capture frustum, one draw per submesh. This is
+    /// a deterministic upper bound on draw submissions (it ignores
+    /// batching), which is the conservative side for a budget gate.
+    /// </summary>
+    private static long CountVisibleDraws(Camera camera)
+    {
+        var planes = GeometryUtility.CalculateFrustumPlanes(camera);
+        long draws = 0;
+        foreach (var renderer in UnityEngine.Object.FindObjectsOfType<Renderer>())
+        {
+            if (!renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (!GeometryUtility.TestPlanesAABB(planes, renderer.bounds))
+            {
+                continue;
+            }
+
+            var filter = renderer.GetComponent<MeshFilter>();
+            draws += filter != null && filter.sharedMesh != null
+                ? filter.sharedMesh.subMeshCount
+                : 1;
+        }
+
+        return draws;
     }
 
     private static void Fail(string reason)

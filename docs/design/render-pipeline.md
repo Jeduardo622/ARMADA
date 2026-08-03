@@ -91,12 +91,16 @@ maturity plus the uniquely cheap pre-art window, not necessity.
 of a sentence (lands with the conversion slice; recorded here so the
 budgets stop being aspirational):
 - **Draw calls < 1.5k mid-fight**: the capture harness writes a stats
-  line per frame into the capture manifest and the diff runner gates on
-  1.5k. **Known limitation (conversion slice):** `UnityStats` counters
-  do not populate for manual offscreen `Camera.Render()` in batchmode —
-  the plumbing and gate are live but read zero; switching the source to
-  `ProfilerRecorder` ("Batches Count") is the named follow-up before the
-  gate can fire.
+  line per frame into the capture manifest (`draws=N`) and the diff
+  runner gates on 1.5k, failing loudly if the stat ever reads zero on
+  every frame. **Source (measured, this arc):** neither `UnityStats`
+  nor `ProfilerRecorder` render counters populate for manual offscreen
+  `Camera.Render()` in batchmode ("Batches Count" reads 0 via both
+  LastValue and CurrentValue, profiler on or off), so the harness
+  counts frustum-visible renderer submeshes itself — a deterministic
+  upper bound on draw submissions (ignores batching), conservative for
+  a budget gate. GPU-counted batches remain a device-profiling concern
+  for the on-device build checklist.
 - **30 fps / p5 > 24 fps mid-tier**: not measurable headless on this
   workstation — requires the Android reference device; recorded as a
   device-matrix gate for the first on-device build (out of scope for
