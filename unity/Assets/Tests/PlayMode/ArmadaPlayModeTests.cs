@@ -1432,6 +1432,195 @@ namespace Armada.Client.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator SpectatorRenderer_ConditionsReadoutTracksWindAndTurnNumerics()
+        {
+            // W4 conditions zone (art-direction.md §7 item 3): the renderer
+            // composes a compact numeric wind/turn line from the wind it is
+            // given and the TurnStart steps it plays; ShowBoard (authoring
+            // states, no queued playback) drops back to wind-only.
+            var gameObject = new GameObject("conditions-readout-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                var ships = new List<SimShip>
+                {
+                    new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 },
+                    new SimShip { Id = "enemy-clipper-a", Side = "enemy", Position = new SimVector2 { X = 20, Y = 0 }, Heading = 180, Speed = 3, Hp = 140, Sail = 110, Crew = 50 }
+                };
+
+                spectator.BeginTurns(
+                    ships,
+                    new List<Mission01TurnRecord>
+                    {
+                        new Mission01TurnRecord
+                        {
+                            Turn = 1,
+                            Events = new List<SimEvent>
+                            {
+                                new SimEvent { Type = "movement", ShipId = "player-sloop-a", Position = new SimVector2 { X = 4, Y = 0 } }
+                            }
+                        }
+                    },
+                    turnLimit: 40,
+                    introLine: "conditions test",
+                    completionLine: "done",
+                    wind: new SimWind { Direction = 90, Speed = 5 });
+
+                // Before any TurnStart the readout is wind-only.
+                Assert.That(spectator.ConditionsText, Is.EqualTo("Wind 90°/5"));
+
+                var sawTurnReadout = false;
+                for (var tick = 0; tick < 100 && !spectator.IsFinished; tick++)
+                {
+                    spectator.Tick(0.5f);
+                    if (spectator.ConditionsText == "Wind 90°/5 | Turn 1/40")
+                    {
+                        sawTurnReadout = true;
+                    }
+                }
+
+                Assert.That(spectator.IsFinished, Is.True);
+                Assert.That(sawTurnReadout, Is.True);
+
+                // Authoring snapshots queue no playback, so no turn number is
+                // authoritative: back to wind-only.
+                spectator.ShowBoard(ships, "authoring", wind: new SimWind { Direction = 270, Speed = 2 });
+                Assert.That(spectator.ConditionsText, Is.EqualTo("Wind 270°/2"));
+
+                // Pure composition covers the remaining shapes.
+                Assert.That(Armada.Client.Playback.SpectatorRenderer.ComposeConditions(null, 3, 40), Is.EqualTo("Turn 3/40"));
+                Assert.That(Armada.Client.Playback.SpectatorRenderer.ComposeConditions(null, 3, 0), Is.EqualTo("Turn 3"));
+                Assert.That(Armada.Client.Playback.SpectatorRenderer.ComposeConditions(null, 0, 40), Is.EqualTo(string.Empty));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BottomStripStacker_PortraitShrinksCellsCentersRowsAndStacksRisers()
+        {
+            // W4 portrait restructure: on a portrait-aspect HUD area the
+            // stacker swaps strip grids to the smaller portrait cells (three
+            // columns instead of two) and re-stacks the order text/rows
+            // risers above the top strip; a landscape pass restores the
+            // authored cells and alignment. Drives Restack directly, exactly
+            // like the headless capture harness — no visual assertions.
+            var containerObject = new GameObject("stacker-container", typeof(RectTransform));
+            var stackerObject = new GameObject("stacker-test");
+            try
+            {
+                var container = (RectTransform)containerObject.transform;
+                // Portrait 9:16 in reference units (1080-height scaling).
+                container.sizeDelta = new Vector2(608f, 1080f);
+
+                var orderStrip = CreateStackerStrip(container, cellCount: 9);
+                var playbackStrip = CreateStackerStrip(container, cellCount: 4);
+                var orderLabel = CreateStackerRiser(container, height: 200f);
+                var orderRows = CreateStackerRiser(container, height: 200f);
+
+                var stacker = stackerObject.AddComponent<Armada.Client.UI.BottomStripStacker>();
+                var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                typeof(Armada.Client.UI.BottomStripStacker).GetField("strips", flags)
+                    .SetValue(stacker, new[] { orderStrip, playbackStrip });
+                typeof(Armada.Client.UI.BottomStripStacker).GetField("risers", flags)
+                    .SetValue(stacker, new[] { orderLabel, orderRows });
+
+                stacker.Restack();
+
+                var orderGrid = orderStrip.GetComponent<UnityEngine.UI.GridLayoutGroup>();
+                var playbackGrid = playbackStrip.GetComponent<UnityEngine.UI.GridLayoutGroup>();
+                Assert.That(orderGrid.cellSize, Is.EqualTo(new Vector2(150f, 110f)));
+                Assert.That(orderGrid.childAlignment, Is.EqualTo(TextAnchor.LowerCenter));
+                // 560-unit strip width fits three 150-unit columns: nine
+                // cells wrap to three rows, four cells to two.
+                Assert.That(orderStrip.rect.height, Is.EqualTo(354f).Within(0.001f));
+                Assert.That(playbackStrip.rect.height, Is.EqualTo(232f).Within(0.001f));
+                Assert.That(orderStrip.anchoredPosition.y, Is.EqualTo(24f).Within(0.001f));
+                Assert.That(playbackStrip.anchoredPosition.y, Is.EqualTo(390f).Within(0.001f));
+                // Risers stack above the top strip, bottom-first: the order
+                // text line, then the order rows above it.
+                Assert.That(orderLabel.anchoredPosition.y, Is.EqualTo(634f).Within(0.001f));
+                Assert.That(orderRows.anchoredPosition.y, Is.EqualTo(846f).Within(0.001f));
+
+                // Landscape restores the authored cells, alignment, and
+                // single-row strip heights.
+                container.sizeDelta = new Vector2(1920f, 1080f);
+                stacker.Restack();
+                Assert.That(orderGrid.cellSize, Is.EqualTo(new Vector2(190f, 140f)));
+                Assert.That(orderGrid.childAlignment, Is.EqualTo(TextAnchor.LowerLeft));
+                Assert.That(playbackGrid.cellSize, Is.EqualTo(new Vector2(190f, 140f)));
+                Assert.That(orderStrip.rect.height, Is.EqualTo(140f).Within(0.001f));
+                Assert.That(playbackStrip.anchoredPosition.y, Is.EqualTo(176f).Within(0.001f));
+                Assert.That(orderLabel.anchoredPosition.y, Is.EqualTo(328f).Within(0.001f));
+                Assert.That(orderRows.anchoredPosition.y, Is.EqualTo(540f).Within(0.001f));
+
+                // Pure helpers.
+                Assert.That(Armada.Client.UI.BottomStripStacker.IsPortrait(608f, 1080f), Is.True);
+                Assert.That(Armada.Client.UI.BottomStripStacker.IsPortrait(1920f, 1080f), Is.False);
+                Assert.That(Armada.Client.UI.BottomStripStacker.CenteredInRow(TextAnchor.LowerLeft), Is.EqualTo(TextAnchor.LowerCenter));
+                Assert.That(Armada.Client.UI.BottomStripStacker.CenteredInRow(TextAnchor.UpperRight), Is.EqualTo(TextAnchor.UpperCenter));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(containerObject);
+                UnityEngine.Object.Destroy(stackerObject);
+            }
+
+            yield break;
+        }
+
+        // Mirrors the scene builders' CreateButtonGrid geometry: full-width
+        // bottom-anchored strip, 190×140 authored cells, 12 spacing, wrap via
+        // GridLayoutGroup + ContentSizeFitter.
+        private static RectTransform CreateStackerStrip(Transform parent, int cellCount)
+        {
+            var gridObject = new GameObject(
+                "strip",
+                typeof(RectTransform),
+                typeof(UnityEngine.UI.GridLayoutGroup),
+                typeof(UnityEngine.UI.ContentSizeFitter));
+            gridObject.transform.SetParent(parent, worldPositionStays: false);
+            var rect = (RectTransform)gridObject.transform;
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.sizeDelta = new Vector2(-48f, 0f);
+            var grid = gridObject.GetComponent<UnityEngine.UI.GridLayoutGroup>();
+            grid.cellSize = new Vector2(190f, 140f);
+            grid.spacing = new Vector2(12f, 12f);
+            grid.startCorner = UnityEngine.UI.GridLayoutGroup.Corner.LowerLeft;
+            grid.startAxis = UnityEngine.UI.GridLayoutGroup.Axis.Horizontal;
+            grid.childAlignment = TextAnchor.LowerLeft;
+            gridObject.GetComponent<UnityEngine.UI.ContentSizeFitter>().verticalFit =
+                UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
+            for (var i = 0; i < cellCount; i++)
+            {
+                var cell = new GameObject($"cell-{i}", typeof(RectTransform));
+                cell.transform.SetParent(gridObject.transform, worldPositionStays: false);
+            }
+
+            return rect;
+        }
+
+        // Mirrors the builders' bottom-anchored order text/rows rects.
+        private static RectTransform CreateStackerRiser(Transform parent, float height)
+        {
+            var riserObject = new GameObject("riser", typeof(RectTransform));
+            riserObject.transform.SetParent(parent, worldPositionStays: false);
+            var rect = (RectTransform)riserObject.transform;
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.sizeDelta = new Vector2(-48f, height);
+            return rect;
+        }
+
+        [UnityTest]
         public IEnumerator FollowCamera_TightensOnLivingShipsAndIgnoresWrecks()
         {
             // W3 composition contract: the camera converges toward the living

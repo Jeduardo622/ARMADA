@@ -2,7 +2,8 @@
   "name": "Armada.Client.PlayModeTests",
   "rootNamespace": "Armada.Client.Tests.PlayMode",
   "references": [
-    "Armada.Client"
+    "Armada.Client",
+    "UnityEngine.UI"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

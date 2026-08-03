@@ -89,6 +89,15 @@ public static class PvPNetplayDemoSceneBuilder
         hudLabel.text = "PvP netplay: waiting for sign-in...";
         var statusLabel = CreateLabel(safeArea, "PhaseStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
+        // Conditions zone (W4 IA item 3): compact numeric wind/turn readout
+        // below the phase line; the spectator renderer feeds it.
+        var conditionsLabel = CreateLabel(safeArea, "Conditions", anchorTop: true, height: 44f, offsetY: -180f);
+        conditionsLabel.fontSize = 24f;
+        conditionsLabel.text = string.Empty;
+        // The order text line's authored offset is a pre-stack fallback: at
+        // runtime and in capture the strip stacker repositions it (and the
+        // order rows) above the button strips, so wrapped rows can never sit
+        // under the panel on narrow aspects (W4 portrait slice).
         var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 340f);
 
         // Structured order rows (W4 HUD IA) above the order-panel text; the
@@ -108,6 +117,7 @@ public static class PvPNetplayDemoSceneBuilder
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
         var spectator = spectatorObject.GetComponent<SpectatorRenderer>();
         SetReference(spectator, "hudLabel", hudLabel);
+        SetReference(spectator, "conditionsLabel", conditionsLabel);
         // Moving fleets must stay in view: the renderer re-frames this
         // camera every tick, never zooming tighter than the authored 8.5.
         SetReference(spectator, "followCamera", camera);
@@ -165,6 +175,9 @@ public static class PvPNetplayDemoSceneBuilder
         var stackerObject = new GameObject("HudStripStacker", typeof(BottomStripStacker));
         var stacker = stackerObject.GetComponent<BottomStripStacker>();
         SetStripArray(stacker, "strips", (RectTransform)orderGrid, menuGridRect, (RectTransform)playbackGrid);
+        // Order text line and order rows ride above the strips (W4 portrait
+        // slice): the stacker owns their vertical position at every aspect.
+        SetStripArray(stacker, "risers", (RectTransform)orderLabel.transform, orderRowsRect);
 
         var bootstrapObject = new GameObject("PvpNetplayBootstrap", typeof(DeterministicSimHooks), typeof(PvpNetplayBootstrap), typeof(MobilePresentation));
         var bootstrap = bootstrapObject.GetComponent<PvpNetplayBootstrap>();

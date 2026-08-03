@@ -101,6 +101,15 @@ public static class Mission10PlayDemoSceneBuilder
         hudLabel.text = "Mission 10 Sail-Cutter: authenticating...";
         var statusLabel = CreateLabel(safeArea, "MissionStatus", anchorTop: true, height: 56f, offsetY: -112f);
         statusLabel.text = string.Empty;
+        // Conditions zone (W4 IA item 3): compact numeric wind/turn readout
+        // below the status line; the spectator renderer feeds it.
+        var conditionsLabel = CreateLabel(safeArea, "Conditions", anchorTop: true, height: 44f, offsetY: -180f);
+        conditionsLabel.fontSize = 24f;
+        conditionsLabel.text = string.Empty;
+        // The order text line's authored offset is a pre-stack fallback: at
+        // runtime and in capture the strip stacker repositions it (and the
+        // order rows) above the button strips, so wrapped rows can never sit
+        // under the panel on narrow aspects (W4 portrait slice).
         var orderLabel = CreateLabel(safeArea, "OrderPanel", anchorTop: false, height: 200f, offsetY: 180f);
 
         // Structured order rows (W4 HUD IA) above the order-panel text; the
@@ -120,6 +129,7 @@ public static class Mission10PlayDemoSceneBuilder
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
         var spectator = spectatorObject.GetComponent<SpectatorRenderer>();
         SetReference(spectator, "hudLabel", hudLabel);
+        SetReference(spectator, "conditionsLabel", conditionsLabel);
         // A freely-manoeuvring player leaves the authored opening frame, so
         // the renderer re-frames this camera every tick.
         SetReference(spectator, "followCamera", camera);
@@ -180,6 +190,9 @@ public static class Mission10PlayDemoSceneBuilder
         var stackerObject = new GameObject("HudStripStacker", typeof(BottomStripStacker));
         var stacker = stackerObject.GetComponent<BottomStripStacker>();
         SetStripArray(stacker, "strips", (RectTransform)buttonGrid, (RectTransform)playbackGrid);
+        // Order text line and order rows ride above the strips (W4 portrait
+        // slice): the stacker owns their vertical position at every aspect.
+        SetStripArray(stacker, "risers", (RectTransform)orderLabel.transform, orderRowsRect);
 
         var bootstrapObject = new GameObject("Mission10Bootstrap", typeof(DeterministicSimHooks), typeof(Mission10Bootstrap), typeof(MobilePresentation));
         var bootstrap = bootstrapObject.GetComponent<Mission10Bootstrap>();
