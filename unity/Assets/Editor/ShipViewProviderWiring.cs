@@ -36,10 +36,14 @@ public static class ShipViewProviderWiring
         var serialized = new SerializedObject(provider);
         foreach (var (field, path) in Slots)
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<ShipView>(path);
+            // Sourced art wins over the greybox where it exists (lane C):
+            // shp-<class>-src--<livery>.prefab beside the greybox prefab.
+            var sourcedPath = path.Replace("--", "-src--");
+            var prefab = AssetDatabase.LoadAssetAtPath<ShipView>(sourcedPath)
+                ?? AssetDatabase.LoadAssetAtPath<ShipView>(path);
             if (prefab == null)
             {
-                Debug.LogWarning($"[ShipViewProviderWiring] No prefab at {path}; '{field}' falls back to primitives.");
+                Debug.LogWarning($"[ShipViewProviderWiring] No prefab at {sourcedPath} or {path}; '{field}' falls back to primitives.");
                 continue;
             }
 
