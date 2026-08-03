@@ -65,6 +65,8 @@ namespace Armada.Client.Playback
 
         [SerializeField] private Renderer tintRenderer;
         [SerializeField] private Renderer accentRenderer;
+        [Tooltip("Additional accent surfaces (extra sails, flags on multi-renderer models); they follow the accent recolor exactly, so status dimming and sinking reach every sail (Codex P2 on PR #103).")]
+        [SerializeField] private Renderer[] extraAccentRenderers;
         [Tooltip("Height of the view's highest point above its origin, in world units; readout bars derive their lift from it.")]
         [SerializeField] private float topClearance = 1f;
 
@@ -116,11 +118,23 @@ namespace Armada.Client.Playback
                 tintRenderer.material.color = resting;
             }
 
+            var accent = IsSunk
+                ? Color.Lerp(SunkTint, Color.white, 0.15f)
+                : Color.Lerp(resting, Color.white, AccentLightening);
             if (accentRenderer != null)
             {
-                accentRenderer.material.color = IsSunk
-                    ? Color.Lerp(SunkTint, Color.white, 0.15f)
-                    : Color.Lerp(resting, Color.white, AccentLightening);
+                accentRenderer.material.color = accent;
+            }
+
+            if (extraAccentRenderers != null)
+            {
+                foreach (var extra in extraAccentRenderers)
+                {
+                    if (extra != null)
+                    {
+                        extra.material.color = accent;
+                    }
+                }
             }
         }
 

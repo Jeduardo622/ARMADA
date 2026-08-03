@@ -3299,6 +3299,78 @@ namespace Armada.Client.Tests.PlayMode
             }
         }
 
+        [Test]
+        public void SourcedShipPrefabs_HonorTheViewContract()
+        {
+            // Lane C: the Kenney-sourced classes (sloop/frigate/capital ×
+            // both liveries) must satisfy the same contract the greybox
+            // pinned — waterline pivot, class-normalized hull length,
+            // honest masthead TopClearance, hull (not a sail/flag) as the
+            // tint surface.
+            (string path, float length)[] sourced =
+            {
+                ("Assets/Art/Ships/Sloop/shp-sloop-src--aurorian.prefab", 1.0f),
+                ("Assets/Art/Ships/Sloop/shp-sloop-src--crimson.prefab", 1.0f),
+                ("Assets/Art/Ships/Frigate/shp-frigate-src--aurorian.prefab", 1.4f),
+                ("Assets/Art/Ships/Frigate/shp-frigate-src--crimson.prefab", 1.4f),
+                ("Assets/Art/Ships/Capital/shp-capital-src--aurorian.prefab", 2.2f),
+                ("Assets/Art/Ships/Capital/shp-capital-src--crimson.prefab", 2.2f)
+            };
+
+            foreach (var (path, length) in sourced)
+            {
+                var prefab = LoadShipPrefab(path);
+                Assert.That(prefab, Is.Not.Null, $"sourced prefab missing: {path}");
+
+                var instance = UnityEngine.Object.Instantiate(prefab);
+                try
+                {
+                    Assert.That(instance.TintRenderer, Is.Not.Null, path);
+                    var tintName = instance.TintRenderer.name.ToLowerInvariant();
+                    Assert.That(tintName, Does.Not.Contain("sail"), path);
+                    Assert.That(tintName, Does.Not.Contain("flag"), path);
+
+                    var renderers = instance.GetComponentsInChildren<Renderer>();
+                    var bounds = renderers[0].bounds;
+                    foreach (var renderer in renderers)
+                    {
+                        bounds.Encapsulate(renderer.bounds);
+                    }
+
+                    // Class-normalized hull length and a waterline pivot
+                    // (keel below zero, deck above).
+                    Assert.That(bounds.size.z, Is.EqualTo(length).Within(0.05f), path);
+                    Assert.That(bounds.min.y, Is.LessThan(0f), path);
+                    Assert.That(bounds.max.y, Is.GreaterThan(0f), path);
+
+                    // Honest masthead clearance: matches the real top.
+                    Assert.That(instance.TopClearance, Is.EqualTo(bounds.max.y).Within(0.01f), path);
+
+                    // Every sail and flag is on the accent path (Codex P2 on
+                    // PR #103): after sinking, the whole rig carries the
+                    // dimmed accent color — no renderer stays bright.
+                    instance.SetSunk();
+                    var sunkAccent = Color.Lerp(new Color(0.10f, 0.16f, 0.24f), Color.white, 0.15f);
+                    foreach (var renderer in renderers)
+                    {
+                        var name = renderer.name.ToLowerInvariant();
+                        if (!name.Contains("sail") && !name.Contains("flag"))
+                        {
+                            continue;
+                        }
+
+                        Assert.That(renderer.material.color.r, Is.EqualTo(sunkAccent.r).Within(0.001f), $"{path}: {renderer.name}");
+                        Assert.That(renderer.material.color.g, Is.EqualTo(sunkAccent.g).Within(0.001f), $"{path}: {renderer.name}");
+                        Assert.That(renderer.material.color.b, Is.EqualTo(sunkAccent.b).Within(0.001f), $"{path}: {renderer.name}");
+                    }
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(instance.gameObject);
+                }
+            }
+        }
+
         [UnityTest]
         public IEnumerator BoardFeatures_SpawnAuthoredPrefabsDeterministically()
         {
