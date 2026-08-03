@@ -47,6 +47,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tintRenderer: {fileID: 419913808881399077}
   accentRenderer: {fileID: 3203245960159545473}
+  extraAccentRenderers:
+  - {fileID: 7163954221541291299}
+  - {fileID: 7468833152875005715}
+  - {fileID: 1342076873858605686}
+  - {fileID: 5272597454481577945}
   topClearance: 1.4222908
 --- !u!1001 &1302174451546892705
 PrefabInstance:
@@ -146,6 +151,11 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: afc32c55a5dbc4a409f98d2c76bbc9af, type: 3}
   m_PrefabInstance: {fileID: 1302174451546892705}
   m_PrefabAsset: {fileID: 0}
+--- !u!23 &1342076873858605686 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -9173195763934475305, guid: afc32c55a5dbc4a409f98d2c76bbc9af, type: 3}
+  m_PrefabInstance: {fileID: 1302174451546892705}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1556268269096652362 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: afc32c55a5dbc4a409f98d2c76bbc9af, type: 3}
@@ -154,5 +164,20 @@ Transform:
 --- !u!23 &3203245960159545473 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 4496413189768569120, guid: afc32c55a5dbc4a409f98d2c76bbc9af, type: 3}
+  m_PrefabInstance: {fileID: 1302174451546892705}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &5272597454481577945 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 6574771330368568952, guid: afc32c55a5dbc4a409f98d2c76bbc9af, type: 3}
+  m_PrefabInstance: {fileID: 1302174451546892705}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &7163954221541291299 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8176631105490410626, guid: afc32c55a5dbc4a409f98d2c76bbc9af, type: 3}
+  m_PrefabInstance: {fileID: 1302174451546892705}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &7468833152875005715 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8481651310646275762, guid: afc32c55a5dbc4a409f98d2c76bbc9af, type: 3}
   m_PrefabInstance: {fileID: 1302174451546892705}
   m_PrefabAsset: {fileID: 0}

@@ -47,6 +47,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tintRenderer: {fileID: 6321906558049438753}
   accentRenderer: {fileID: 2899489725604154411}
+  extraAccentRenderers:
+  - {fileID: 3929307708644622171}
+  - {fileID: 4668044962586958706}
   topClearance: 0.96238005
 --- !u!1001 &4646159164687339685
 PrefabInstance:
@@ -136,6 +139,16 @@ PrefabInstance:
 --- !u!23 &2899489725604154411 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 7514106100042079374, guid: a4107a998ae7fea4ca77874ee4c25635, type: 3}
+  m_PrefabInstance: {fileID: 4646159164687339685}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &3929307708644622171 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -649136622991167490, guid: a4107a998ae7fea4ca77874ee4c25635, type: 3}
+  m_PrefabInstance: {fileID: 4646159164687339685}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &4668044962586958706 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -9173195763934475305, guid: a4107a998ae7fea4ca77874ee4c25635, type: 3}
   m_PrefabInstance: {fileID: 4646159164687339685}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &5183854662467467086 stripped

@@ -47,6 +47,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tintRenderer: {fileID: 7464037777659857568}
   accentRenderer: {fileID: 1734858778647136938}
+  extraAccentRenderers:
+  - {fileID: 480142296403917274}
+  - {fileID: 5634694214725465860}
+  - {fileID: 8135260679263280627}
+  - {fileID: 3128388488746756188}
   topClearance: 1.1185493
 --- !u!1001 &8094098217733559844
 PrefabInstance:
@@ -141,14 +146,34 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 846dec2e3fd44184fa7a39c65960719a, type: 3}
+--- !u!23 &480142296403917274 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -649136622991167490, guid: 846dec2e3fd44184fa7a39c65960719a, type: 3}
+  m_PrefabInstance: {fileID: 8094098217733559844}
+  m_PrefabAsset: {fileID: 0}
 --- !u!23 &1734858778647136938 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 7514106100042079374, guid: 846dec2e3fd44184fa7a39c65960719a, type: 3}
   m_PrefabInstance: {fileID: 8094098217733559844}
   m_PrefabAsset: {fileID: 0}
+--- !u!23 &3128388488746756188 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 6574771330368568952, guid: 846dec2e3fd44184fa7a39c65960719a, type: 3}
+  m_PrefabInstance: {fileID: 8094098217733559844}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &5634694214725465860 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4496413189768569120, guid: 846dec2e3fd44184fa7a39c65960719a, type: 3}
+  m_PrefabInstance: {fileID: 8094098217733559844}
+  m_PrefabAsset: {fileID: 0}
 --- !u!23 &7464037777659857568 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 846dec2e3fd44184fa7a39c65960719a, type: 3}
+  m_PrefabInstance: {fileID: 8094098217733559844}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &8135260679263280627 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -9173195763934475305, guid: 846dec2e3fd44184fa7a39c65960719a, type: 3}
   m_PrefabInstance: {fileID: 8094098217733559844}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &8637545698924753359 stripped
