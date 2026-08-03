@@ -1,0 +1,158 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4262522667117081452
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8975588315403557639}
+  - component: {fileID: 2506327624640122772}
+  m_Layer: 0
+  m_Name: shp-frigate-src--crimson
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8975588315403557639
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4262522667117081452}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 7217420701996128390}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2506327624640122772
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4262522667117081452}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c38b00a0425a2755cdab28cf155aac8c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tintRenderer: {fileID: 8386337195981038569}
+  accentRenderer: {fileID: 856989260729836515}
+  topClearance: 1.1185493
+--- !u!1001 &7179816010050633581
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 8975588315403557639}
+    m_Modifications:
+    - target: {fileID: -9173195763934475305, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 6be3f8e96ac098b49beb5442e331f04a, type: 2}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.13206968
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.13206968
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.13206968
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.1973603
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 6be3f8e96ac098b49beb5442e331f04a, type: 2}
+    - target: {fileID: -649136622991167490, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 6be3f8e96ac098b49beb5442e331f04a, type: 2}
+    - target: {fileID: 919132149155446097, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_Name
+      value: shp-frigate-src--crimson
+      objectReference: {fileID: 0}
+    - target: {fileID: 4496413189768569120, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 6be3f8e96ac098b49beb5442e331f04a, type: 2}
+    - target: {fileID: 6574771330368568952, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 6be3f8e96ac098b49beb5442e331f04a, type: 2}
+    - target: {fileID: 7514106100042079374, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 6be3f8e96ac098b49beb5442e331f04a, type: 2}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+--- !u!23 &856989260729836515 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7514106100042079374, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+  m_PrefabInstance: {fileID: 7179816010050633581}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &7217420701996128390 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+  m_PrefabInstance: {fileID: 7179816010050633581}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &8386337195981038569 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: e339d0d339802944bbee4fc0669aa32b, type: 3}
+  m_PrefabInstance: {fileID: 7179816010050633581}
+  m_PrefabAsset: {fileID: 0}

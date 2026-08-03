@@ -22,6 +22,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4e037ac0583a34d479383e91aad033f3
+    m_Address: ships/shp-sloop-src--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 66f62887dbb970045a9c332744ab0328
+    m_Address: ships/shp-capital-src--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 75a40a6c5cfb8d640a980d102dba41c7
     m_Address: ships/shp-capital--crimson
     m_ReadOnly: 0
@@ -37,8 +47,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7e2f5782bb6ff014ba89be0dea5a1103
+    m_Address: ships/shp-frigate-src--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 82b82967202623d4c820cbe4b108a5ad
     m_Address: ships/shp-sloop--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8cdc986684323fa47852c6d26fd89302
+    m_Address: ships/shp-frigate-src--crimson
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -54,6 +74,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ca0f789be1e69fb40a9bb16d06682a8d
     m_Address: ships/shp-brig--aurorian
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d51540efa3b9b044a8a230e72a369a35
+    m_Address: ships/shp-capital-src--crimson
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d61dd80e0c122e041a797520fa677185
+    m_Address: ships/shp-sloop-src--crimson
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
