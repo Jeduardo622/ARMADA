@@ -8,7 +8,7 @@
 ## 1. Build
 
 ```bash
-node scripts/build/android-build.mjs
+node scripts/android/android-build.mjs
 ```
 
 Produces `reports/android/armada-dev.apk` (gitignored) from a project
