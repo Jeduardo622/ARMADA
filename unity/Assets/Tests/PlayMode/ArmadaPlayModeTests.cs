@@ -1542,10 +1542,16 @@ namespace Armada.Client.Tests.PlayMode
                 Assert.That(playbackStrip.rect.height, Is.EqualTo(232f).Within(0.001f));
                 Assert.That(orderStrip.anchoredPosition.y, Is.EqualTo(24f).Within(0.001f));
                 Assert.That(playbackStrip.anchoredPosition.y, Is.EqualTo(390f).Within(0.001f));
-                // Risers stack above the top strip, bottom-first: the order
-                // text line, then the order rows above it.
+                // Risers stack above the top strip, bottom-first — and
+                // compact to the portrait height (Codex P2 on PR #101: the
+                // authored 200-unit rects on top of three wrapped strips
+                // overflowed the 1080 canvas in the netplay scene), so the
+                // whole stack stays inside the viewport.
+                Assert.That(orderLabel.rect.height, Is.EqualTo(140f).Within(0.001f));
+                Assert.That(orderRows.rect.height, Is.EqualTo(140f).Within(0.001f));
                 Assert.That(orderLabel.anchoredPosition.y, Is.EqualTo(634f).Within(0.001f));
-                Assert.That(orderRows.anchoredPosition.y, Is.EqualTo(846f).Within(0.001f));
+                Assert.That(orderRows.anchoredPosition.y, Is.EqualTo(786f).Within(0.001f));
+                Assert.That(orderRows.anchoredPosition.y + orderRows.rect.height, Is.LessThan(1080f));
 
                 // Landscape restores the authored cells, alignment, and
                 // single-row strip heights.
@@ -1556,6 +1562,8 @@ namespace Armada.Client.Tests.PlayMode
                 Assert.That(playbackGrid.cellSize, Is.EqualTo(new Vector2(190f, 140f)));
                 Assert.That(orderStrip.rect.height, Is.EqualTo(140f).Within(0.001f));
                 Assert.That(playbackStrip.anchoredPosition.y, Is.EqualTo(176f).Within(0.001f));
+                // Authored riser heights come back with the landscape pass.
+                Assert.That(orderLabel.rect.height, Is.EqualTo(200f).Within(0.001f));
                 Assert.That(orderLabel.anchoredPosition.y, Is.EqualTo(328f).Within(0.001f));
                 Assert.That(orderRows.anchoredPosition.y, Is.EqualTo(540f).Within(0.001f));
 

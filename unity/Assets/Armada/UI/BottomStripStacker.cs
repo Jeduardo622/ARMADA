@@ -44,8 +44,11 @@ namespace Armada.Client.UI
         [SerializeField] private Vector2 portraitCellSize = new Vector2(150f, 110f);
         [Tooltip("Bottom-anchored rects (order text line, order rows) stacked above the top strip, bottom-most first, so wrapped button rows can never overlap them. Same pivot/anchor contract as strips.")]
         [SerializeField] private RectTransform[] risers;
+        [Tooltip("Riser height while portrait: the authored 200-unit rects on top of three wrapped portrait strips overflow the 1080 canvas (Codex P2 on PR #101); 140 fits three 44-unit order rows and keeps the netplay stack inside the viewport. Authored heights come back on wide aspects.")]
+        [SerializeField] private float portraitRiserHeight = 140f;
 
         private readonly Dictionary<GridLayoutGroup, (Vector2 cellSize, TextAnchor alignment)> _authored = new();
+        private readonly Dictionary<RectTransform, float> _authoredRiserHeights = new();
 
         private void LateUpdate()
         {
@@ -95,6 +98,7 @@ namespace Armada.Client.UI
             }
 
             var portrait = IsPortrait(container.rect.width, container.rect.height);
+            ApplyRiserHeights(portrait);
             foreach (var strip in strips)
             {
                 if (strip == null)
@@ -121,6 +125,37 @@ namespace Armada.Client.UI
                     grid.cellSize = cellSize;
                     grid.childAlignment = alignment;
                     LayoutRebuilder.ForceRebuildLayoutImmediate(strip);
+                }
+            }
+        }
+
+        // Compacts the riser rects while portrait so the full stack (three
+        // wrapped strips + order text + order rows) stays inside the
+        // reference canvas; authored heights restore on wide aspects.
+        private void ApplyRiserHeights(bool portrait)
+        {
+            if (risers == null)
+            {
+                return;
+            }
+
+            foreach (var riser in risers)
+            {
+                if (riser == null)
+                {
+                    continue;
+                }
+
+                if (!_authoredRiserHeights.TryGetValue(riser, out var authored))
+                {
+                    authored = riser.sizeDelta.y;
+                    _authoredRiserHeights[riser] = authored;
+                }
+
+                var height = portrait ? Mathf.Min(portraitRiserHeight, authored) : authored;
+                if (!Mathf.Approximately(riser.sizeDelta.y, height))
+                {
+                    riser.sizeDelta = new Vector2(riser.sizeDelta.x, height);
                 }
             }
         }
