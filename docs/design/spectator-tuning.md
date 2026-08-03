@@ -1,8 +1,10 @@
 # Spectator Demo Design Tuning
 
-> **Status: Review REOPENED** (W2 slice 3: the sink/status/board-feature/
-> wind rows below; the slice-2 feedback reopening was signed off via the
-> merge of PR #88). Prior status: Reviewed — applied values approved
+> **Status: Review REOPENED** (art-integration lane B: the sea and
+> board-feature *mechanism* rows below changed — painterly water shader
+> and authored rock/debris meshes; every color **value** is kept.
+> Previously reopened by W2 slice 3, signed off via the merge of
+> PR #88). Prior status: Reviewed — applied values approved
 > by @Jeduardo622 via the PR #51 merge on 2026-07-21, drafted following
 > the Mission 07 precedent (see the QA notes in
 > `docs/content/missions/mission-07-burning-seas.md`). Future value
@@ -47,7 +49,7 @@ change here (see Regeneration below).
 | Rake flourish (derived, hard-coded) | victim flashes the shot color too; HUD appends "BOW/STERN RAKE" (**new, W2**) | keep | The showcase tactic reads on the board, not just in the narration. |
 | Sink presentation (hard-coded) | deep-sea tint (0.10, 0.16, 0.24), hull settles 0.35 below the waterline, bars hide, flashes stop (**new, W2 s3**) | keep | Sunk ships previously persisted in full color with empty bars; one mechanism covers every kill path via the applied remaining blocks. |
 | Status tints (hard-coded) | fire warms the hull 45% toward ember (1.0, 0.45, 0.1); slow dims 35% toward gray (**new, W2 s3**) | keep | modifiers.statusEffects were mechanically live and invisible; HUD narrates ABLAZE/slowed/recovers. |
-| `obstacleColor` | (0.25, 0.22, 0.18) (**new, W2 s3**) | keep | Impassable rocks render as dark squat cylinders scaled by sim radius — ships previously routed around invisible terrain. |
+| `obstacleColor` | (0.25, 0.22, 0.18) (**new, W2 s3**) | keep | Impassable rocks render in this tint; since lane B they are authored irregular meshes (3 variants, position-picked) scaled by sim radius, falling back to the squat cylinder when unwired — ships previously routed around invisible terrain. |
 | `slowZoneColor` | (0.55, 0.62, 0.60, 0.5) (**new, W2 s3**) | keep | Debris fields render as pale flat discs under the ships. |
 | `windIndicatorOffset` / `windIndicatorColor` | (0, 0.5, −4.5) / (0.85, 0.9, 1.0, 0.9) (**new, W2 s3**) | keep | The wind arrow re-anchors to the fleet centroid every tick (the follow camera never loses it), points downwind via the ships' own heading→yaw mapping, and its shaft length scales gently with wind speed. |
 
@@ -81,7 +83,7 @@ change here (see Regeneration below).
 | Camera position | (12.5, 20, 0) | keep | Centered over the board with ample clip distance. |
 | Camera background | (0.03, 0.08, 0.15) | keep | Near-black navy makes the sea board read as the play surface. |
 | Board cube | 30×1×16 @ (12.5, −0.55, 0) | keep | Covers sim space (x 0–250, y ±60 at 0.1 world units per sim unit). |
-| Sea material color | (0.07, 0.22, 0.36) | keep | Dark sea keeps all five flash/side colors legible. |
+| Sea material color | (0.07, 0.22, 0.36) | keep | Dark sea keeps all five flash/side colors legible. Since lane B the board renders the painterly `Armada/WaterPainterly` shader with this value as its `[MainColor]` mid band (deep/crest/foam band around it); captures render it frozen (`_Animate` 0) and `WaterAnimator` starts the swell in play mode only. |
 | Label font size | 32 (**applied, D2-B**) | keep | Readable at arm's length on a phone; the canvas now scales with screen height (reference 1920×1080). |
 | Label rect (hard-coded) | ±16 edge offset, −64 width inset, 84 height (**applied, D2-B**) | keep | Two-line safety height at the larger font; labels sit inside a `SafeAreaInsets` wrapper so notches never clip them. |
 | Directional light rotation (hard-coded) | (50, −30, 0) | keep | Unity's default key-light angle; markers are flat-tinted so lighting is non-critical. |

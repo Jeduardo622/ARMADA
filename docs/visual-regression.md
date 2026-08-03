@@ -93,6 +93,11 @@ silent re-capture at different moments.
 - `antiAliasing = 1`; PNG via `EncodeToPNG` (deterministic encoder).
 - HUD label is deliberately unwired: captures must not depend on the TMP
   Essentials import. HUD narration is asserted by PlayMode tests instead.
+- The painterly sea renders **frozen**: the serialized material ships
+  `_Animate = 0` (a PlayMode test pins it), so every capture sees the
+  same zero-time swell; `WaterAnimator` starts the motion in play mode
+  only. Animated water is therefore never on any diffed frame — motion
+  review happens in the Editor, not the harness.
 
 ## Environment
 

@@ -22,14 +22,28 @@ public static class AddressablesGroupSetup
     [MenuItem("Assets/Armada/Configure Addressables Ships Group")]
     public static void EnsureShipsGroup()
     {
+        EnsureGroupForFolder(ShipsGroupName, ShipsFolder);
+    }
+
+    [MenuItem("Assets/Armada/Configure Addressables Board Group")]
+    public static void EnsureBoardGroup()
+    {
+        EnsureGroupForFolder("board", "Assets/Art/Board");
+    }
+
+    /// <summary>Group per top-level Art/ folder (asset-pipeline.md §7),
+    /// local packing; every prefab in the folder gets an entry addressed
+    /// "&lt;group&gt;/&lt;file-stem&gt;". Idempotent.</summary>
+    private static void EnsureGroupForFolder(string groupName, string folder)
+    {
         // Creates Assets/AddressableAssetsData (settings, profiles) on first
         // run; subsequent runs load the committed settings.
         var settings = AddressableAssetSettingsDefaultObject.GetSettings(true);
-        var group = settings.FindGroup(ShipsGroupName);
+        var group = settings.FindGroup(groupName);
         if (group == null)
         {
             group = settings.CreateGroup(
-                ShipsGroupName,
+                groupName,
                 setAsDefaultGroup: false,
                 readOnly: false,
                 postEvent: false,
@@ -38,16 +52,16 @@ public static class AddressablesGroupSetup
         }
 
         var added = 0;
-        foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { ShipsFolder }))
+        foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { folder }))
         {
             var path = AssetDatabase.GUIDToAssetPath(guid);
             var entry = settings.CreateOrMoveEntry(guid, group, readOnly: false, postEvent: false);
-            entry.address = $"ships/{System.IO.Path.GetFileNameWithoutExtension(path)}";
+            entry.address = $"{groupName}/{System.IO.Path.GetFileNameWithoutExtension(path)}";
             added++;
         }
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[AddressablesGroupSetup] '{ShipsGroupName}' group holds {added} ship prefab entries.");
+        Debug.Log($"[AddressablesGroupSetup] '{groupName}' group holds {added} prefab entries.");
     }
 }
 #endif
