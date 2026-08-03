@@ -14,8 +14,10 @@ namespace Armada.Client.Playback
     ///    from top-down at gameplay zoom;
     ///  - <see cref="TintRenderer"/> is the surface side tinting and
     ///    broadside/ram flashes recolor; an optional accent renderer (the
-    ///    primitive bow cue, sails on a real model) follows the base tint at
-    ///    a lighter shade and is never flashed;
+    ///    primitive bow cue, sails on a real model) carries the side's
+    ///    authored accent color when one is supplied (faction sail/flag
+    ///    identity), otherwise a lighter shade of the base tint, and is
+    ///    never flashed;
     ///  - <see cref="TopClearance"/> is the height of the view's highest
     ///    point above its origin, in world units — readout bars float above
     ///    it, so it must be honest for any model.
@@ -28,6 +30,7 @@ namespace Armada.Client.Playback
         private const float SunkSubmersion = 0.35f;
 
         private Color _baseColor = Color.white;
+        private Color? _accentColor;
         private bool _onFire;
         private bool _slowed;
 
@@ -48,19 +51,23 @@ namespace Armada.Client.Playback
                     return SunkTint;
                 }
 
-                var color = _baseColor;
-                if (_onFire)
-                {
-                    color = Color.Lerp(color, EmberTint, 0.45f);
-                }
-
-                if (_slowed)
-                {
-                    color = Color.Lerp(color, Color.gray, 0.35f);
-                }
-
-                return color;
+                return ApplyStatusTints(_baseColor);
             }
+        }
+
+        private Color ApplyStatusTints(Color color)
+        {
+            if (_onFire)
+            {
+                color = Color.Lerp(color, EmberTint, 0.45f);
+            }
+
+            if (_slowed)
+            {
+                color = Color.Lerp(color, Color.gray, 0.35f);
+            }
+
+            return color;
         }
 
         [SerializeField] private Renderer tintRenderer;
@@ -83,6 +90,20 @@ namespace Armada.Client.Playback
         public void SetBaseTint(Color color)
         {
             _baseColor = color;
+            _accentColor = null;
+            ApplyResting();
+        }
+
+        /// <summary>
+        /// Applies the side colors with an authored accent (faction sails
+        /// and flags, e.g. Aurorian brass over a navy hull) instead of the
+        /// derived lighter shade. Status tints and the sunk presentation
+        /// reach the accent exactly as they do the hull.
+        /// </summary>
+        public void SetBaseTint(Color color, Color accentColor)
+        {
+            _baseColor = color;
+            _accentColor = accentColor;
             ApplyResting();
         }
 
@@ -120,7 +141,9 @@ namespace Armada.Client.Playback
 
             var accent = IsSunk
                 ? Color.Lerp(SunkTint, Color.white, 0.15f)
-                : Color.Lerp(resting, Color.white, AccentLightening);
+                : _accentColor is { } authored
+                    ? ApplyStatusTints(authored)
+                    : Color.Lerp(resting, Color.white, AccentLightening);
             if (accentRenderer != null)
             {
                 accentRenderer.material.color = accent;
