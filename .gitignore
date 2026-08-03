@@ -16,6 +16,7 @@ build/
 coverage/
 reports/harness/
 reports/unity/
+reports/android/
 
 # Unity
 unity/Library/
