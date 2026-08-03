@@ -242,10 +242,16 @@ public static class SpectatorVisualCapture
         board.name = "Board";
         board.transform.position = new Vector3(11f, -0.55f, 0f);
         board.transform.localScale = new Vector3(140f, 1f, 120f);
-        board.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"))
-        {
-            color = BoardColor
-        };
+        // Same painterly sea as the generated scenes; its serialized
+        // _Animate = 0 freezes the swell, so frames stay byte-stable. The
+        // flat fallback keeps captures alive if the asset is missing.
+        var seaMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Shared/mat-sea-painterly.mat");
+        board.GetComponent<Renderer>().sharedMaterial = seaMaterial != null
+            ? seaMaterial
+            : new Material(Shader.Find("Universal Render Pipeline/Lit"))
+            {
+                color = BoardColor
+            };
 
         return camera;
     }
@@ -262,9 +268,11 @@ public static class SpectatorVisualCapture
         var property = serialized.FindProperty("followCamera");
         property.objectReferenceValue = camera;
         serialized.ApplyModifiedPropertiesWithoutUndo();
-        // Same view provider as the generated scenes (greybox prefabs with
-        // primitive fallback), so captures show what the scenes show.
+        // Same view provider and board features as the generated scenes
+        // (greybox prefabs with primitive fallback), so captures show what
+        // the scenes show.
         ShipViewProviderWiring.Attach(spectator);
+        BoardFeatureWiring.Attach(spectator);
         return spectator;
     }
 

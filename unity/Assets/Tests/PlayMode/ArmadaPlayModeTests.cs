@@ -3101,6 +3101,131 @@ namespace Armada.Client.Tests.PlayMode
                 UnityEngine.Object.DestroyImmediate(gameObject);
             }
         }
+
+        [UnityTest]
+        public IEnumerator BoardFeatures_SpawnAuthoredPrefabsDeterministically()
+        {
+            // Lane B (art-needs §3 P2): wired rock/debris prefabs replace the
+            // pre-art primitives; the rock variant derives from the sim
+            // position (stable across spawns), the footprint scales with the
+            // radius while authored height survives, and both features keep
+            // their reviewed spectator-tuning tints.
+            var gameObject = new GameObject("board-feature-prefab-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                var rockPrefabs = new[]
+                {
+                    UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/Board/env-rock-a.prefab"),
+                    UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/Board/env-rock-b.prefab"),
+                    UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/Board/env-rock-c.prefab")
+                };
+                var debrisPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/Board/env-debris.prefab");
+                foreach (var prefab in rockPrefabs)
+                {
+                    Assert.That(prefab, Is.Not.Null, "board rock prefab missing");
+                }
+
+                Assert.That(debrisPrefab, Is.Not.Null, "debris prefab missing");
+
+                var serialized = new UnityEditor.SerializedObject(spectator);
+                var rocks = serialized.FindProperty("rockPrefabs");
+                rocks.arraySize = rockPrefabs.Length;
+                for (var i = 0; i < rockPrefabs.Length; i++)
+                {
+                    rocks.GetArrayElementAtIndex(i).objectReferenceValue = rockPrefabs[i];
+                }
+
+                serialized.FindProperty("debrisPrefab").objectReferenceValue = debrisPrefab;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>(),
+                    turnLimit: 1,
+                    introLine: "board feature test",
+                    completionLine: "done",
+                    obstacles: new List<SimObstacle> { new SimObstacle { Position = new SimVector2 { X = 50, Y = 0 }, Radius = 20 } },
+                    slowZones: new List<SimSlowZone> { new SimSlowZone { Position = new SimVector2 { X = 70, Y = 10 }, Radius = 15, SpeedPenalty = 2 } });
+
+                var rock = spectator.transform.Find("obstacle-50-0");
+                Assert.That(rock, Is.Not.Null);
+                // Variant is |x*31 + y| % 3 = 1550 % 3 = 2 → env-rock-c, every time.
+                Assert.That(
+                    rock.GetComponent<MeshFilter>().sharedMesh.name,
+                    Does.Contain("env-rock-c"));
+                // Footprint scales with radius (20 sim units × 0.1 × 2);
+                // authored height survives.
+                Assert.That(rock.localScale.x, Is.EqualTo(4f).Within(0.001f));
+                Assert.That(rock.localScale.y, Is.EqualTo(1f).Within(0.001f));
+
+                var debris = spectator.transform.Find("slow-zone-70-10");
+                Assert.That(debris, Is.Not.Null);
+                Assert.That(
+                    debris.GetComponent<MeshFilter>().sharedMesh.name,
+                    Does.Contain("env-debris"));
+                Assert.That(debris.localScale.x, Is.EqualTo(3f).Within(0.001f));
+                // The slow-zone tint keeps its reviewed 0.5 alpha, which the
+                // transparent authored material actually honors now.
+                Assert.That(debris.GetComponent<Renderer>().material.color.a, Is.EqualTo(0.5f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+
+            yield break;
+        }
+
+        [Test]
+        public void SeaMaterial_ShipsFrozenForCaptureDeterminism()
+        {
+            // The serialized sea material must keep _Animate = 0: headless
+            // captures render it as-is, and a stray animated save would break
+            // byte-stability for every future baseline run.
+            var sea = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Shared/mat-sea-painterly.mat");
+            Assert.That(sea, Is.Not.Null, "painterly sea material missing");
+            Assert.That(sea.shader.name, Is.EqualTo("Armada/WaterPainterly"));
+            Assert.That(sea.GetFloat("_Animate"), Is.EqualTo(0f));
+            // The reviewed base color survives as the mid band.
+            Assert.That(sea.color.r, Is.EqualTo(0.07f).Within(0.001f));
+            Assert.That(sea.color.g, Is.EqualTo(0.22f).Within(0.001f));
+            Assert.That(sea.color.b, Is.EqualTo(0.36f).Within(0.001f));
+        }
+
+        [UnityTest]
+        public IEnumerator WaterAnimator_TurnsTheSwellOnInPlayModeOnly()
+        {
+            // The scene ships frozen (deterministic captures); Start — which
+            // only play mode runs — flips the instance material to animated
+            // without touching the shared asset.
+            var gameObject = new GameObject("water-animator-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var renderer = gameObject.AddComponent<MeshRenderer>();
+                var material = new Material(Shader.Find("Armada/WaterPainterly"));
+                renderer.sharedMaterial = material;
+                Assert.That(material.GetFloat("_Animate"), Is.EqualTo(0f));
+
+                var animator = gameObject.AddComponent<Armada.Client.Playback.WaterAnimator>();
+                animator.Configure(renderer);
+                gameObject.SetActive(true);
+                yield return null;
+
+                Assert.That(renderer.material.GetFloat("_Animate"), Is.EqualTo(1f));
+                // The shared asset-side material stays frozen.
+                Assert.That(material.GetFloat("_Animate"), Is.EqualTo(0f));
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
 #endif
     }
 }

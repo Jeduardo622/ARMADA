@@ -21,8 +21,8 @@ public static class PvPHotseatDemoSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/PvPHotseatDemo.unity";
     private const string ConfigAssetPath = "Assets/Scenes/PvPHotseatClientConfig.asset";
-    // The board material is shared with the spectator demo scene.
-    private const string BoardMaterialPath = "Assets/Scenes/SpectatorBoardMat.mat";
+    // The painterly sea material is shared with every generated scene.
+    private const string BoardMaterialPath = "Assets/Art/Shared/mat-sea-painterly.mat";
 
     [MenuItem("Assets/Armada/Build PvP Hotseat Demo Scene")]
     public static void Build()
@@ -72,6 +72,8 @@ public static class PvPHotseatDemoSceneBuilder
         // reach open void — cosmetic only).
         board.transform.localScale = new Vector3(140f, 1f, 120f);
         board.GetComponent<Renderer>().sharedMaterial = boardMaterial;
+        var water = board.AddComponent<WaterAnimator>();
+        SetReference(water, "waterRenderer", board.GetComponent<Renderer>());
 
         var canvasObject = new GameObject("HUD Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         var canvas = canvasObject.GetComponent<Canvas>();
@@ -115,6 +117,7 @@ public static class PvPHotseatDemoSceneBuilder
         // camera every tick, never zooming tighter than the authored 8.5.
         SetReference(spectator, "followCamera", camera);
         ShipViewProviderWiring.Attach(spectator);
+        BoardFeatureWiring.Attach(spectator);
 
         // On-screen playback controls (D2-B touch controls): pause/step/speed
         // buttons calling the same renderer API as the keyboard bindings.
@@ -191,9 +194,10 @@ public static class PvPHotseatDemoSceneBuilder
         var material = AssetDatabase.LoadAssetAtPath<Material>(BoardMaterialPath);
         if (material == null)
         {
-            material = new Material(Shader.Find("Universal Render Pipeline/Lit"))
+            material = new Material(Shader.Find("Armada/WaterPainterly"))
             {
-                // Placeholder sea color pending art direction.
+                // The reviewed sea base color; the painterly shader bands
+                // around it.
                 color = new Color(0.07f, 0.22f, 0.36f)
             };
             AssetDatabase.CreateAsset(material, BoardMaterialPath);

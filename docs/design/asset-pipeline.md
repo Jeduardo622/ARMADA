@@ -13,10 +13,11 @@ Addressables groups (docs/design/render-pipeline.md §4):
 ```
 Assets/Art/
   Ships/<class>/          ship models, textures, per-class materials
+  Board/                  sea-surface props: rocks, debris (lane B)
   Effects/                muzzle, splash, rake, sink, fire, wake
   UI/                     skin atlases (parchment, rope, icons)
   Audio/                  banks and clips
-  Shared/                 palettes, common materials, LUTs
+  Shared/                 palettes, common materials, LUTs, shaders
 ```
 
 - Code-created placeholder visuals (primitives, flat tints) stay
@@ -27,8 +28,9 @@ Assets/Art/
 ## 2. Naming
 
 - Folders `PascalCase`; asset files `kebab-case` with a type prefix:
-  `shp-` ship model, `tex-` texture, `mat-` material, `fx-` effect
-  prefab, `ui-` sprite/atlas, `sfx-`/`mus-` audio
+  `shp-` ship model, `env-` board/environment prop, `tex-` texture,
+  `mat-` material, `fx-` effect prefab, `ui-` sprite/atlas,
+  `sfx-`/`mus-` audio
   (e.g. `shp-frigate-aurorian.fbx`, `tex-frigate-aurorian-albedo.png`).
 - One asset per file; variants suffix with `--variant`
   (`tex-sail--crimson.png`). No spaces, no version numbers in names —
@@ -84,7 +86,7 @@ essentials entries — the convention starts enforced, not aspirational.
 
 ## 7. Addressables
 
-Group per top-level `Art/` folder (`ships`, `effects`, `ui`, `audio`),
-local packing until the remote-catalog follow-up
-(render-pipeline.md §4) lands. The first group is created when the
-first prefab-backed `ShipViewProvider` lands, not before.
+Group per top-level `Art/` folder (`ships`, `board`, `effects`, `ui`,
+`audio`), local packing until the remote-catalog follow-up
+(render-pipeline.md §4) lands. `ships` was created with the first
+prefab-backed `ShipViewProvider`; `board` with the lane-B board props.

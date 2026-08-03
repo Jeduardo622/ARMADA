@@ -70,6 +70,12 @@ namespace Armada.Client.Playback
         [Header("Board features & wind (design-tunable placeholders)")]
         [Tooltip("Impassable terrain (rocks/islands): dark cylinders scaled by sim radius.")]
         [SerializeField] private Color obstacleColor = new Color(0.25f, 0.22f, 0.18f);
+
+        [Header("Board feature prefabs (optional; primitives when empty)")]
+        [Tooltip("Authored rock variants; an obstacle picks one deterministically from its sim position. Empty falls back to the pre-art cylinder.")]
+        [SerializeField] private GameObject[] rockPrefabs;
+        [Tooltip("Authored debris patch for slow zones. Null falls back to the pre-art disc.")]
+        [SerializeField] private GameObject debrisPrefab;
         [Tooltip("Hazard slow zones (debris): pale translucent discs scaled by sim radius.")]
         [SerializeField] private Color slowZoneColor = new Color(0.55f, 0.62f, 0.60f, 0.5f);
         [Tooltip("World offset of the wind arrow from the fleet centroid; re-anchored every tick so the follow camera never loses it.")]
@@ -934,13 +940,31 @@ namespace Armada.Client.Playback
                         continue;
                     }
 
-                    var rock = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    rock.name = $"obstacle-{obstacle.Position.X}-{obstacle.Position.Y}";
-                    rock.transform.SetParent(transform, worldPositionStays: false);
+                    // Authored rocks (art-needs.md §3 P2) replace the pre-art
+                    // cylinder when wired; the variant derives from the sim
+                    // position so a given rock never changes between spawns.
                     var radius = obstacle.Radius * worldUnitsPerSimUnit;
-                    rock.transform.position = new Vector3(
-                        obstacle.Position.X * worldUnitsPerSimUnit, 0.2f, obstacle.Position.Y * worldUnitsPerSimUnit);
-                    rock.transform.localScale = new Vector3(radius * 2f, 0.4f, radius * 2f);
+                    GameObject rock;
+                    if (rockPrefabs != null && rockPrefabs.Length > 0)
+                    {
+                        var variant = Mathf.Abs(obstacle.Position.X * 31 + obstacle.Position.Y) % rockPrefabs.Length;
+                        rock = Instantiate(rockPrefabs[variant], transform);
+                        // Authored meshes span a unit footprint at authored
+                        // height; only the footprint scales with the radius.
+                        rock.transform.localScale = new Vector3(radius * 2f, 1f, radius * 2f);
+                        rock.transform.position = new Vector3(
+                            obstacle.Position.X * worldUnitsPerSimUnit, 0f, obstacle.Position.Y * worldUnitsPerSimUnit);
+                    }
+                    else
+                    {
+                        rock = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                        rock.transform.SetParent(transform, worldPositionStays: false);
+                        rock.transform.position = new Vector3(
+                            obstacle.Position.X * worldUnitsPerSimUnit, 0.2f, obstacle.Position.Y * worldUnitsPerSimUnit);
+                        rock.transform.localScale = new Vector3(radius * 2f, 0.4f, radius * 2f);
+                    }
+
+                    rock.name = $"obstacle-{obstacle.Position.X}-{obstacle.Position.Y}";
                     TintFeature(rock, obstacleColor);
                     _boardFeatures.Add(rock);
                 }
@@ -955,13 +979,28 @@ namespace Armada.Client.Playback
                         continue;
                     }
 
-                    var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    disc.name = $"slow-zone-{zone.Position.X}-{zone.Position.Y}";
-                    disc.transform.SetParent(transform, worldPositionStays: false);
                     var radius = zone.Radius * worldUnitsPerSimUnit;
-                    disc.transform.position = new Vector3(
-                        zone.Position.X * worldUnitsPerSimUnit, 0.02f, zone.Position.Y * worldUnitsPerSimUnit);
-                    disc.transform.localScale = new Vector3(radius * 2f, 0.02f, radius * 2f);
+                    GameObject disc;
+                    if (debrisPrefab != null)
+                    {
+                        // Authored debris patch: unit footprint, authored
+                        // thinness; its transparent material honors the slow
+                        // zone color's alpha (the primitive never could).
+                        disc = Instantiate(debrisPrefab, transform);
+                        disc.transform.localScale = new Vector3(radius * 2f, 1f, radius * 2f);
+                        disc.transform.position = new Vector3(
+                            zone.Position.X * worldUnitsPerSimUnit, 0.02f, zone.Position.Y * worldUnitsPerSimUnit);
+                    }
+                    else
+                    {
+                        disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                        disc.transform.SetParent(transform, worldPositionStays: false);
+                        disc.transform.position = new Vector3(
+                            zone.Position.X * worldUnitsPerSimUnit, 0.02f, zone.Position.Y * worldUnitsPerSimUnit);
+                        disc.transform.localScale = new Vector3(radius * 2f, 0.02f, radius * 2f);
+                    }
+
+                    disc.name = $"slow-zone-{zone.Position.X}-{zone.Position.Y}";
                     TintFeature(disc, slowZoneColor);
                     _boardFeatures.Add(disc);
                 }

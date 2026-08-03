@@ -21,7 +21,7 @@ public static class SpectatorDemoSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/SpectatorDemo.unity";
     private const string ConfigAssetPath = "Assets/Scenes/SpectatorDemoClientConfig.asset";
-    private const string BoardMaterialPath = "Assets/Scenes/SpectatorBoardMat.mat";
+    private const string BoardMaterialPath = "Assets/Art/Shared/mat-sea-painterly.mat";
 
     [MenuItem("Assets/Armada/Build Spectator Demo Scene")]
     public static void Build()
@@ -66,6 +66,8 @@ public static class SpectatorDemoSceneBuilder
         board.transform.position = new Vector3(12.5f, -0.55f, 0f);
         board.transform.localScale = new Vector3(30f, 1f, 16f);
         board.GetComponent<Renderer>().sharedMaterial = boardMaterial;
+        var water = board.AddComponent<WaterAnimator>();
+        SetReference(water, "waterRenderer", board.GetComponent<Renderer>());
 
         // GraphicRaycaster + EventSystem are new with the D2-B playback
         // buttons: this scene was previously spectate-only with no
@@ -92,6 +94,7 @@ public static class SpectatorDemoSceneBuilder
         var spectator = spectatorObject.GetComponent<SpectatorRenderer>();
         SetReference(spectator, "hudLabel", hudLabel);
         ShipViewProviderWiring.Attach(spectator);
+        BoardFeatureWiring.Attach(spectator);
 
         // On-screen playback controls (D2-B touch controls): pause/step/speed
         // buttons calling the same renderer API as the keyboard bindings.
@@ -154,9 +157,10 @@ public static class SpectatorDemoSceneBuilder
         var material = AssetDatabase.LoadAssetAtPath<Material>(BoardMaterialPath);
         if (material == null)
         {
-            material = new Material(Shader.Find("Universal Render Pipeline/Lit"))
+            material = new Material(Shader.Find("Armada/WaterPainterly"))
             {
-                // Placeholder sea color pending art direction.
+                // The reviewed sea base color; the painterly shader bands
+                // around it.
                 color = new Color(0.07f, 0.22f, 0.36f)
             };
             AssetDatabase.CreateAsset(material, BoardMaterialPath);
