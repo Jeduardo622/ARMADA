@@ -1752,7 +1752,7 @@ namespace Armada.Client.Tests.PlayMode
                 spectator.Tick(0.1f);  // status step: ship a ablaze
                 Assert.That(spectator.HudText, Does.Contain("ABLAZE"));
                 var attackerView = spectator.transform.Find("marker-a").GetComponent<Armada.Client.Playback.ShipView>();
-                Assert.That(attackerView.RestingColor, Is.Not.EqualTo(new Color(0.20f, 0.75f, 0.35f)));
+                Assert.That(attackerView.RestingColor, Is.Not.EqualTo(new Color(0.13f, 0.25f, 0.60f)));
 
                 spectator.Tick(0.3f);  // status step ends
                 spectator.Tick(0.1f);  // killing broadside begins
@@ -1947,6 +1947,75 @@ namespace Armada.Client.Tests.PlayMode
                 UnityEngine.Object.Destroy(gameObject);
             }
             yield break;
+        }
+
+        [UnityTest]
+        public IEnumerator ShipView_AuthoredFactionAccentsReachAccentsAndFollowStatusAndSinking()
+        {
+            // Faction palette (art-direction §1): the renderer hands every view
+            // an authored accent color (Aurorian brass / Crimson canvas) beside
+            // the hull tint; sails and flags carry the faction read from the
+            // top-down camera, so the accent must be the authored color — not
+            // the legacy derived lightening — and status/sink presentation must
+            // still reach it (Codex P2 on PR #103 holds under the new seam).
+            var gameObject = new GameObject("faction-accent-test");
+            gameObject.SetActive(false);
+            try
+            {
+                var spectator = gameObject.AddComponent<Armada.Client.Playback.SpectatorRenderer>();
+                spectator.BeginTurns(
+                    new List<SimShip>
+                    {
+                        new SimShip { Id = "player-sloop-a", Side = "player", Position = new SimVector2 { X = 0, Y = 0 }, Heading = 0, Speed = 3, Hp = 120, Sail = 80, Crew = 50 },
+                        new SimShip { Id = "enemy-clipper-a", Side = "enemy", Position = new SimVector2 { X = 100, Y = 0 }, Heading = 180, Speed = 3, Hp = 140, Sail = 110, Crew = 50 }
+                    },
+                    new List<Mission01TurnRecord>(),
+                    turnLimit: 1,
+                    introLine: "faction accent test",
+                    completionLine: "done");
+
+                var navy = new Color(0.13f, 0.25f, 0.60f);
+                var brass = new Color(0.80f, 0.64f, 0.28f);
+                var crimson = new Color(0.72f, 0.11f, 0.18f);
+                var canvas = new Color(0.83f, 0.47f, 0.51f);
+
+                var playerHull = spectator.transform.Find("marker-player-sloop-a").GetComponent<Renderer>();
+                var playerAccent = spectator.transform.Find("marker-player-sloop-a").Find("bow-cue").GetComponent<Renderer>();
+                var enemyHull = spectator.transform.Find("marker-enemy-clipper-a").GetComponent<Renderer>();
+                var enemyAccent = spectator.transform.Find("marker-enemy-clipper-a").Find("bow-cue").GetComponent<Renderer>();
+
+                AssertColor(playerHull.material.color, navy, "player hull navy");
+                AssertColor(playerAccent.material.color, brass, "player accent brass");
+                AssertColor(enemyHull.material.color, crimson, "enemy hull crimson");
+                AssertColor(enemyAccent.material.color, canvas, "enemy accent canvas");
+
+                // Status tints reach the authored accent with the same lerps
+                // as the hull; sinking overrides both.
+                var view = spectator.transform.Find("marker-player-sloop-a").GetComponent<Armada.Client.Playback.ShipView>();
+                view.SetStatus(onFire: true, slowed: false);
+                AssertColor(
+                    playerAccent.material.color,
+                    Color.Lerp(brass, new Color(1.00f, 0.45f, 0.10f), 0.45f),
+                    "burning accent warms toward ember");
+
+                view.SetSunk();
+                AssertColor(
+                    playerAccent.material.color,
+                    Color.Lerp(new Color(0.10f, 0.16f, 0.24f), Color.white, 0.15f),
+                    "sunk accent dims to the deep-sea shade");
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(gameObject);
+            }
+            yield break;
+        }
+
+        private static void AssertColor(Color actual, Color expected, string label)
+        {
+            Assert.That(actual.r, Is.EqualTo(expected.r).Within(0.001f), label);
+            Assert.That(actual.g, Is.EqualTo(expected.g).Within(0.001f), label);
+            Assert.That(actual.b, Is.EqualTo(expected.b).Within(0.001f), label);
         }
 
         [UnityTest]
