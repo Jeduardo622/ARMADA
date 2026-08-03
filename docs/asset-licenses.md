@@ -7,7 +7,6 @@ that introduced it (docs/design/asset-pipeline.md §6).
 | Asset | Source | License | Scope of use | License file in repo |
 | --- | --- | --- | --- | --- |
 | Liberation Sans (font + SDF atlas) | TMP Essential Resources (com.unity.textmeshpro 3.0.9) | SIL Open Font License 1.1 | Default HUD font in all scenes | `unity/Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt` |
-| EmojiOne sample sprites | TMP Essential Resources (com.unity.textmeshpro 3.0.9) | CC-BY 4.0 (attribution required) | Unused sample content shipped with TMP essentials; remove before release or attribute | `unity/Assets/TextMesh Pro/Sprites/EmojiOne Attribution.txt` |
 | TMP shaders/resources | Unity Technologies package | Unity Companion License | Text rendering | Package license (com.unity.textmeshpro) |
 | URP, Addressables, other com.unity.* packages | Unity Technologies | Unity Companion License | Engine features | Package licenses (Packages/manifest.json) |
 | MCP for Unity (com.coplaydev.unity-mcp) | CoplayDev git dependency (Packages/manifest.json) | MIT (per upstream repository) | Local editor tooling only (agent harness); editor assembly, never in player builds | Upstream LICENSE (github.com/CoplayDev/unity-mcp) |
@@ -22,6 +21,14 @@ that introduced it (docs/design/asset-pipeline.md §6).
 | Beach Ocean Waves (4 loops) | jasinski via qubodup, opengameart.org | CC0 1.0 | P5 sea ambience (`sfx-sea-wave--*.flac`) | `unity/Assets/Art/Audio/license-oga-audio.txt` |
 | Solo Seagull Sound Effects (3 curated) | Rango Mango, opengameart.org | CC0 1.0 (author notes derivation from a YouTube recording — provenance caveat recorded, replaceable) | P5 gull ambience layer (`sfx-gull--*.wav`) | `unity/Assets/Art/Audio/license-oga-audio.txt` |
 
-Release-gating note: the EmojiOne row carries an obligation — either
-delete the sample sprites in the release-prep pass or ship its
-attribution. Tracked so it cannot be forgotten.
+Resolved obligation (2026-08-03, lane K cleanup): the EmojiOne sample
+sprites (CC-BY 4.0, TMP Essential Resources) were deleted from the
+repository rather than attributed. Removed with their `.meta` files:
+`unity/Assets/TextMesh Pro/Resources/Sprite Assets/EmojiOne.asset`,
+`unity/Assets/TextMesh Pro/Sprites/EmojiOne.png`,
+`unity/Assets/TextMesh Pro/Sprites/EmojiOne.json`,
+`unity/Assets/TextMesh Pro/Sprites/EmojiOne Attribution.txt`, and the
+two emptied folders (`Sprites/`, `Resources/Sprite Assets/`). The TMP
+Settings default sprite asset reference was cleared. If a future
+`ImportTmpEssentials` re-import restores these sample sprites, this
+obligation re-opens: delete them again or add the attribution row back.
