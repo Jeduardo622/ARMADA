@@ -89,10 +89,20 @@ public static class SpectatorDemoSceneBuilder
         hudLabel.text = "Waiting for run... (buttons below; keys: Space pause, Right Arrow step, 1-4 speed, +/- cycle)";
         var statusLabel = CreateLabel(safeArea, "MissionStatus", anchorTop: false);
         statusLabel.text = string.Empty;
+        // Conditions zone (W4 IA item 3): compact numeric wind/turn readout
+        // below the narration; sized to clear the portrait 3-line wrap of
+        // this scene's long narration/hint line.
+        var conditionsLabel = CreateLabel(safeArea, "Conditions", anchorTop: true);
+        var conditionsRect = (RectTransform)conditionsLabel.transform;
+        conditionsRect.anchoredPosition = new Vector2(0f, -180f);
+        conditionsRect.sizeDelta = new Vector2(-64f, 44f);
+        conditionsLabel.fontSize = 24f;
+        conditionsLabel.text = string.Empty;
 
         var spectatorObject = new GameObject("Spectator", typeof(SpectatorRenderer));
         var spectator = spectatorObject.GetComponent<SpectatorRenderer>();
         SetReference(spectator, "hudLabel", hudLabel);
+        SetReference(spectator, "conditionsLabel", conditionsLabel);
         ShipViewProviderWiring.Attach(spectator);
         BoardFeatureWiring.Attach(spectator);
 

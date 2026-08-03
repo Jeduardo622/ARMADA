@@ -56,6 +56,8 @@ namespace Armada.Client.Playback
 
         [Header("UI Wiring")]
         [SerializeField] private TMP_Text hudLabel;
+        [Tooltip("W4 conditions zone (art-direction.md §7 item 3): compact numeric wind/turn readout; optional — scenes without the label just skip it.")]
+        [SerializeField] private TMP_Text conditionsLabel;
 
         [Header("Camera follow (optional; wired by the PvP scenes)")]
         [Tooltip("When set, the orthographic camera re-frames every tick to keep all markers in view; null keeps the scene's fixed authored framing (mission scenes).")]
@@ -107,6 +109,7 @@ namespace Armada.Client.Playback
         private TurnPlayback _playback;
         private Mission10Outcome _outcome;
         private int _turnLimit;
+        private int _currentTurn;
         private string _completionLine;
         private PlaybackStep _currentStep;
         private float _stepElapsed;
@@ -119,6 +122,9 @@ namespace Armada.Client.Playback
 
         /// <summary>Last HUD line written (narration plus control status); test hook.</summary>
         public string HudText { get; private set; }
+
+        /// <summary>Last conditions readout written (wind/turn numerics); test hook.</summary>
+        public string ConditionsText { get; private set; }
 
         public bool IsFinished { get; private set; }
 
@@ -220,6 +226,7 @@ namespace Armada.Client.Playback
             SpawnBoardFeatures(obstacles, slowZones);
             _outcome = null;
             _turnLimit = turnLimit;
+            _currentTurn = 0;
             _completionLine = completionLine;
             _currentStep = null;
             _stepArmed = false;
@@ -229,6 +236,7 @@ namespace Armada.Client.Playback
             // After the markers: the arrow anchors to the fleet centroid,
             // which is empty until they exist (Codex P2 on #89).
             SetWind(wind);
+            RefreshConditionsLabel();
 
             _playback = new TurnPlayback(shipsAtStart, turns);
             SetHud(introLine);
@@ -266,6 +274,10 @@ namespace Armada.Client.Playback
             // After the markers, for the same anchoring reason as BeginTurns;
             // ShowBoard has no tick loop to correct a stale position later.
             SetWind(wind);
+            // No playback is queued, so no turn number is authoritative here;
+            // the conditions readout drops to wind-only until the next run.
+            _currentTurn = 0;
+            RefreshConditionsLabel();
             SetHud(hudLine);
         }
 
@@ -552,6 +564,8 @@ namespace Armada.Client.Playback
             {
                 case PlaybackStepKind.TurnStart:
                     _stepDuration = turnBannerSeconds;
+                    _currentTurn = step.Turn;
+                    RefreshConditionsLabel();
                     SetHud($"Turn {step.Turn}/{_turnLimit}");
                     break;
                 case PlaybackStepKind.Maneuver:
@@ -1166,6 +1180,34 @@ namespace Armada.Client.Playback
             {
                 hudLabel.text = HudText;
             }
+        }
+
+        // W4 conditions zone (art-direction.md §7 item 3): the wind and turn
+        // numbers the client already holds, as one compact numeric line. Fed
+        // from the wind passed to BeginTurns/ShowBoard and the TurnStart
+        // steps of the playback stream; empty when neither is known.
+        private void RefreshConditionsLabel()
+        {
+            ConditionsText = ComposeConditions(_wind, _currentTurn, _turnLimit);
+            if (conditionsLabel != null)
+            {
+                conditionsLabel.text = ConditionsText;
+            }
+        }
+
+        /// <summary>Pure composition of the conditions readout; test hook.</summary>
+        public static string ComposeConditions(SimWind wind, int turn, int turnLimit)
+        {
+            var windPart = wind != null ? $"Wind {wind.Direction}°/{wind.Speed}" : null;
+            var turnPart = turn > 0
+                ? (turnLimit > 0 ? $"Turn {turn}/{turnLimit}" : $"Turn {turn}")
+                : null;
+            if (windPart == null)
+            {
+                return turnPart ?? string.Empty;
+            }
+
+            return turnPart == null ? windPart : $"{windPart} | {turnPart}";
         }
     }
 }
