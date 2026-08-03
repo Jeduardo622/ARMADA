@@ -30,8 +30,14 @@ namespace Armada.Client.Playback
         [SerializeField] private float flashSeconds = 0.45f;
 
         [Header("Colors (design-tunable placeholders)")]
-        [SerializeField] private Color playerColor = new Color(0.20f, 0.75f, 0.35f);
-        [SerializeField] private Color enemyColor = new Color(0.85f, 0.25f, 0.20f);
+        [Tooltip("Aurorian Empire hull navy (art-direction §1 faction identity); must stay legible against the sea mid band and the deep-sea sunk tint.")]
+        [SerializeField] private Color playerColor = new Color(0.13f, 0.25f, 0.60f);
+        [Tooltip("Aurorian brass: authored sail/flag accent over the navy hull — the faction read from the top-down camera, where sails dominate the silhouette.")]
+        [SerializeField] private Color playerAccentColor = new Color(0.80f, 0.64f, 0.28f);
+        [Tooltip("Crimson Republic hull crimson; deeper than the old placeholder red for separation from the round-shot amber flash.")]
+        [SerializeField] private Color enemyColor = new Color(0.72f, 0.11f, 0.18f);
+        [Tooltip("Crimson sun-bleached canvas: authored sail/flag accent (matches the previous derived lightening, now explicit so both factions use the same seam).")]
+        [SerializeField] private Color enemyAccentColor = new Color(0.83f, 0.47f, 0.51f);
         [SerializeField] private Color roundShotFlashColor = new Color(1.00f, 0.72f, 0.05f);
         [Tooltip("Chain shot is the Mission 10 showcase; its flash must read distinct from round shot.")]
         [SerializeField] private Color chainShotFlashColor = new Color(0.20f, 0.90f, 1.00f);
@@ -766,7 +772,8 @@ namespace Armada.Client.Playback
             view.transform.rotation = HeadingToRotation(ship.Heading);
 
             var baseColor = ship.Side == "player" ? playerColor : enemyColor;
-            view.SetBaseTint(baseColor);
+            var accentColor = ship.Side == "player" ? playerAccentColor : enemyAccentColor;
+            view.SetBaseTint(baseColor, accentColor);
 
             var marker = new Marker
             {

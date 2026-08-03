@@ -1,10 +1,14 @@
 # Spectator Demo Design Tuning
 
-> **Status: Review REOPENED** (art-integration lane B: the sea and
-> board-feature *mechanism* rows below changed — painterly water shader
-> and authored rock/debris meshes; every color **value** is kept.
-> Previously reopened by W2 slice 3, signed off via the merge of
-> PR #88). Prior status: Reviewed — applied values approved
+> **Status: Review REOPENED** (faction-palette slice: `playerColor` and
+> `enemyColor` **values** changed from the placeholder green/red to the
+> Aurorian navy vs Crimson faction identity of `art-direction.md` §1/§5,
+> and each side gains an authored sail/flag accent color — see the
+> Colors table. Sign-off is the merge of the implementing PR.
+> Previously reopened by art-integration lane B — painterly water shader
+> and authored rock/debris mesh mechanism rows — and before that by W2
+> slice 3, signed off via the merges of PR #100 and PR #88 respectively.
+> Prior status: Reviewed — applied values approved
 > by @Jeduardo622 via the PR #51 merge on 2026-07-21, drafted following
 > the Mission 07 precedent (see the QA notes in
 > `docs/content/missions/mission-07-burning-seas.md`). Future value
@@ -39,8 +43,10 @@ change here (see Regeneration below).
 
 | Knob | Current | Proposed | Rationale |
 | --- | --- | --- | --- |
-| `playerColor` | (0.20, 0.75, 0.35) | keep | Green reads well on the dark sea; shape (cube vs capsule) is the primary side cue. |
-| `enemyColor` | (0.85, 0.25, 0.20) | keep | Strong contrast against both sea and player green. |
+| `playerColor` | (0.13, 0.25, 0.60) | keep | Aurorian Empire hull navy (art-direction §1). Brighter and bluer than the desaturated sea mid band (0.07, 0.22, 0.36) and clearly apart from the deep-sea sunk tint (0.10, 0.16, 0.24); the brass accent carries the primary read from top-down, where sails dominate. Replaces the placeholder green (0.20, 0.75, 0.35). |
+| `playerAccentColor` | (0.80, 0.64, 0.28) (**new, faction palette**) | keep | Aurorian brass sails/flags: the at-a-glance faction identity the GDD asks for. Warm but darker and greener than round-shot amber (1.00, 0.72, 0.05); flashes recolor the hull only, so the two never compete on the same surface. |
+| `enemyColor` | (0.72, 0.11, 0.18) | keep | Crimson Republic hull crimson (art-direction §5). Deeper than the placeholder red (0.85, 0.25, 0.20), buying separation from the round-shot amber flash while keeping strong contrast with the navy hull and the sea. |
+| `enemyAccentColor` | (0.83, 0.47, 0.51) (**new, faction palette**) | keep | Sun-bleached crimson canvas: matches the value the old derived lightening produced, made explicit so both factions use the same authored-accent seam (`ShipView.SetBaseTint(hull, accent)`). |
 | `roundShotFlashColor` | (1.00, 0.60, 0.10) | (1.00, 0.72, 0.05) | More separation from enemy red when an enemy attacker flashes, while staying warm-family so chain cyan stays the distinct showcase. |
 | `chainShotFlashColor` | (0.20, 0.90, 1.00) | keep | Mission 10 showcase; cyan must stay visually distinct from round shot. |
 | `ramFlashColor` | white | keep | Neutral, distinct from both shot flashes. |
