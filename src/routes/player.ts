@@ -16,11 +16,12 @@ export function registerPlayerRoutes(app: FastifyInstance) {
     }
     const rows = await app.prisma.missionProgress.findMany({
       where: { playerId: request.user.id },
-      select: { mission: { select: { code: true } }, status: true, lastResult: true },
+      select: { mission: { select: { code: true } }, status: true, lastResult: true, verifiedResult: true, verifiedStars: true },
       orderBy: { mission: { code: 'asc' } }
     });
     return { progress: rows.map((row) => ({
-      missionCode: row.mission.code, status: row.status, lastResult: row.lastResult
+      missionCode: row.mission.code, status: row.status, lastResult: row.lastResult,
+      verifiedResult: row.verifiedResult ?? null, verifiedStars: row.verifiedStars ?? null
     })) };
   });
 

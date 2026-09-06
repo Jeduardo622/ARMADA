@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { authPlugin } from '../src/plugins/auth.js';
 import { registerAuthRoutes } from '../src/routes/auth.js';
 import { registerPlayerRoutes } from '../src/routes/player.js';
+import { registerMissionRoutes } from '../src/routes/missions.js';
+import { campaignWinFixtures } from './fixtures/campaignWins.js';
 
 // Opt-in against an independently created, migrated, disposable database only.
 // Never falls back to DATABASE_URL or the main local Armada database.
@@ -34,9 +36,11 @@ describe.runIf(Boolean(url))('guest credentials on isolated PostgreSQL', () => {
   async function server() {
     const app = Fastify({ logger: false });
     app.decorate('prisma', prisma);
+    app.decorate('flags', { isEnabled: () => true, ready: () => true, getVariant: () => ({ name: 'default', enabled: true }) });
     await app.register(authPlugin);
     registerAuthRoutes(app);
     registerPlayerRoutes(app);
+    registerMissionRoutes(app);
     await app.ready();
     return app;
   }
@@ -66,7 +70,7 @@ describe.runIf(Boolean(url))('guest credentials on isolated PostgreSQL', () => {
       expect(restored.statusCode).toBe(200);
       expect(restored.json().player.id).toBe(session!.player.id);
       const progress = await second.inject({ url: '/players/me/progress', headers: { authorization: `Bearer ${restored.json().token}` } });
-      expect(progress.json()).toEqual({ progress: [{ missionCode: missionCodes[0], status: 'COMPLETED', lastResult: { result: 'win' } }] });
+      expect(progress.json()).toEqual({ progress: [{ missionCode: missionCodes[0], status: 'COMPLETED', lastResult: { result: 'win' }, verifiedStars: null, verifiedResult: null }] });
       await prisma.guestCredential.updateMany({ where: { playerId: session!.player.id }, data: { revokedAt: new Date() } });
       const revoked = await second.inject({ method: 'POST', url: '/auth/refresh', payload: { guestCredential: session!.guestCredential } });
       expect(revoked.statusCode).toBe(401);
@@ -83,5 +87,39 @@ describe.runIf(Boolean(url))('guest credentials on isolated PostgreSQL', () => {
     })).rejects.toMatchObject({ code: 'P2002' });
     expect(await prisma.player.count()).toBe(before);
     expect(await prisma.guestCredential.count({ where: { digest: 'transaction-rollback-fixture' } })).toBe(0);
+  });
+
+  it('retains the best matching star metadata under concurrent real completions and isolates the owner', async () => {
+    const app = await server();
+    const fixture = campaignWinFixtures[0];
+    try {
+      const alice = (await app.inject({ method: 'POST', url: '/auth/guest', payload: {} })).json();
+      const bob = (await app.inject({ method: 'POST', url: '/auth/guest', payload: {} })).json();
+      playerIds.push(alice.player.id, bob.player.id);
+      missionCodes.push(fixture.code);
+      const mission = await prisma.mission.create({ data: { code: fixture.code, name: 'Verified star fixture' } });
+      const headers = { authorization: `Bearer ${alice.token}` };
+      const complete = (seed: number) => app.inject({ method: 'POST', url: `/missions/${fixture.code}/complete`, headers,
+        payload: { playerId: alice.player.id, seed, turns: fixture.turns, result: { stars: 999 } } });
+      const results = await Promise.all([complete(12), complete(16)]);
+      expect(results.map((response) => response.statusCode)).toEqual([200, 200]);
+      expect(results.filter((response) => response.json().rewardsGranted.length > 0)).toHaveLength(1);
+      expect((await prisma.inventoryItem.findUnique({ where: { playerId_itemKey: { playerId: alice.player.id, itemKey: 'gold' } } }))?.quantity).toBe(100);
+      const owned = await app.inject({ url: '/players/me/progress', headers });
+      expect(owned.json().progress[0]).toMatchObject({ verifiedStars: 3, verifiedResult: {
+        result: 'win', seed: 12, bonusObjectives: { underHullDamageThreshold: true, withinTurnTarget: true }
+      } });
+      const other = await app.inject({ url: '/players/me/progress', headers: { authorization: `Bearer ${bob.token}` } });
+      expect(other.json()).toEqual({ progress: [] });
+      const spoof = await app.inject({ method: 'POST', url: `/missions/${fixture.code}/complete`, headers,
+        payload: { playerId: bob.player.id, seed: 12, turns: fixture.turns } });
+      expect(spoof.statusCode).toBe(403);
+      // Pair integrity is enforced by PostgreSQL, not only by the route.
+      await expect(prisma.missionProgress.update({
+        where: { playerId_missionId: { playerId: alice.player.id, missionId: mission.id } }, data: { verifiedStars: null }
+      })).rejects.toThrow();
+      const saved = await prisma.missionProgress.findUnique({ where: { playerId_missionId: { playerId: alice.player.id, missionId: mission.id } } });
+      expect(saved?.verifiedStars).toBe(3);
+    } finally { await app.close(); }
   });
 });

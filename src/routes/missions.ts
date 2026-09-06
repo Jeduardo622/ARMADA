@@ -120,7 +120,7 @@ type MissionWinProofConfig = {
     seed: number,
     turns: SimOrder[][],
     upgrades?: ShipUpgradeTiers
-  ) => { result: 'win' | 'loss' };
+  ) => { result: 'win' | 'loss'; turnCount: number; bonusObjectives: Record<string, boolean> };
   playerShipIds: ReadonlySet<string>;
   enemyShipIds: ReadonlySet<string>;
   allowBoarding: boolean;
@@ -1050,6 +1050,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
     // Reward-bearing missions require the winning run as proof; the server
     // re-simulates it under the same order constraints as /resolve.
     const proofConfig = missionWinProofConfigs[params.data.code];
+    let verifiedResult: {
+      schemaVersion: number; result: string; seed: number; turnCount: number; bonusObjectives: Record<string, boolean>
+    } | null = null;
     if (proofConfig) {
       if (parsed.data.seed === undefined || parsed.data.turns === undefined) {
         return reply.status(400).send({ error: 'win_proof_required' });
@@ -1106,6 +1109,10 @@ export function registerMissionRoutes(app: FastifyInstance) {
       if (outcome.result !== 'win') {
         return reply.status(400).send({ error: 'mission_not_won' });
       }
+      verifiedResult = {
+        schemaVersion: 1, result: 'win', seed: parsed.data.seed,
+        turnCount: outcome.turnCount, bonusObjectives: outcome.bonusObjectives
+      };
     }
 
     const rewards = missionRewardsForCode(params.data.code);
@@ -1145,6 +1152,20 @@ export function registerMissionRoutes(app: FastifyInstance) {
             });
             firstCompletion = true;
           }
+        }
+
+        if (verifiedResult) {
+          // A win earns one star; each of the mission's two bonus goals earns
+          // one more. Compare and write the result/score pair in one SQL update
+          // so concurrent retries cannot downgrade or mismatch the best run.
+          const verifiedStars = 1 + Object.values(verifiedResult.bonusObjectives).filter(Boolean).length;
+          await tx.missionProgress.updateMany({
+            where: {
+              playerId: player.id, missionId: mission.id,
+              OR: [{ verifiedStars: null }, { verifiedStars: { lt: verifiedStars } }]
+            },
+            data: { verifiedStars, verifiedResult }
+          });
         }
 
         const rewardsGranted = firstCompletion ? rewards : [];

@@ -101,7 +101,7 @@ components:
           description: Persisted records for the authenticated player, sorted by mission code. An absent record means no saved progress. Client-claimed bestScore is deliberately excluded.
           items:
             type: object
-            required: [missionCode, status, lastResult]
+            required: [missionCode, status, lastResult, verifiedResult, verifiedStars]
             properties:
               missionCode:
                 type: string
@@ -113,6 +113,36 @@ components:
                 nullable: true
                 additionalProperties: true
                 description: Persisted client result metadata, not an authoritative star rating. Completion status is server-validated separately.
+              verifiedResult:
+                $ref: '#/components/schemas/VerifiedMissionResult'
+              verifiedStars:
+                type: integer
+                nullable: true
+                minimum: 1
+                maximum: 3
+                description: Server-replayed best star count. Null for legacy or unverified records; never infer stars from lastResult.
+    VerifiedMissionResult:
+      type: object
+      nullable: true
+      description: Server-owned best winning replay metadata. Updated atomically with verifiedStars only when the score improves; ties retain the earlier result.
+      required: [schemaVersion, result, seed, turnCount, bonusObjectives]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        result:
+          type: string
+          enum: [win]
+        seed:
+          type: integer
+          minimum: 0
+        turnCount:
+          type: integer
+          minimum: 1
+        bonusObjectives:
+          type: object
+          additionalProperties:
+            type: boolean
     CreatePlayerRequest:
       type: object
       properties:
@@ -163,6 +193,14 @@ components:
           type: object
           additionalProperties: true
           nullable: true
+        verifiedStars:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 3
+          description: One star for a verified win plus one per satisfied bonus. Legacy records remain null until replay. Lower or tied repeat runs retain the prior best metadata.
+        verifiedResult:
+          $ref: '#/components/schemas/VerifiedMissionResult'
     RewardGrant:
       type: object
       required: [itemKey, quantity]
@@ -183,9 +221,11 @@ components:
         result:
           type: object
           additionalProperties: true
+          description: Legacy client metadata only; cannot set verifiedResult or verifiedStars.
         bestScore:
           type: integer
           minimum: 1
+          description: Legacy client metadata only; not the authoritative star count.
         seed:
           type: integer
           minimum: 0
