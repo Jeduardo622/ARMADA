@@ -332,7 +332,7 @@ describe('mission 09 routes', () => {
     expect(res.json().error).toBe('invalid_order_ship');
   });
 
-  it('rejects upgrade tiers because the mission does not support them', async () => {
+  it('rejects upgrade tiers the player does not own', async () => {
     const res = await app.inject({
       method: 'POST',
       url: `/missions/${MISSION_09_CODE}/resolve`,
@@ -343,6 +343,7 @@ describe('mission 09 routes', () => {
         upgrades: { cannon: 1 }
       }
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('upgrade_tiers_exceed_owned');
   });
 });

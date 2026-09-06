@@ -1,4 +1,6 @@
 import { resolveSimPreview } from './engine.js';
+import { campaignDamageScale, type CampaignLoadout } from './campaignLoadout.js';
+import { upgradedHullHp } from './upgradeEffects.js';
 import {
   SimEvent,
   SimModifiers,
@@ -38,6 +40,7 @@ export interface MissionRunConfig {
   // modifiers.shipUpgrades so the engine scales player-side ships (the hull
   // bonus applies on turn 1 only and carries forward through the chain).
   upgrades?: ShipUpgradeTiers;
+  loadout?: CampaignLoadout;
 }
 
 export interface MissionRunResult {
@@ -69,11 +72,22 @@ export function runMissionLoop(
       wind: config.windForTurn(seed, turn)
     };
     const startState = structuredClone(turnState);
+    // Display the effective opening hull, but pass the unscaled state to the
+    // engine, which applies its existing turn-one hull upgrade exactly once.
+    if (turn === 1 && config.upgrades?.hull) {
+      for (const ship of startState.ships) if (ship.side === 'player') ship.hp = upgradedHullHp(ship.hp, config.upgrades.hull);
+    }
     const orders = [...(playerTurnOrders[turn - 1] ?? []), ...config.enemyOrders(turnState)];
-    const modifiers =
+    let modifiers =
       typeof config.modifiers === 'function'
         ? config.modifiers(turnState, turn)
         : config.modifiers;
+    const progressionScale = config.loadout ? campaignDamageScale(config.loadout) : 1;
+    if (progressionScale !== 1) {
+      const damageScale = { ...modifiers.damageScale };
+      for (const ship of turnState.ships) if (ship.side === 'player') damageScale[ship.id] = (damageScale[ship.id] ?? 1) * progressionScale;
+      modifiers = { ...modifiers, damageScale };
+    }
     const preview = resolveSimPreview({
       schemaVersion: 1,
       seed,

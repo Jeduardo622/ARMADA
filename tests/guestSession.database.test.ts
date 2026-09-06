@@ -162,4 +162,41 @@ describe.runIf(Boolean(url))('guest credentials on isolated PostgreSQL', () => {
       expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { playerId_itemKey: { playerId, itemKey: 'captain_shard' } } })).quantity).toBe(1);
     } finally { await app.close(); }
   });
+
+  it('validates frozen owned loadouts through real authentication across all ten missions and concurrent profile changes', async () => {
+    const app = await server();
+    try {
+      const owner = (await app.inject({ method: 'POST', url: '/auth/guest', payload: {} })).json();
+      const other = (await app.inject({ method: 'POST', url: '/auth/guest', payload: {} })).json();
+      playerIds.push(owner.player.id, other.player.id);
+      await prisma.playerProgression.create({ data: { playerId: owner.player.id, xp: 250, firstMate: 'calico_jim', gunneryChief: 'one_eyed_ella' } });
+      await prisma.playerShipUpgrade.createMany({ data: ['cannon', 'hull'].map(component => ({ playerId: owner.player.id, component, tier: 1 })) });
+      await prisma.inventoryItem.create({ data: { playerId: owner.player.id, itemKey: 'captain_shard', quantity: 1 } });
+      const headers = { authorization: `Bearer ${owner.token}` };
+      const loadout = { schemaVersion: 1, captainLevel: 3, firstMate: 'calico_jim', gunneryChief: 'one_eyed_ella' };
+      const upgrades = { cannon: 1, sail: 0, hull: 1 };
+      const resolve = (fixture: typeof campaignWinFixtures[number], token = owner.token) => app.inject({ method: 'POST', url: `/missions/${fixture.code}/resolve`,
+        headers: { authorization: `Bearer ${token}` }, payload: { seed: fixture.seed, turns: fixture.turns, upgrades, loadout } });
+      const first = await resolve(campaignWinFixtures[0]);
+      const [training, crew, concurrent, forbidden] = await Promise.all([
+        app.inject({ method: 'POST', url: '/players/me/progression/train', headers, payload: { sequence: 1 } }),
+        app.inject({ method: 'POST', url: '/players/me/progression/crew', headers, payload: { firstMate: null, gunneryChief: null } }),
+        resolve(campaignWinFixtures[0]), resolve(campaignWinFixtures[0], other.token)
+      ]);
+      expect([training.statusCode, crew.statusCode, concurrent.statusCode, forbidden.statusCode]).toEqual([200, 200, 200, 409]);
+      expect(concurrent.json()).toEqual(first.json());
+      expect((await resolve(campaignWinFixtures[0])).json()).toEqual(first.json());
+      for (const fixture of campaignWinFixtures) {
+        missionCodes.push(fixture.code);
+        await prisma.mission.upsert({ where: { code: fixture.code }, create: { code: fixture.code, name: 'Frozen loadout fixture' }, update: {} });
+        const resolved = await resolve(fixture);
+        expect(resolved.statusCode).toBe(200);
+        expect(resolved.json().outcome.result).toBe('win');
+        const complete = await app.inject({ method: 'POST', url: `/missions/${fixture.code}/complete`, headers,
+          payload: { playerId: owner.player.id, seed: fixture.seed, turns: fixture.turns, upgrades, loadout } });
+        expect(complete.statusCode).toBe(200);
+        expect(complete.json().progress.verifiedResult.bonusObjectives).toEqual(resolved.json().outcome.bonusObjectives);
+      }
+    } finally { await app.close(); }
+  });
 });

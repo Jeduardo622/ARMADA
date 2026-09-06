@@ -124,7 +124,7 @@ components:
     StarterProgression:
       type: object
       required: [captain, training, crew]
-      description: Owned starter profile. Levels derive from cumulative XP thresholds 0/100/250/450/700. No combat effects are active in this contract.
+      description: Owned starter profile. Levels derive from cumulative XP thresholds 0/100/250/450/700. Battle effects require an explicit validated PvE loadout; this read does not mutate a battle.
       properties:
         captain:
           type: object
@@ -253,10 +253,54 @@ components:
         quantity:
           type: integer
           minimum: 1
+    Mission01ResolveRequest:
+      type: object
+      additionalProperties: false
+      required: [seed, turns]
+      properties:
+        schemaVersion: { type: integer, enum: [1], default: 1 }
+        seed: { type: integer, minimum: 0 }
+        loadout: { $ref: '#/components/schemas/CampaignLoadout' }
+        upgrades: { $ref: '#/components/schemas/ShipUpgradeTiers' }
+        turns:
+          type: array
+          maxItems: 8
+          items:
+            type: array
+            maxItems: 2
+            items: { $ref: '#/components/schemas/SimOrder' }
+    Mission02ResolveRequest:
+      type: object
+      additionalProperties: false
+      required: [seed, turns]
+      properties:
+        schemaVersion: { type: integer, enum: [1], default: 1 }
+        seed: { type: integer, minimum: 0 }
+        loadout: { $ref: '#/components/schemas/CampaignLoadout' }
+        upgrades: { $ref: '#/components/schemas/ShipUpgradeTiers' }
+        turns:
+          type: array
+          maxItems: 9
+          items:
+            type: array
+            maxItems: 4
+            items: { $ref: '#/components/schemas/SimOrder' }
+    CampaignLoadout:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, captainLevel, firstMate, gunneryChief]
+      description: Frozen owned PvE snapshot, revalidated independently on resolve and complete. No binding to a prior resolve call. Server derives player gun damage scale as 1 plus 1% per captain level above one plus 2% for the starter pair; enemy scaling stays unchanged. Clients retain exactly this snapshot and upgrades for the battle.
+      properties:
+        schemaVersion: { type: integer, enum: [1] }
+        captainLevel: { type: integer, minimum: 1, maximum: 5 }
+        firstMate: { type: string, nullable: true, enum: [calico_jim, null] }
+        gunneryChief: { type: string, nullable: true, enum: [one_eyed_ella, null] }
     MissionCompleteRequest:
       type: object
       required: [playerId]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
         playerId:
           type: string
           format: uuid
@@ -852,7 +896,7 @@ components:
       required: [turn, hash, summary, events, startState, nextState]
       properties:
         startState:
-          description: Authoritative planning state after scripted spawns and this turn's wind.
+          description: Authoritative planning state after scripted spawns and wind, including effective opening hull upgrades. This is display state, not an engine replay input; never apply hull upgrades again to it.
           allOf:
             - $ref: '#/components/schemas/SimState'
         nextState:
@@ -1004,6 +1048,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1135,6 +1183,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1248,6 +1300,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1371,6 +1427,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1504,6 +1564,8 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1623,6 +1685,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1738,6 +1804,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1859,6 +1929,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -2407,6 +2481,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-01-fair-wind/resolve:
+    post:
+      summary: Resolve Mission 01 with optional owned frozen loadout and upgrades
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Mission01ResolveRequest' }
+      responses:
+        '200': { description: Authoritative outcome and turn records }
+        '400': { description: Invalid orders or loadout }
+        '401': { description: Authentication required }
+        '403': { description: Feature disabled }
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
+  /missions/mission-02-weather-gage/resolve:
+    post:
+      summary: Resolve Mission 02 with optional owned frozen loadout and upgrades
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Mission02ResolveRequest' }
+      responses:
+        '200': { description: Authoritative outcome and turn records }
+        '400': { description: Invalid orders or loadout }
+        '401': { description: Authentication required }
+        '403': { description: Feature disabled }
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
   /missions/{code}/complete:
     post:
       summary: Mark mission completion
@@ -2465,7 +2571,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: >-
-            Proof upgrade tiers exceed the player's owned tiers
+            Frozen captain level exceeds owned level (captain_level_exceeds_owned) or proof upgrade tiers exceed the player's owned tiers
             (upgrade_tiers_exceed_owned; the body names the offending
             component with the claimed and owned tier).
           content:
@@ -2520,6 +2626,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission03ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with telemetry
           content:
@@ -2596,6 +2703,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission04ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with boarding telemetry
           content:
@@ -2672,6 +2780,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission05ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with first-sink and choke telemetry
           content:
@@ -2748,6 +2857,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission06ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with boss-phase and enrage telemetry
           content:
@@ -2824,6 +2934,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission07ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with fire and slow telemetry
           content:
@@ -2900,6 +3011,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission08ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with clamped-maneuver telemetry
           content:
@@ -2976,6 +3088,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission09ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with ram telemetry
           content:
@@ -3052,6 +3165,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission10ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with ammo telemetry
           content:

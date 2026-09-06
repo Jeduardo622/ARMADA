@@ -1,8 +1,9 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor } from './ai.js';
 import { createDeterministicRng, RAM_CONTACT_RANGE } from './engine.js';
 import { classifyLoss, countRamProfile } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState, Wind } from './types.js';
+import { ShipUpgradeTiers, SimOrder, SimState, Wind } from './types.js';
 
 // Mission 09 "Iron Bow" — docs/content/missions/mission-09-iron-bow.md
 // First mission to adopt modifiers.ramming: movement-phase hull contact
@@ -174,8 +175,10 @@ export interface Mission09Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission09(seed: number, playerTurnOrders: SimOrder[][]): Mission09Outcome {
+export function runMission09(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission09Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_09_TURN_LIMIT,
     createState: createMission09State,
     windForTurn: mission09WindForTurn,
@@ -191,11 +194,11 @@ export function runMission09(seed: number, playerTurnOrders: SimOrder[][]): Miss
   const failReason =
     result === 'win' ? null : classifyLoss(run.finalState, run.playerSunk, FLANKED_SPREAD);
 
-  const rams = countRamProfile(turns, MISSION_09_PLAYER_SHIP_IDS, createMission09State());
+  const rams = countRamProfile(turns, MISSION_09_PLAYER_SHIP_IDS, turns[0].startState);
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
-  const playerBaseHull = PLAYER_HULL_HP * MISSION_09_PLAYER_SHIP_IDS.length;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull = BRIG_HULL_HP * MISSION_09_ENEMY_SHIP_IDS.length;
   const enemyRemainingHp = enemies.reduce((sum, ship) => sum + ship.hp, 0);

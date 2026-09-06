@@ -1,8 +1,9 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor, BossParams, bossOrderFor, bossPhaseIndex } from './ai.js';
 import { createDeterministicRng } from './engine.js';
 import { classifyLoss } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { ShipState, SimModifiers, SimOrder, SimState, Wind } from './types.js';
+import { ShipUpgradeTiers, ShipState, SimModifiers, SimOrder, SimState, Wind } from './types.js';
 
 // Mission 06 "Dreadnought Siege" — docs/content/missions/mission-06-dreadnought-siege.md
 export const MISSION_06_CODE = 'mission-06-dreadnought-siege';
@@ -285,8 +286,10 @@ export interface Mission06Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission06(seed: number, playerTurnOrders: SimOrder[][]): Mission06Outcome {
+export function runMission06(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission06Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_06_TURN_LIMIT,
     createState: createMission06State,
     windForTurn: mission06WindForTurn,
@@ -323,7 +326,7 @@ export function runMission06(seed: number, playerTurnOrders: SimOrder[][]): Miss
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
   const boss = run.finalState.ships.find((ship) => ship.id === MISSION_06_BOSS_ID);
-  const playerBaseHull = PLAYER_BASE_HULL_HP * MISSION_06_PLAYER_SHIP_IDS.length;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull =
     BOSS_HULL_HP + (spawned ? REINFORCEMENT_HULL_HP : 0);

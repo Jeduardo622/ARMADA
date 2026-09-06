@@ -107,6 +107,7 @@ let ownedUpgrades: Array<{ component: string; tier: number }> = [];
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const prisma = app.prisma as any;
 prisma.playerProgression = {
+  findUnique: async () => ({ xp: captainXp, firstMate: null, gunneryChief: null }),
   upsert: async () => ({}),
   findUniqueOrThrow: async () => ({ xp: captainXp }),
   update: async ({ data }: any) => { captainXp = data.xp; return { xp: captainXp }; }
@@ -347,6 +348,34 @@ describe('mission completion win proof', () => {
 });
 
 describe('mission completion upgrade tiers', () => {
+  it.each(campaignWinFixtures)('$code resolves and completes an owned frozen loadout', async ({ code, seed, turns }) => {
+    captainXp = 700;
+    ownedUpgrades = [{ component: 'cannon', tier: 1 }, { component: 'hull', tier: 1 }];
+    const loadout = { schemaVersion: 1, captainLevel: 5, firstMate: 'calico_jim', gunneryChief: 'one_eyed_ella' };
+    const upgrades = { cannon: 1, hull: 1, sail: 0 };
+    const resolved = await app.inject({ method: 'POST', url: `/missions/${code}/resolve`, payload: { seed, turns, loadout, upgrades } });
+    expect(resolved.statusCode).toBe(200);
+    expect(resolved.json().outcome.result).toBe('win');
+    const completed = await complete(code, { seed, turns, loadout, upgrades });
+    expect(completed.statusCode).toBe(200);
+    expect(completed.json().progress.verifiedResult.bonusObjectives).toEqual(resolved.json().outcome.bonusObjectives);
+  });
+
+  it.each(campaignWinFixtures)('$code rejects forged level, crew and upgrades on resolve and complete', async ({ code, seed, turns }) => {
+    const send = (operation: string, options: object) => app.inject({ method: 'POST', url: `/missions/${code}/${operation}`,
+      payload: { seed, turns, ...(operation === 'complete' ? { playerId: PLAYER_ID } : {}), ...options } });
+    for (const operation of ['resolve', 'complete']) {
+      const unownedLevel = await send(operation, { loadout: { schemaVersion: 1, captainLevel: 5, firstMate: null, gunneryChief: null } });
+      expect(unownedLevel.statusCode).toBe(409);
+      expect(unownedLevel.json().error).toBe('captain_level_exceeds_owned');
+      expect((await send(operation, { loadout: { schemaVersion: 1, captainLevel: 1, firstMate: 'unowned', gunneryChief: null } })).statusCode).toBe(400);
+      expect((await send(operation, { loadout: { schemaVersion: 1, captainLevel: 1, firstMate: null, gunneryChief: null, damageScale: 100 } })).statusCode).toBe(400);
+      expect((await send(operation, { upgrades: { cannon: 3 } })).statusCode).toBe(409);
+    }
+    expect(captainXp).toBe(0);
+    expect(inventoryStore.size).toBe(0);
+  });
+
   const mission07Complete = (overrides: Record<string, unknown> = {}) =>
     complete(MISSION_07_CODE, {
       seed: MISSION_07_WINNING_SEED,
@@ -354,10 +383,10 @@ describe('mission completion upgrade tiers', () => {
       ...overrides
     });
 
-  it('rejects upgrade tiers in proofs for missions without upgrade support', async () => {
+  it('rejects unowned upgrade tiers in mission 01 proofs', async () => {
     const res = await complete(MISSION_01_CODE, { upgrades: { cannon: 1, sail: 0, hull: 0 } });
-    expect(res.statusCode).toBe(400);
-    expect(res.json().error).toBe('upgrades_not_supported');
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('upgrade_tiers_exceed_owned');
     expect(transactionCalls).toBe(0);
     expect(inventoryStore.size).toBe(0);
   });

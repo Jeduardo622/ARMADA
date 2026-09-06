@@ -1,8 +1,9 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor } from './ai.js';
 import { createDeterministicRng } from './engine.js';
 import { classifyLoss, countBoardings, countRakes } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState, Wind } from './types.js';
+import { ShipUpgradeTiers, SimOrder, SimState, Wind } from './types.js';
 
 // Mission 03 "Raking Shot" — docs/content/missions/mission-03-raking-shot.md
 export const MISSION_03_CODE = 'mission-03-raking-shot';
@@ -186,8 +187,10 @@ export interface Mission03Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission03(seed: number, playerTurnOrders: SimOrder[][]): Mission03Outcome {
+export function runMission03(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission03Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_03_TURN_LIMIT,
     createState: createMission03State,
     windForTurn: mission03WindForTurn,
@@ -214,7 +217,7 @@ export function runMission03(seed: number, playerTurnOrders: SimOrder[][]): Miss
   );
 
   const initialByShip = new Map(
-    createMission03State().ships.map((ship) => [ship.id, ship.hp] as const)
+    turns[0].startState.ships.map((ship) => [ship.id, ship.hp] as const)
   );
   const perShip: Mission03ShipDamage[] = run.finalState.ships.map((ship) => ({
     shipId: ship.id,
@@ -224,7 +227,7 @@ export function runMission03(seed: number, playerTurnOrders: SimOrder[][]): Miss
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
-  const playerBaseHull = PLAYER_BASE_HULL_HP * MISSION_03_PLAYER_SHIP_IDS.length;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull = FRIGATE_HULL_HP + SLOOP_HULL_HP;
   const enemyRemainingHp = enemies.reduce((sum, ship) => sum + ship.hp, 0);

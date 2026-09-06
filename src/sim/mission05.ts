@@ -1,8 +1,9 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor, escortOrderFor } from './ai.js';
 import { createDeterministicRng } from './engine.js';
 import { classifyLoss } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState, Wind } from './types.js';
+import { ShipUpgradeTiers, SimOrder, SimState, Wind } from './types.js';
 
 // Mission 05 "Line Break" — docs/content/missions/mission-05-line-break.md
 export const MISSION_05_CODE = 'mission-05-line-break';
@@ -237,8 +238,10 @@ export interface Mission05Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission05(seed: number, playerTurnOrders: SimOrder[][]): Mission05Outcome {
+export function runMission05(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission05Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_05_TURN_LIMIT,
     createState: createMission05State,
     windForTurn: mission05WindForTurn,
@@ -262,7 +265,7 @@ export function runMission05(seed: number, playerTurnOrders: SimOrder[][]): Miss
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
-  const playerBaseHull = PLAYER_BASE_HULL_HP * MISSION_05_PLAYER_SHIP_IDS.length;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull = FLAGSHIP_HULL_HP + ESCORT_HULL_HP * MISSION_05_ESCORT_SHIP_IDS.length;
   const enemyRemainingHp = enemies.reduce((sum, ship) => sum + ship.hp, 0);

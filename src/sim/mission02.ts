@@ -1,8 +1,9 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor } from './ai.js';
 import { createDeterministicRng } from './engine.js';
 import { classifyLoss, countRakes, heldWeatherGageOnTurn } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState, Wind } from './types.js';
+import { ShipUpgradeTiers, SimOrder, SimState, Wind } from './types.js';
 
 // Mission 02 "Weather Gage" — docs/content/missions/mission-02-weather-gage.md
 export const MISSION_02_CODE = 'mission-02-weather-gage';
@@ -183,8 +184,10 @@ export interface Mission02Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission02(seed: number, playerTurnOrders: SimOrder[][]): Mission02Outcome {
+export function runMission02(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission02Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_02_TURN_LIMIT,
     createState: createMission02State,
     windForTurn: mission02WindForTurn,
@@ -211,7 +214,7 @@ export function runMission02(seed: number, playerTurnOrders: SimOrder[][]): Miss
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
-  const playerBaseHull = PLAYER_BASE_HULL_HP * MISSION_02_PLAYER_SHIP_IDS.length;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull = ENEMY_BASE_HULL_HP * MISSION_02_ENEMY_SHIP_IDS.length;
   const enemyRemainingHp = enemies.reduce((sum, ship) => sum + ship.hp, 0);

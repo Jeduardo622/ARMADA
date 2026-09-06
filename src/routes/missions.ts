@@ -99,7 +99,8 @@ import {
   type SimOrder
 } from '../sim/types.js';
 import { missionRewardsForCode } from '../economy/missionRewards.js';
-import { UPGRADE_COMPONENTS } from '../economy/upgrades.js';
+import { validateBattleLoadout } from '../services/battleLoadout.js';
+import { campaignLoadoutSchema, type CampaignLoadout } from '../sim/campaignLoadout.js';
 
 const completeSchema = z.object({
   playerId: z.string().uuid(),
@@ -109,7 +110,8 @@ const completeSchema = z.object({
   turns: z.array(z.array(simOrderSchema).max(6)).max(20).optional(),
   // Upgrade tiers the winning run was played with; only accepted for
   // missions that support upgrades and validated against owned tiers.
-  upgrades: shipUpgradeTiersSchema.optional()
+  upgrades: shipUpgradeTiersSchema.optional(),
+  loadout: campaignLoadoutSchema.optional()
 });
 
 // Completion of a reward-bearing mission must carry the winning run itself
@@ -120,7 +122,8 @@ type MissionWinProofConfig = {
   run: (
     seed: number,
     turns: SimOrder[][],
-    upgrades?: ShipUpgradeTiers
+    upgrades?: ShipUpgradeTiers,
+    loadout?: CampaignLoadout
   ) => { result: 'win' | 'loss'; turnCount: number; bonusObjectives: Record<string, boolean> };
   playerShipIds: ReadonlySet<string>;
   enemyShipIds: ReadonlySet<string>;
@@ -138,6 +141,8 @@ const mission01StartSchema = z
 
 const mission01ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_01_TURN_LIMIT)
@@ -152,6 +157,8 @@ const mission02StartSchema = z
 
 const mission02ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_02_TURN_LIMIT)
@@ -166,6 +173,8 @@ const mission03StartSchema = z
 
 const mission03ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_03_TURN_LIMIT)
@@ -180,6 +189,8 @@ const mission04StartSchema = z
 
 const mission04ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_04_TURN_LIMIT)
@@ -194,6 +205,8 @@ const mission05StartSchema = z
 
 const mission05ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(6)).max(MISSION_05_TURN_LIMIT)
@@ -208,6 +221,8 @@ const mission06StartSchema = z
 
 const mission06ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(6)).max(MISSION_06_TURN_LIMIT)
@@ -225,9 +240,8 @@ const mission07ResolveSchema = z
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_07_TURN_LIMIT),
-    // Practice resolution trusts the caller's tiers; completion re-validates
-    // them against owned upgrades before any reward is granted.
-    upgrades: shipUpgradeTiersSchema.optional()
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional()
   })
   .strict();
 
@@ -239,6 +253,8 @@ const mission08StartSchema = z
 
 const mission08ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_08_TURN_LIMIT)
@@ -253,6 +269,8 @@ const mission09StartSchema = z
 
 const mission09ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_09_TURN_LIMIT)
@@ -267,6 +285,8 @@ const mission10StartSchema = z
 
 const mission10ResolveSchema = z
   .object({
+    upgrades: shipUpgradeTiersSchema.optional(),
+    loadout: campaignLoadoutSchema.optional(),
     schemaVersion: z.literal(1).default(1),
     seed: z.number().int().nonnegative(),
     turns: z.array(z.array(simOrderSchema).max(4)).max(MISSION_10_TURN_LIMIT)
@@ -279,42 +299,42 @@ const missionWinProofConfigs: Record<string, MissionWinProofConfig> = {
     playerShipIds: new Set([MISSION_01_PLAYER_SHIP_ID]),
     enemyShipIds: new Set([MISSION_01_ENEMY_SHIP_ID]),
     allowBoarding: false,
-    supportsUpgrades: false
+    supportsUpgrades: true
   },
   [MISSION_02_CODE]: {
     run: runMission02,
     playerShipIds: new Set(MISSION_02_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_02_ENEMY_SHIP_IDS),
     allowBoarding: false,
-    supportsUpgrades: false
+    supportsUpgrades: true
   },
   [MISSION_03_CODE]: {
     run: runMission03,
     playerShipIds: new Set(MISSION_03_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_03_ENEMY_SHIP_IDS),
     allowBoarding: true,
-    supportsUpgrades: false
+    supportsUpgrades: true
   },
   [MISSION_04_CODE]: {
     run: runMission04,
     playerShipIds: new Set(MISSION_04_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_04_ENEMY_SHIP_IDS),
     allowBoarding: true,
-    supportsUpgrades: false
+    supportsUpgrades: true
   },
   [MISSION_05_CODE]: {
     run: runMission05,
     playerShipIds: new Set(MISSION_05_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_05_ENEMY_SHIP_IDS),
     allowBoarding: true,
-    supportsUpgrades: false
+    supportsUpgrades: true
   },
   [MISSION_06_CODE]: {
     run: runMission06,
     playerShipIds: new Set(MISSION_06_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_06_ENEMY_SHIP_IDS),
     allowBoarding: true,
-    supportsUpgrades: false
+    supportsUpgrades: true
   },
   [MISSION_07_CODE]: {
     run: runMission07,
@@ -328,27 +348,21 @@ const missionWinProofConfigs: Record<string, MissionWinProofConfig> = {
     playerShipIds: new Set(MISSION_08_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_08_ENEMY_SHIP_IDS),
     allowBoarding: true,
-    // runMission08 never passes modifiers.shipUpgrades, so proofs must not
-    // carry upgrade tiers.
-    supportsUpgrades: false
+    supportsUpgrades: true
   },
   [MISSION_09_CODE]: {
     run: runMission09,
     playerShipIds: new Set(MISSION_09_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_09_ENEMY_SHIP_IDS),
     allowBoarding: true,
-    // runMission09 never passes modifiers.shipUpgrades, so proofs must not
-    // carry upgrade tiers.
-    supportsUpgrades: false
+    supportsUpgrades: true
   },
   [MISSION_10_CODE]: {
     run: runMission10,
     playerShipIds: new Set(MISSION_10_PLAYER_SHIP_IDS),
     enemyShipIds: new Set(MISSION_10_ENEMY_SHIP_IDS),
     allowBoarding: true,
-    // runMission10 never passes modifiers.shipUpgrades, so proofs must not
-    // carry upgrade tiers.
-    supportsUpgrades: false
+    supportsUpgrades: true
   }
 };
 
@@ -379,7 +393,7 @@ export function registerMissionRoutes(app: FastifyInstance) {
     return mission01StartResponse(parsed.data.seed);
   });
 
-  app.post(`/missions/${MISSION_01_CODE}/resolve`, async (request, reply) => {
+  app.post('/missions/mission-01-fair-wind/resolve', async (request, reply) => {
     if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_01_CODE }))) {
       return;
     }
@@ -409,7 +423,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission01(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission01(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -441,7 +457,7 @@ export function registerMissionRoutes(app: FastifyInstance) {
     return mission02StartResponse(parsed.data.seed);
   });
 
-  app.post(`/missions/${MISSION_02_CODE}/resolve`, async (request, reply) => {
+  app.post('/missions/mission-02-weather-gage/resolve', async (request, reply) => {
     if (!(await ensureFlag(app, reply, 'missions_api', { missionCode: MISSION_02_CODE }))) {
       return;
     }
@@ -473,7 +489,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission02(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission02(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -541,7 +559,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission03(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission03(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -607,7 +627,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission04(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission04(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -670,7 +692,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission05(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission05(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -735,7 +759,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission06(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission06(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -799,7 +825,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission07(parsed.data.seed, parsed.data.turns, parsed.data.upgrades);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission07(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -863,7 +891,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission08(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission08(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -927,7 +957,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission09(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission09(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -992,7 +1024,9 @@ export function registerMissionRoutes(app: FastifyInstance) {
       }
     }
 
-    const outcome = runMission10(parsed.data.seed, parsed.data.turns);
+    const invalidLoadout = await validateBattleLoadout(app.prisma, request.user!.id, parsed.data.upgrades, parsed.data.loadout);
+    if (invalidLoadout) return reply.status(409).send(invalidLoadout);
+    const outcome = runMission10(parsed.data.seed, parsed.data.turns, parsed.data.upgrades, parsed.data.loadout);
 
     request.log.info(
       {
@@ -1084,29 +1118,10 @@ export function registerMissionRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'upgrades_not_supported' });
       }
 
-      if (upgrades) {
-        // Tier authenticity: the proof may only claim tiers the player owns
-        // (row absence = tier 0), so the re-simulated win cannot borrow
-        // stats the player never purchased.
-        const ownedRows = await app.prisma.playerShipUpgrade.findMany({
-          where: { playerId: player.id }
-        });
-        const owned = new Map(ownedRows.map((row) => [row.component, row.tier]));
-        for (const component of UPGRADE_COMPONENTS) {
-          const claimed = upgrades[component];
-          const ownedTier = owned.get(component) ?? 0;
-          if (claimed > ownedTier) {
-            return reply.status(409).send({
-              error: 'upgrade_tiers_exceed_owned',
-              component,
-              claimed,
-              owned: ownedTier
-            });
-          }
-        }
-      }
+      const invalidLoadout = await validateBattleLoadout(app.prisma, player.id, upgrades, parsed.data.loadout);
+      if (invalidLoadout) return reply.status(409).send(invalidLoadout);
 
-      const outcome = proofConfig.run(parsed.data.seed, parsed.data.turns, upgrades);
+      const outcome = proofConfig.run(parsed.data.seed, parsed.data.turns, upgrades, parsed.data.loadout);
       if (outcome.result !== 'win') {
         return reply.status(400).send({ error: 'mission_not_won' });
       }

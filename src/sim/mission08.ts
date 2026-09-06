@@ -1,3 +1,4 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor } from './ai.js';
 import {
   createDeterministicRng,
@@ -6,7 +7,7 @@ import {
 } from './engine.js';
 import { classifyLoss, countManeuverWindProfile } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState, Wind } from './types.js';
+import { ShipUpgradeTiers, SimOrder, SimState, Wind } from './types.js';
 
 // Mission 08 "Eye of the Wind" — docs/content/missions/mission-08-eye-of-the-wind.md
 // First mission to adopt modifiers.windTurnRate: turning is harder upwind,
@@ -180,8 +181,10 @@ export interface Mission08Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission08(seed: number, playerTurnOrders: SimOrder[][]): Mission08Outcome {
+export function runMission08(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission08Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_08_TURN_LIMIT,
     createState: createMission08State,
     windForTurn: mission08WindForTurn,
@@ -206,7 +209,7 @@ export function runMission08(seed: number, playerTurnOrders: SimOrder[][]): Miss
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
-  const playerBaseHull = PLAYER_HULL_HP * MISSION_08_PLAYER_SHIP_IDS.length;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull = CORVETTE_HULL_HP * MISSION_08_ENEMY_SHIP_IDS.length;
   const enemyRemainingHp = enemies.reduce((sum, ship) => sum + ship.hp, 0);

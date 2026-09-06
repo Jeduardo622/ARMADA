@@ -202,6 +202,9 @@ describe('mission 07 routes', () => {
   });
 
   it('resolves with upgrade tiers and reflects them in the outcome', async () => {
+    const previous = app.prisma.playerShipUpgrade.findMany;
+    app.prisma.playerShipUpgrade.findMany = (async () => ['cannon', 'sail', 'hull'].map(component => ({ component, tier: 3 }))) as typeof previous;
+    try {
     const withUpgrades = await app.inject({
       method: 'POST',
       url: `/missions/${MISSION_07_CODE}/resolve`,
@@ -222,6 +225,7 @@ describe('mission 07 routes', () => {
       payload: { schemaVersion: 1, seed: 21, turns: gunneryOrders }
     });
     expect(outcome.turns[0].hash).not.toBe(baseline.json().outcome.turns[0].hash);
+    } finally { app.prisma.playerShipUpgrade.findMany = previous; }
   });
 
   it('rejects upgrade tiers outside the owned range', async () => {
