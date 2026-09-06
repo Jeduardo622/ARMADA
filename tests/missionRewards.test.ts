@@ -6,6 +6,7 @@ import {
   type RewardGrant
 } from '../src/economy/missionRewards.js';
 import { UPGRADE_COST_TABLE } from '../src/economy/upgrades.js';
+import { campaignWinFixtures } from './fixtures/campaignWins.js';
 import {
   MISSION_01_CODE,
   MISSION_01_ENEMY_SHIP_ID,
@@ -86,6 +87,9 @@ type ProgressRow = {
   missionId: string;
   status: string;
   bestScore: number | null;
+  lastResult?: unknown;
+  verifiedStars?: number | null;
+  verifiedResult?: unknown;
 };
 const progressStore = new Map<string, ProgressRow>();
 const inventoryStore = new Map<string, number>();
@@ -114,22 +118,33 @@ prisma.missionProgress.updateMany = async (args: any) => {
   updateManyArgs.push(args);
   const key = `${args.where.playerId}|${args.where.missionId}`;
   const row = progressStore.get(key);
+  if (args.where.OR) {
+    if (!row || (row.verifiedStars != null && row.verifiedStars >= args.data.verifiedStars)) return { count: 0 };
+    row.verifiedStars = args.data.verifiedStars;
+    row.verifiedResult = args.data.verifiedResult;
+    return { count: 1 };
+  }
   if (!row || row.status === 'COMPLETED') {
     return { count: 0 };
   }
   row.status = 'COMPLETED';
   row.bestScore = args.data.bestScore ?? row.bestScore;
+  row.lastResult = args.data.lastResult ?? row.lastResult;
   return { count: 1 };
 };
 prisma.missionProgress.findUnique = async (args: any) => {
   const key = `${args.where.playerId_missionId.playerId}|${args.where.playerId_missionId.missionId}`;
   return progressStore.get(key) ?? null;
 };
+prisma.missionProgress.findMany = async (args: any) => [...progressStore.values()]
+  .filter((row) => row.playerId === args.where.playerId)
+  .map((row) => ({ ...row, mission: { code: row.missionId.replace('mission-id:', '') } }));
 prisma.missionProgress.update = async (args: any) => {
   const key = `${args.where.playerId_missionId.playerId}|${args.where.playerId_missionId.missionId}`;
   const row = progressStore.get(key);
   if (!row) throw new Error('missionProgress.update: row missing');
   row.bestScore = args.data.bestScore ?? row.bestScore;
+  row.lastResult = args.data.lastResult ?? row.lastResult;
   return row;
 };
 prisma.missionProgress.create = async (args: any) => {
@@ -157,7 +172,10 @@ prisma.missionProgress.create = async (args: any) => {
     playerId: args.data.playerId,
     missionId: args.data.missionId,
     status: args.data.status,
-    bestScore: args.data.bestScore ?? null
+    bestScore: args.data.bestScore ?? null,
+    lastResult: args.data.lastResult,
+    verifiedStars: null,
+    verifiedResult: null
   };
   progressStore.set(key, row);
   return row;
@@ -374,6 +392,65 @@ describe('mission completion upgrade tiers', () => {
 });
 
 describe('mission completion rewards', () => {
+  it.each(campaignWinFixtures)('saves the real replay bonus flags for $code', async ({ code, seed, turns }) => {
+    const resolved = await app.inject({ method: 'POST', url: `/missions/${code}/resolve`, payload: { seed, turns } });
+    expect(resolved.statusCode).toBe(200);
+    const outcome = resolved.json().outcome;
+    expect(outcome.result).toBe('win');
+    const completed = await complete(code, { seed, turns, result: { stars: 999, verified: true } });
+    expect(completed.statusCode).toBe(200);
+    const expectedStars = 1 + Object.values(outcome.bonusObjectives).filter((value) => value === true).length;
+    expect(completed.json().progress.verifiedStars).toBe(expectedStars);
+    expect(completed.json().progress.verifiedResult).toEqual({
+      schemaVersion: 1, result: 'win', seed, turnCount: outcome.turnCount, bonusObjectives: outcome.bonusObjectives
+    });
+  });
+
+  it('persists replay-derived stars and bonus flags despite fabricated client result fields', async () => {
+    const res = await complete(MISSION_01_CODE, { bestScore: 999, result: {
+      stars: 3, verifiedStars: 3, bonusObjectives: { underHullDamageThreshold: true, withinTurnTarget: true }
+    } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().progress.verifiedStars).toBe(2);
+    expect(res.json().progress.verifiedResult).toEqual({ schemaVersion: 1, result: 'win', seed: WINNING_SEED, turnCount: 5,
+      bonusObjectives: { underHullDamageThreshold: false, withinTurnTarget: true } });
+    const read = await app.inject({ url: '/players/me/progress' });
+    expect(read.json().progress[0].verifiedStars).toBe(2);
+    expect(read.json().progress[0].verifiedResult).toEqual(res.json().progress.verifiedResult);
+  });
+
+  it('improves the best verified result without extra rewards and never replaces it with a poorer or losing replay', async () => {
+    await complete(MISSION_01_CODE);
+    const inventory = new Map(inventoryStore);
+    const improved = await complete(MISSION_01_CODE, { seed: 12 });
+    expect(improved.statusCode).toBe(200);
+    expect(improved.json().progress.verifiedStars).toBe(3);
+    expect(improved.json().rewardsGranted).toEqual([]);
+    const best = improved.json().progress.verifiedResult;
+    const poorer = await complete(MISSION_01_CODE, { result: { stars: 3 } });
+    expect(poorer.json().progress.verifiedResult).toEqual(best);
+    expect(poorer.json().progress.verifiedStars).toBe(3);
+    const losing = await complete(MISSION_01_CODE, { turns: [] });
+    expect(losing.statusCode).toBe(400);
+    const saved = progressStore.get(`${PLAYER_ID}|${missionIdFor(MISSION_01_CODE)}`);
+    expect(saved?.verifiedResult).toEqual(best);
+    expect(inventoryStore).toEqual(inventory);
+  });
+
+  it('leaves forged legacy metadata unrated until a new replay, without regranting first-clear rewards', async () => {
+    progressStore.set(`${PLAYER_ID}|${missionIdFor(MISSION_01_CODE)}`, {
+      playerId: PLAYER_ID, missionId: missionIdFor(MISSION_01_CODE), status: 'COMPLETED', bestScore: 999,
+      lastResult: { verified: true, verifiedStars: 3, stars: 3 }, verifiedStars: null, verifiedResult: null
+    });
+    const legacy = await app.inject({ url: '/players/me/progress' });
+    expect(legacy.json().progress[0].verifiedStars).toBeNull();
+    expect(legacy.json().progress[0].verifiedResult).toBeNull();
+    const replay = await complete(MISSION_01_CODE);
+    expect(replay.json().progress.verifiedStars).toBe(2);
+    expect(replay.json().rewardsGranted).toEqual([]);
+    expect(inventoryStore.size).toBe(0);
+  });
+
   it('grants the reward table entry on first verified completion', async () => {
     const res = await complete(MISSION_01_CODE);
     expect(res.statusCode).toBe(200);

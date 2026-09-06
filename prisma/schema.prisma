@@ -135,6 +135,10 @@ model MissionProgress {
   status      MissionStatus @default(NOT_STARTED)
   bestScore   Int?
   lastResult  Json?
+  // Dedicated server-owned fields. Legacy lastResult/bestScore are client
+  // metadata and must never be promoted into verified stars.
+  verifiedResult Json?
+  verifiedStars Int?
   updatedAt   DateTime      @updatedAt
   createdAt   DateTime      @default(now())
   player      Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)

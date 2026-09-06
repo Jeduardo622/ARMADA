@@ -153,7 +153,7 @@ describe('durable guest credentials through real authentication', () => {
     expect((await app.inject({ url: '/players/me/progress' })).statusCode).toBe(401);
     const own = await app.inject({ url: '/players/me/progress', headers });
     expect(own.statusCode).toBe(200);
-    expect(own.json()).toEqual({ progress: [{ missionCode: 'mission-01-fair-wind', status: 'COMPLETED', lastResult: { result: 'win' } }] });
+    expect(own.json()).toEqual({ progress: [{ missionCode: 'mission-01-fair-wind', status: 'COMPLETED', lastResult: { result: 'win' }, verifiedStars: null, verifiedResult: null }] });
     expect((await app.inject({ url: `/players/me/progress?playerId=${bob.player.id}`, headers })).statusCode).toBe(400);
     expect((await app.inject({ url: `/players/${bob.player.id}`, headers })).statusCode).toBe(403);
   });
