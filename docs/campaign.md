@@ -12,9 +12,13 @@ The shipyard displays authoritative costs and balances and purchases exactly the
 
 Each battle reads owned component tiers and captain/crew once. That defensive snapshot accompanies every resolution and completion request, including retries and undo. An opening fetch failure blocks sailing and can be retried; successful snapshots remain frozen for the battle. Hull readouts use the server's upgraded opening state as their maximum. See `campaign-loadouts.md` for the server validation and stateless replay limits.
 
+The Sail Loft previews Default and free Harbor Blue on an enlarged sloop. Cancel restores the saved appearance; Apply sends the selected owned ID and refreshes saved equipment. The tint changes separately authored sails on player ships, preserving hull and faction markings. Greybox frigate/clipper/brig models with combined rig meshes retain their authored appearance. Preview enlargement and hidden readouts end when a normal battle board is created. See `campaign-local-builds.md` for standalone development builds.
+
 ## Evidence and verification
 
 The first actual Unity campaign pass on 2026-09-06 completed all ten missions with three stars shown, through normal controller order handlers and actual API playback/completion. Winning turn counts: **5, 5, 9, 5, 8, 10, 7, 8, 6, 8**. This is local runtime proof, not device performance or release evidence.
+
+The integrated progression pass replayed missions 2–10, then mission 1, with owned hull and captain/crew loadouts. Every mission saved three stars. Server readback confirmed all ten verified ratings, 325 XP, training sequence 3 and nine remaining captain shards; resource rewards were not duplicated. Live sail preview/cancel/equip persisted Harbor Blue and returning to battle restored normal model scale and camera framing. Stopping the local API during the final authored playback produced Save Failed; after restart, Retry Save secured the same victory without duplicate rewards.
 
 Focused tests cover maneuver serialization, order bounds, proof snapshots, forecast-win rejection, retry/undo, planning snapshots, chart locking, UI callbacks, save-failure navigation, and affordable tier selection. Run `npm run verify:local` with `UNITY_EDITOR_PATH` configured for final integrated verification, including licensed EditMode and PlayMode gates.
 

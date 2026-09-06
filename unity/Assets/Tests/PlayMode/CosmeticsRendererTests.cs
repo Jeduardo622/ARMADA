@@ -58,6 +58,11 @@ public sealed class CosmeticsRendererTests
             method.Invoke(spectator, new object[] { null });
             Assert.That(provider.Sails[ships[0].Id].material.color, Is.EqualTo(friendlyDefault));
             Assert.That(Newtonsoft.Json.JsonConvert.SerializeObject(ships), Is.EqualTo(originalState));
+            spectator.ShowSailPreview(ships[0]);
+            Assert.That(provider.Sails[ships[0].Id].transform.parent.localScale.x, Is.EqualTo(6));
+            spectator.ShowBoard(ships, "battle after preview");
+            Assert.That(provider.Sails[ships[0].Id].transform.parent.localScale.x, Is.EqualTo(1));
+            Assert.That(Newtonsoft.Json.JsonConvert.SerializeObject(ships), Is.EqualTo(originalState));
         }
         finally { Object.DestroyImmediate(root); }
     }

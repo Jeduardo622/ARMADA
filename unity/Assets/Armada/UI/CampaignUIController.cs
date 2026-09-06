@@ -150,6 +150,33 @@ namespace Armada.Client.UI
                 () => { audio.ToggleMuted(); ShowHarbor(resources, chart, shipyard, captain, sails); }, 0.82f, 0.065f, 0.97f, 0.19f);
         }
 
+        public void ShowSails(CosmeticsResponse data, string selectedId, string notice,
+            Action<string> preview, Action<string> equip, Action cancel, Action back)
+        {
+            BeginScreen("Sails", false);
+            Panel("Header", _screen, 0, 0.82f, 1, 1, Navy);
+            Panel("CatalogShade", _screen, 0, 0, 0.50f, 0.82f, Navy);
+            Panel("Footer", _screen, 0.50f, 0, 1, 0.22f, Navy);
+            Label("Title", _screen, "THE SAIL LOFT", 48, Brass, 0.05f, 0.84f, 0.75f, 0.97f);
+            Button("Back", _screen, "HARBOR", back, 0.80f, 0.85f, 0.96f, 0.98f);
+            Label("SailHint", _screen, "Choose a sail to preview on your sloop.\nStarter sails are free and change appearance only.", 28, Parchment, 0.05f, 0.64f, 0.46f, 0.80f);
+            var catalog = data.Catalog ?? new List<CosmeticSail>();
+            for (var i = 0; i < catalog.Count; i++)
+            {
+                var sail = catalog[i];
+                var y = 0.60f - i * 0.16f;
+                var button = Button("Preview_" + sail.SailId, _screen,
+                    sail.DisplayName.ToUpperInvariant() + (sail.SailId == data.EquippedId ? "  /  EQUIPPED" : ""),
+                    () => preview(sail.SailId), 0.05f, y - 0.13f, 0.46f, y, sail.SailId == selectedId);
+                button.interactable = data.OwnedIds?.Contains(sail.SailId) == true;
+            }
+            var canApply = selectedId != data.EquippedId && data.OwnedIds?.Contains(selectedId) == true && catalog.Any(s => s.SailId == selectedId);
+            var apply = Button("ApplySail", _screen, "APPLY SAIL", () => equip(selectedId), 0.05f, 0.12f, 0.25f, 0.25f, canApply);
+            apply.interactable = canApply;
+            Button("CancelPreview", _screen, "CANCEL PREVIEW", cancel, 0.27f, 0.12f, 0.47f, 0.25f);
+            Label("Notice", _screen, notice ?? "Preview changes are temporary until you apply the sail.", 25, Parchment, 0.54f, 0.035f, 0.96f, 0.19f);
+        }
+
         public void ShowCaptain(CaptainProgressionResponse data, List<InventoryItem> inventory, string notice,
             Action<int> train, Action<string, string> assignCrew, Action back)
         {

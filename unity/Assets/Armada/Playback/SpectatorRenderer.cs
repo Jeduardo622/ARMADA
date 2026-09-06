@@ -327,6 +327,16 @@ namespace Armada.Client.Playback
             }
         }
 
+        /// <summary>Presentation-only enlarged model; a normal board recreates standard instances.</summary>
+        public void ShowSailPreview(SimShip ship)
+        {
+            ShowBoard(new List<SimShip> { ship }, "Sail preview");
+            if (ship?.Id == null || !_markers.TryGetValue(ship.Id, out var marker)) return;
+            marker.View.ApplyUniformScale(6);
+            marker.HullBar.gameObject.SetActive(false);
+            marker.SailBar.gameObject.SetActive(false);
+        }
+
         public bool TryGetMarkerPosition(string shipId, out Vector3 position)
         {
             if (shipId != null && _markers.TryGetValue(shipId, out var marker))

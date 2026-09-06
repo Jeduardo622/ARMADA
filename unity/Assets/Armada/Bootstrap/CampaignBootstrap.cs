@@ -25,6 +25,12 @@ namespace Armada.Client.Bootstrap
         private InventoryService _inventory;
         private CampaignProgressService _progress;
         private UpgradesService _upgrades;
+        private CosmeticsService _cosmetics;
+        private CosmeticsResponse _sailCatalog;
+        private CosmeticsPreviewSession _sailPreview;
+        private Rect _battleViewport;
+        private Vector3 _battleCameraPosition;
+        private float _battleCameraSize;
         private CaptainProgressionService _captain;
         private readonly HashSet<string> _completed = new();
         private readonly Dictionary<string, int?> _stars = new();
@@ -50,6 +56,13 @@ namespace Armada.Client.Bootstrap
             _inventory = new InventoryService(api, flags);
             _progress = new CampaignProgressService(api);
             _upgrades = new UpgradesService(api, flags);
+            _cosmetics = new CosmeticsService(api);
+            if (Camera.main != null)
+            {
+                _battleViewport = Camera.main.rect;
+                _battleCameraPosition = Camera.main.transform.position;
+                _battleCameraSize = Camera.main.orthographicSize;
+            }
             _captain = new CaptainProgressionService(api);
             play.enabled = false;
         }
@@ -58,6 +71,7 @@ namespace Armada.Client.Bootstrap
         private async Task LoadHarborAsync()
         {
             _loading = true;
+            RestoreBattleCamera();
             play.enabled = false;
             view.ShowMessage("WELCOME ABOARD", "Opening your captain's log…", null);
             try
@@ -76,8 +90,9 @@ namespace Armada.Client.Bootstrap
                 }
                 var progress = await _progress.GetAsync();
                 var inventory = await _inventory.ListAsync(PlayerId);
+                var cosmetics = await _cosmetics.GetAsync();
                 if (this == null) return;
-                if (!progress.Success || progress.Data?.Progress == null || !inventory.Success || inventory.Data == null)
+                if (!progress.Success || progress.Data?.Progress == null || !inventory.Success || inventory.Data == null || !cosmetics.Success)
                 {
                     view.ShowMessage("LOGBOOK UNAVAILABLE", "Your saved progress and supplies could not be loaded. Retry to continue.", GoHarbor);
                     return;
@@ -90,7 +105,9 @@ namespace Armada.Client.Bootstrap
                     _stars[row.MissionCode] = row.VerifiedStars;
                 }
                 _items = inventory.Data;
-                view.ShowHarbor(Resources(), ShowChart, ShowShipyard, ShowCaptain);
+                _sailCatalog = cosmetics.Data;
+                _sailPreview = new CosmeticsPreviewSession(_sailCatalog, spectator.SetPlayerSailCosmetic);
+                view.ShowHarbor(Resources(), ShowChart, ShowShipyard, ShowCaptain, ShowSails);
             }
             catch (Exception) { if (this != null) view.ShowMessage("CONNECTION LOST", "Your saved captain is kept. Retry when the connection returns.", GoHarbor); }
             finally { _loading = false; }
@@ -108,6 +125,7 @@ namespace Armada.Client.Bootstrap
         public void Launch(int number)
         {
             if (_loading || number < 1 || number > CampaignCatalog.All.Count) return;
+            RestoreBattleCamera();
             var mission = CampaignCatalog.All[number - 1];
             if (number > 1 && !_completed.Contains(mission.Code) && !_completed.Contains(CampaignCatalog.All[number - 2].Code)) return;
             var session = new CampaignBattleSession(mission, new CampaignMissionClient(_missions, _upgrades, _captain));
@@ -122,6 +140,62 @@ namespace Armada.Client.Bootstrap
             play.BeginMission();
         }
         public void ShowShipyard() { if (!_loading) ActiveOperation = LoadShipyardAsync(null); }
+        public void ShowSails() { if (!_loading) ActiveOperation = LoadSailsAsync(null); }
+
+        private void RestoreBattleCamera()
+        {
+            if (Camera.main == null || _battleCameraSize <= 0) return;
+            Camera.main.rect = _battleViewport;
+            Camera.main.transform.position = _battleCameraPosition;
+            Camera.main.orthographicSize = _battleCameraSize;
+        }
+        private async Task LoadSailsAsync(string notice)
+        {
+            _loading = true;
+            view.ShowMessage("THE SAIL LOFT", "Reading your saved sails…", null);
+            try
+            {
+                var response = await _cosmetics.GetAsync();
+                if (this == null) return;
+                if (!response.Success) throw new InvalidOperationException();
+                _sailCatalog = response.Data;
+                _sailPreview = new CosmeticsPreviewSession(_sailCatalog, spectator.SetPlayerSailCosmetic);
+                var ship = CampaignCatalog.All[0].StartState().Ships.First(s => s.Side == "player");
+                ship.Position = new SimVector2();
+                spectator.ShowSailPreview(ship);
+                if (Camera.main != null)
+                {
+                    Camera.main.rect = new Rect(0.50f, 0.22f, 0.50f, 0.60f);
+                    Camera.main.transform.position = new Vector3(0, _battleCameraPosition.y, 0);
+                    Camera.main.orthographicSize = 12;
+                }
+                RenderSails(notice);
+            }
+            catch (Exception)
+            {
+                if (this != null) view.ShowMessage("SAILS UNAVAILABLE", "Your saved sails could not be loaded. Retry when connected.", ShowSails, GoHarbor);
+            }
+            finally { _loading = false; }
+        }
+        private void RenderSails(string notice) => view.ShowSails(_sailCatalog, _sailPreview.SelectedId, notice,
+            id => { if (!_loading && _sailPreview.Preview(id)) RenderSails(null); },
+            id => { if (!_loading) ActiveOperation = EquipSailAsync(id); },
+            () => { if (!_loading) { _sailPreview.Cancel(); RenderSails(null); } },
+            () => { if (!_loading) { _sailPreview.Cancel(); GoHarbor(); } });
+        private async Task EquipSailAsync(string sailId)
+        {
+            _loading = true;
+            view.ShowMessage("FITTING SAILS", "Confirming your chosen sail…", null);
+            var notice = "The change could not be confirmed. Your saved sail has been refreshed below.";
+            try
+            {
+                var response = await _cosmetics.EquipAsync(sailId);
+                if (response.Success) notice = "Sail equipped. Your appearance is saved.";
+            }
+            catch (Exception) { }
+            finally { _loading = false; }
+            if (this != null) await LoadSailsAsync(notice);
+        }
         public void ShowCaptain() { if (!_loading) ActiveOperation = LoadCaptainAsync(null); }
 
         private async Task LoadCaptainAsync(string notice)
