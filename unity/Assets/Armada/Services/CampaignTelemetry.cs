@@ -19,7 +19,7 @@ namespace Armada.Client.Services
             if (_sessionStarted) return;
             _sessionStarted = true;
             Emit("session_start", new Dictionary<string, object> {
-                ["platform"] = Allowed(platform, "windows", "android", "ios", "mac", "linux"),
+                ["platform"] = Allowed(platform, "editor", "windows", "android", "ios", "mac", "linux"),
                 ["memory_class"] = memoryMb <= 0 ? "unknown" : memoryMb <= 2048 ? "up_to_2gb" : memoryMb <= 4096 ? "up_to_4gb" : memoryMb <= 8192 ? "up_to_8gb" : "over_8gb"
             });
         }

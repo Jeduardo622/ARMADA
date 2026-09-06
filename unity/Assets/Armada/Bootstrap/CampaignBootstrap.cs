@@ -21,6 +21,12 @@ namespace Armada.Client.Bootstrap
         [SerializeField] private SpectatorRenderer spectator;
         [SerializeField] private CampaignPlayController play;
         private AuthService _auth;
+        private ApiClient _api;
+        private TelemetryService _telemetryService;
+        private CampaignTelemetry _telemetry;
+        private float _sessionStarted;
+        private float _perfSeconds;
+        private int _perfFrames;
         private MissionService _missions;
         private InventoryService _inventory;
         private CampaignProgressService _progress;
@@ -51,6 +57,7 @@ namespace Armada.Client.Bootstrap
             var json = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
             var flags = new FeatureFlags(clientConfig.FeatureToggles);
             var api = new ApiClient(clientConfig.BaseUrl, new AuthProxy(() => _auth?.GetTokenAsync()), json);
+            _api = api;
             _auth = new AuthService(api, json);
             _missions = new MissionService(api, flags);
             _inventory = new InventoryService(api, flags);
@@ -88,6 +95,7 @@ namespace Armada.Client.Bootstrap
                     view.ShowMessage("UNABLE TO SIGN IN", message, GoHarbor);
                     return;
                 }
+                StartTelemetry();
                 var progress = await _progress.GetAsync();
                 var inventory = await _inventory.ListAsync(PlayerId);
                 var cosmetics = await _cosmetics.GetAsync();
@@ -135,7 +143,7 @@ namespace Armada.Client.Bootstrap
                 _completed.Add(mission.Code);
                 _stars[mission.Code] = Math.Max(_stars.TryGetValue(mission.Code, out var rating) ? rating ?? 0 : 0, session.Stars);
                 if (next > CampaignCatalog.All.Count) ShowChart(); else ShowBriefing(next);
-            });
+            }, _telemetry);
             play.enabled = true;
             play.BeginMission();
         }
@@ -160,6 +168,7 @@ namespace Armada.Client.Bootstrap
                 if (!response.Success) throw new InvalidOperationException();
                 _sailCatalog = response.Data;
                 _sailPreview = new CosmeticsPreviewSession(_sailCatalog, spectator.SetPlayerSailCosmetic);
+                foreach (var id in _sailCatalog.OwnedIds) _telemetry?.SailImpression(id);
                 var ship = CampaignCatalog.All[0].StartState().Ships.First(s => s.Side == "player");
                 ship.Position = new SimVector2();
                 spectator.ShowSailPreview(ship);
@@ -178,8 +187,8 @@ namespace Armada.Client.Bootstrap
             finally { _loading = false; }
         }
         private void RenderSails(string notice) => view.ShowSails(_sailCatalog, _sailPreview.SelectedId, notice,
-            id => { if (!_loading && _sailPreview.Preview(id)) RenderSails(null); },
-            id => { if (!_loading) ActiveOperation = EquipSailAsync(id); },
+            id => { if (!_loading && _sailPreview.Preview(id)) { _telemetry?.SailClick(id); RenderSails(null); } },
+            id => { if (!_loading) { _telemetry?.SailClick(id); ActiveOperation = EquipSailAsync(id); } },
             () => { if (!_loading) { _sailPreview.Cancel(); RenderSails(null); } },
             () => { if (!_loading) { _sailPreview.Cancel(); GoHarbor(); } });
         private async Task EquipSailAsync(string sailId)
@@ -225,7 +234,7 @@ namespace Armada.Client.Bootstrap
 
         private void TrainCaptain(int displayedSequence)
         {
-            if (!_loading) ActiveOperation = ChangeCaptainAsync(() => _captain.TrainAsync(displayedSequence), "Training confirmed.");
+            if (!_loading) ActiveOperation = ChangeCaptainAsync(() => _captain.TrainAsync(displayedSequence), "Training confirmed.", true);
         }
 
         private void AssignCrew(string firstMate, string gunneryChief)
@@ -233,8 +242,10 @@ namespace Armada.Client.Bootstrap
             if (!_loading) ActiveOperation = ChangeCaptainAsync(() => _captain.AssignCrewAsync(firstMate, gunneryChief), "Crew assignments confirmed.");
         }
 
-        private async Task ChangeCaptainAsync(Func<Task<ApiResponse<CaptainProgressionResponse>>> change, string successNotice)
+        private async Task ChangeCaptainAsync(Func<Task<ApiResponse<CaptainProgressionResponse>>> change, string successNotice, bool training = false)
         {
+            var previousShards = Quantity("captain_shard");
+            var confirmed = false;
             _loading = true;
             view.ShowMessage("UPDATING SERVICE RECORD", "Waiting for the harbor master to confirm…", null);
             var notice = "The change could not be confirmed. The current captain, crew and shard balance are shown below. Check them before choosing another action.";
@@ -243,11 +254,13 @@ namespace Armada.Client.Bootstrap
                 // Exactly one request for the displayed sequence/slots. An
                 // ambiguous response only triggers reads, never another charge.
                 var result = await change();
-                if (result.Success && result.Data?.Captain != null && result.Data.Crew != null) notice = successNotice;
+                if (result.Success && result.Data?.Captain != null && result.Data.Crew != null) { notice = successNotice; confirmed = true; }
             }
             catch (Exception) { }
             finally { _loading = false; }
             if (this != null) await LoadCaptainAsync(notice);
+            if (this != null && training && confirmed)
+                _telemetry?.Economy(false, "captain_shard", previousShards - Quantity("captain_shard"), "captain_training");
         }
 
         private async Task LoadShipyardAsync(string notice)
@@ -283,11 +296,45 @@ namespace Armada.Client.Bootstrap
             {
                 // Use exactly the tier displayed by the button. Never retry by buying a newly computed next tier.
                 var result = await _upgrades.PurchaseAsync(new UpgradePurchaseRequest { PlayerId = PlayerId, Component = component, Tier = tier });
-                if (result.Success) notice = "Fitting installed. Your ship is ready.";
+                if (result.Success)
+                {
+                    notice = "Fitting installed. Your ship is ready.";
+                    if (result.Data?.Spent != null) foreach (var cost in result.Data.Spent)
+                        _telemetry?.Economy(false, cost.ItemKey, cost.Quantity, "upgrade_" + component);
+                }
             }
             catch (Exception) { }
             finally { _loading = false; }
             if (this != null) await LoadShipyardAsync(notice);
+        }
+        private void StartTelemetry()
+        {
+            if (_telemetry != null) return;
+            var json = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+            _telemetryService = new TelemetryService(_api, new TelemetryQueue(json, clientConfig.TelemetryMaxPayloadBytes),
+                clientConfig.TelemetryFlushSeconds, clientConfig.TelemetryMaxBatchSize, clientConfig.TelemetryMaxPayloadBytes, PlayerId);
+            _telemetry = new CampaignTelemetry(_telemetryService);
+            _sessionStarted = Time.realtimeSinceStartup;
+            var platform = Application.isEditor ? "editor" : Application.platform == RuntimePlatform.Android ? "android"
+                : Application.platform == RuntimePlatform.IPhonePlayer ? "ios" : Application.platform == RuntimePlatform.WindowsPlayer ? "windows"
+                : Application.platform == RuntimePlatform.OSXPlayer ? "mac" : "linux";
+            _telemetry.SessionStart(platform, SystemInfo.systemMemorySize);
+            _telemetryService.Start();
+        }
+        private void Update()
+        {
+            if (_telemetry == null) return;
+            _perfSeconds += Time.unscaledDeltaTime;
+            _perfFrames++;
+            if (_perfSeconds < 30) return;
+            _telemetry.Performance(_perfFrames / _perfSeconds, _perfSeconds * 1000 / _perfFrames);
+            _perfSeconds = 0; _perfFrames = 0;
+        }
+        private void OnApplicationQuit() => _telemetry?.SessionEnd(Time.realtimeSinceStartup - _sessionStarted);
+        private void OnDestroy()
+        {
+            _telemetry?.SessionEnd(Time.realtimeSinceStartup - _sessionStarted);
+            _telemetryService?.Dispose();
         }
         private sealed class AuthProxy : IAuthProvider
         {

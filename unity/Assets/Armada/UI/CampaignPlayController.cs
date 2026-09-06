@@ -19,14 +19,17 @@ namespace Armada.Client.UI
         private Action<int> _next;
         private CampaignBattleActions _actions;
         private bool _advancing;
+        private CampaignTelemetry _telemetry;
+        private bool _telemetryEnded;
         public CampaignBattleSession Session { get; private set; }
         public Task ActiveOperation { get; private set; } = Task.CompletedTask;
 
         public void Compose(CampaignUIController view, SpectatorRenderer renderer, CampaignBattleSession session,
-            Func<string> playerId, Action harbor, Action<int> next)
+            Func<string> playerId, Action harbor, Action<int> next, CampaignTelemetry telemetry = null)
         {
             _view = view; _renderer = renderer; Session = session;
             _playerId = playerId; _harbor = harbor; _next = next;
+            _telemetry = telemetry;
             _actions = new CampaignBattleActions
             {
                 NextShip = OnNextShip, TurnLeft = OnTurnLeft, TurnRight = OnTurnRight,
@@ -39,11 +42,14 @@ namespace Armada.Client.UI
         public void BeginMission() { if (Session != null && !Session.IsBusy) ActiveOperation = BeginAsync(); }
         private async Task BeginAsync()
         {
+            _telemetryEnded = false;
+            _telemetry?.MissionStart(Session.Mission.Number);
             _view.ShowMessage("PREPARING TO SAIL", "Reading the wind and enemy formation…", null);
             await Session.BeginAsync();
             if (this == null) return;
             if (Session.Phase == CampaignPhase.Error)
             {
+                EndTelemetry(false, "load_failed");
                 _view.ShowMessage("UNABLE TO SAIL", "The battle could not be loaded. Check your connection and retry.", BeginMission, _harbor);
                 return;
             }
@@ -132,8 +138,23 @@ namespace Armada.Client.UI
             if (Session.Phase == CampaignPhase.OrderEntry || Session.Phase == CampaignPhase.SaveFailed)
                 _view.ConfirmLeave(Session.Phase == CampaignPhase.SaveFailed
                     ? "This victory has not been saved. Leaving will lose this battle and its unclaimed rewards. Previously saved progress is kept."
-                    : "Your current battle will be lost. Saved campaign progress is kept.", Render, () => { enabled = false; _harbor(); });
-            else { enabled = false; _harbor(); }
+                    : "Your current battle will be lost. Saved campaign progress is kept.", Render, LeaveToHarbor);
+            else LeaveToHarbor();
+        }
+        private void LeaveToHarbor()
+        {
+            EndTelemetry(false, "abandoned");
+            enabled = false;
+            _harbor();
+        }
+        private void EndTelemetry(bool won, string reason)
+        {
+            if (_telemetryEnded || Session == null) return;
+            _telemetryEnded = true;
+            _telemetry?.MissionEnd(Session.Mission.Number, won, reason, Session.AuthoredTurns, Session.Stars);
+            if (won && Session.SavedResult?.Data?.RewardsGranted != null)
+                foreach (var reward in Session.SavedResult.Data.RewardsGranted)
+                    _telemetry?.Economy(true, reward.ItemKey, reward.Quantity, "mission_clear");
         }
         private void ShowBoard()
         {
@@ -143,6 +164,8 @@ namespace Armada.Client.UI
         private void Render()
         {
             var phase = Session.Phase;
+            if (phase == CampaignPhase.Saved) EndTelemetry(true, null);
+            else if (phase == CampaignPhase.Defeat) EndTelemetry(false, Session.Outcome?.FailReason);
             if (phase == CampaignPhase.OrderEntry || phase == CampaignPhase.Resolving || phase == CampaignPhase.Playback)
             {
                 _view.ShowBattle(Session.Mission, phase == CampaignPhase.OrderEntry ? Session.TurnNumber : Session.AuthoredTurns,

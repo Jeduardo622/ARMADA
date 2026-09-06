@@ -184,7 +184,9 @@ namespace Armada.Client.Core
     public sealed class TelemetryIngestRequest
     {
         public int SchemaVersion { get; set; } = 1;
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string PlayerId { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string MissionCode { get; set; }
         public Dictionary<string, object> Payload { get; set; }
     }

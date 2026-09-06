@@ -14,6 +14,8 @@ Each battle reads owned component tiers and captain/crew once. That defensive sn
 
 The Sail Loft previews Default and free Harbor Blue on an enlarged sloop. Cancel restores the saved appearance; Apply sends the selected owned ID and refreshes saved equipment. The tint changes separately authored sails on player ships, preserving hull and faction markings. Greybox frigate/clipper/brig models with combined rig meshes retain their authored appearance. Preview enlargement and hidden readouts end when a normal battle board is created. See `campaign-local-builds.md` for standalone development builds.
 
+Campaign telemetry records sessions, mission outcomes, confirmed reward and upgrade changes, sail interactions, and coarse performance buckets through the authenticated ingest API. Its memory-only queue is bounded to 256 events / 256 KB, retains failed batches within that bound, and preserves Unity's thread context. Events contain allowlisted values, not credentials or raw errors. Training spend is an observed balance change after a confirmed request; these client events are diagnostics, not an accounting ledger. Shutdown delivery is best effort, and an already-started request can finish after disposal.
+
 ## Evidence and verification
 
 The first actual Unity campaign pass on 2026-09-06 completed all ten missions with three stars shown, through normal controller order handlers and actual API playback/completion. Winning turn counts: **5, 5, 9, 5, 8, 10, 7, 8, 6, 8**. This is local runtime proof, not device performance or release evidence.
@@ -24,4 +26,4 @@ Focused tests cover maneuver serialization, order bounds, proof snapshots, forec
 
 ## Risk and rollback
 
-Class C applies to authentication, API integration, state serialization and purchase boundaries. Backend/Security and Unity review plus human merge are required. Revert the campaign client commit to return to the existing demo entry points; retain protected guest credentials and additive server progress columns. No production or store deployment is part of this local slice.
+Class C applies to authentication, API integration, state serialization, telemetry and purchase boundaries. Backend/Security and Unity review plus human merge are required. Revert the campaign client commit to return to the existing demo entry points; retain protected guest credentials and additive server progress columns. Revert telemetry wiring and its service/helper commit together to remove campaign event collection. No production or store deployment is part of this local slice.

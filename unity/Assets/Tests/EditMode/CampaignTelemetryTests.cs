@@ -14,6 +14,20 @@ namespace Armada.Client.Tests
     public sealed class CampaignTelemetryTests
     {
         [Test]
+        public void Envelope_OmitsAbsentOptionalFieldsAndPreservesMissionScope()
+        {
+            var settings = new JsonSerializerSettings { ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver() };
+            var request = new TelemetryIngestRequest { Payload = new Dictionary<string, object>() };
+            var json = Newtonsoft.Json.Linq.JObject.Parse(JsonConvert.SerializeObject(request, settings));
+            Assert.That(json.Property("missionCode"), Is.Null);
+            Assert.That(json.Property("playerId"), Is.Null);
+            request.PlayerId = "owner"; request.MissionCode = "mission_01";
+            json = Newtonsoft.Json.Linq.JObject.Parse(JsonConvert.SerializeObject(request, settings));
+            Assert.That((string)json["playerId"], Is.EqualTo("owner"));
+            Assert.That((string)json["missionCode"], Is.EqualTo("mission_01"));
+        }
+
+        [Test]
         public void Queue_BoundsOfflineMemoryAndFreezesAcceptedEvents()
         {
             var queue = new TelemetryQueue(new JsonSerializerSettings(), 1024);
