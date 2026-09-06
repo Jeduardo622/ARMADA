@@ -7,7 +7,7 @@ node scripts/campaign/build-local.mjs windows
 node scripts/campaign/build-local.mjs android
 ```
 
-The runner copies the project into a temporary sandbox and builds `Campaign.unity` as the only entry scene. It changes player settings in that sandbox. Windows uses Mono; Android uses IL2CPP/ARM64. Both are development builds. A failed build or stale artifact is reported as failure.
+The runner copies the project into a temporary sandbox and builds `Campaign.unity` as the only entry scene. It changes player settings in that sandbox. Windows uses Mono; Android uses IL2CPP/ARM64. Both are local test artifacts with the Unity Development Player flag off, so gameplay does not need a profiler/discovery listener. The existing company/product storage namespace is preserved. A failed build or stale artifact is reported as failure.
 
 Outputs are `reports/campaign/windows/Armada.exe` (keep its adjacent data files) and `reports/campaign/android/armada.apk`. Logs are `build.log` beside each output. Start the local backend on port 4500 before playing. Windows opens a 1600×900 window and stores its guest credential with current-user DPAPI.
 

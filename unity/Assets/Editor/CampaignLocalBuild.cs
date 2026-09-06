@@ -38,7 +38,8 @@ public static class CampaignLocalBuild
         // rejects non-HTTPS origins other than loopback; Android uses adb reverse.
         PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output)));
-        var report = BuildPipeline.BuildPlayer(new[] { "Assets/Scenes/Campaign.unity" }, output, target, BuildOptions.Development);
+        // No development-player discovery/profiler listener is needed for play.
+        var report = BuildPipeline.BuildPlayer(new[] { "Assets/Scenes/Campaign.unity" }, output, target, BuildOptions.None);
         if (report.summary.result != BuildResult.Succeeded)
             throw new InvalidOperationException($"Campaign build {report.summary.result}: {report.summary.totalErrors} errors.");
         Debug.Log($"Campaign build succeeded: {report.summary.totalSize} bytes -> {output}");
