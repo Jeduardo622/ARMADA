@@ -28,6 +28,7 @@ model Player {
   matchSeats  MatchParticipant[]
   guestCredentials GuestCredential[]
   progression PlayerProgression?
+  cosmetics PlayerCosmetics?
 }
 
 model PlayerProgression {
@@ -37,6 +38,12 @@ model PlayerProgression {
   firstMate String?
   gunneryChief String?
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model PlayerCosmetics {
+  playerId     String @id
+  player       Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  equippedSail String @default("default")
 }
 
 // Opaque bearer credentials: only a SHA-256 digest is stored. They grant

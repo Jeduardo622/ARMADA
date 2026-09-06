@@ -11,6 +11,38 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    PlayerCosmetics:
+      type: object
+      additionalProperties: false
+      required: [catalogVersion, catalog, ownedIds, equippedId]
+      properties:
+        catalogVersion:
+          type: integer
+          example: 1
+        catalog:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [sailId, displayName, sailColor]
+            properties:
+              sailId:
+                type: string
+              displayName:
+                type: string
+              sailColor:
+                type: string
+                nullable: true
+                description: Null preserves the default authored sail appearance. Presentation only.
+                example: '#6C9FC0'
+        ownedIds:
+          type: array
+          description: Both starter sails are free test content; no purchased entitlement or charge.
+          items:
+            type: string
+        equippedId:
+          type: string
+          enum: [default, harbor_blue]
     ErrorResponse:
       type: object
       properties:
@@ -2036,6 +2068,56 @@ components:
         algorithm:
           type: string
 paths:
+  /players/me/cosmetics:
+    get:
+      summary: Read owned starter sails and saved equipment for the authenticated player
+      description: No query parameters. Returns default equipment without writing if no selection exists. Cache-Control is no-store.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Versioned presentation-only catalog and saved equipment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerCosmetics'
+        '400':
+          description: Unexpected query parameter
+        '401':
+          description: Authentication required
+        '404':
+          description: Player not found
+  /players/me/cosmetics/equip:
+    post:
+      summary: Persist a free owned starter sail for the authenticated player
+      description: No query parameters, payments, combat fields, or client-selected player IDs. Repeating the same selection is safe. Cache-Control is no-store.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sailId]
+              properties:
+                sailId:
+                  type: string
+                  enum: [default, harbor_blue]
+      responses:
+        '200':
+          description: Saved equipment and versioned catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerCosmetics'
+        '400':
+          description: Unknown sail or malformed request
+        '401':
+          description: Authentication required
+        '404':
+          description: Player not found
   /healthz:
     get:
       summary: Liveness probe

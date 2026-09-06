@@ -23,6 +23,7 @@ import { registerPvpRoutes } from './routes/pvp.js';
 import { registerSimRoutes } from './routes/sim.js';
 import { registerTelemetryRoutes } from './routes/telemetry.js';
 import { registerConfigRoutes } from './routes/config.js';
+import { registerCosmeticsRoutes } from './routes/cosmetics.js';
 
 type BuildOptions = {
   testing?: boolean;
@@ -115,6 +116,7 @@ export function buildServer(options?: BuildOptions) {
     registerSimRoutes(app);
     registerTelemetryRoutes(app);
     registerConfigRoutes(app);
+    registerCosmeticsRoutes(app);
   });
 
   return app;
