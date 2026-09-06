@@ -26,6 +26,21 @@ model Player {
   telemetry   TelemetryEvent[]
   upgrades    PlayerShipUpgrade[]
   matchSeats  MatchParticipant[]
+  guestCredentials GuestCredential[]
+}
+
+// Opaque bearer credentials: only a SHA-256 digest is stored. They grant
+// access to one guest identity and are never recoverable from public IDs.
+model GuestCredential {
+  id        String   @id @default(uuid())
+  playerId  String
+  digest    String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
 }
 
 // Server-authoritative PvP match lifecycle (pvp_api routes). Status/side/

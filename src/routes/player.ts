@@ -8,6 +8,22 @@ const createPlayerSchema = z.object({
 });
 
 export function registerPlayerRoutes(app: FastifyInstance) {
+  app.get('/players/me/progress', async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    if (!request.user?.id) return reply.status(401).send({ error: 'unauthorized' });
+    if (!z.object({}).strict().safeParse(request.query).success) {
+      return reply.status(400).send({ error: 'invalid_request' });
+    }
+    const rows = await app.prisma.missionProgress.findMany({
+      where: { playerId: request.user.id },
+      select: { mission: { select: { code: true } }, status: true, lastResult: true },
+      orderBy: { mission: { code: 'asc' } }
+    });
+    return { progress: rows.map((row) => ({
+      missionCode: row.mission.code, status: row.status, lastResult: row.lastResult
+    })) };
+  });
+
   app.post('/players', async (request, reply) => {
     const parsed = createPlayerSchema.safeParse(request.body);
     if (!parsed.success) {
