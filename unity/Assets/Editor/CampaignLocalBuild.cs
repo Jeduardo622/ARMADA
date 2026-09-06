@@ -31,7 +31,8 @@ public static class CampaignLocalBuild
     {
         var output = Environment.GetEnvironmentVariable("ARMADA_CAMPAIGN_BUILD_OUT");
         if (string.IsNullOrWhiteSpace(output)) throw new InvalidOperationException("Use the local campaign build runner.");
-        PlayerSettings.companyName = "Armada";
+        // Preserve the project's company/product storage namespace so local
+        // development builds can reopen the Editor's protected captain profile.
         PlayerSettings.productName = "Armada";
         // Loopback HTTP is a development transport. Guest storage independently
         // rejects non-HTTPS origins other than loopback; Android uses adb reverse.
