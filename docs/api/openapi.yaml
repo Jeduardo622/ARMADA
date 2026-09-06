@@ -39,20 +39,80 @@ components:
           format: date-time
     GuestAuthRequest:
       type: object
+      additionalProperties: false
       properties:
         externalId:
           type: string
+          maxLength: 0
+          description: Legacy empty value only. Nonempty public IDs cannot authenticate or link a player.
         displayName:
           type: string
+          maxLength: 32
         region:
           type: string
+          maxLength: 10
     GuestAuthResponse:
       type: object
+      required: [token, player, guestCredential, accessExpiresAt, credentialExpiresAt]
       properties:
         token:
           type: string
         player:
           $ref: '#/components/schemas/Player'
+        guestCredential:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          description: Opaque bearer secret returned only at issuance. Persist in protected client storage; never log it.
+        accessExpiresAt:
+          type: string
+          format: date-time
+        credentialExpiresAt:
+          type: string
+          format: date-time
+          description: Absolute expiry 180 days after issuance; refresh does not extend it.
+    GuestRefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [guestCredential]
+      properties:
+        guestCredential:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+    GuestRefreshResponse:
+      type: object
+      required: [token, player, accessExpiresAt, credentialExpiresAt]
+      properties:
+        token:
+          type: string
+        player:
+          $ref: '#/components/schemas/Player'
+        accessExpiresAt:
+          type: string
+          format: date-time
+        credentialExpiresAt:
+          type: string
+          format: date-time
+    OwnedCampaignProgress:
+      type: object
+      required: [progress]
+      properties:
+        progress:
+          type: array
+          description: Persisted records for the authenticated player, sorted by mission code. An absent record means no saved progress. Client-claimed bestScore is deliberately excluded.
+          items:
+            type: object
+            required: [missionCode, status, lastResult]
+            properties:
+              missionCode:
+                type: string
+              status:
+                type: string
+                enum: [NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED]
+              lastResult:
+                type: object
+                nullable: true
+                additionalProperties: true
+                description: Persisted client result metadata, not an authoritative star rating. Completion status is server-validated separately.
     CreatePlayerRequest:
       type: object
       properties:
@@ -1834,7 +1894,8 @@ paths:
           description: Ready
   /auth/guest:
     post:
-      summary: Guest auth placeholder
+      summary: Register a new guest and issue a durable credential
+      description: Creates a new identity atomically with its credential. Never resumes by externalId. Responses are no-store. Use HTTPS outside loopback development.
       requestBody:
         required: false
         content:
@@ -1843,7 +1904,7 @@ paths:
               $ref: '#/components/schemas/GuestAuthRequest'
       responses:
         '200':
-          description: Guest token issued
+          description: New player, access token and one-time credential issued
           content:
             application/json:
               schema:
@@ -1854,6 +1915,70 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /auth/refresh:
+    post:
+      summary: Restore a guest session with its opaque credential
+      description: Does not rotate or extend the credential. Missing, malformed, unknown, expired and revoked credentials return the same unauthorized response. Responses are no-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestRefreshRequest'
+      responses:
+        '200':
+          description: Access token issued for the credential owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestRefreshResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/guest/credential:
+    post:
+      summary: Enroll a durable credential for an existing authenticated session
+      description: Uses only the verified JWT subject. Existing unexpired tokens remain compatible. Expired legacy sessions cannot recover by public ID. Responses are no-store.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: New credential for the authenticated player
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestAuthResponse'
+        '400':
+          description: Body must be empty; identity selectors are rejected
+        '401':
+          description: Unauthorized or player no longer exists
+  /players/me/progress:
+    get:
+      summary: Read the authenticated player's persisted campaign progress
+      description: No player selector or query parameters are accepted. Responses are no-store.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Owned persisted mission records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnedCampaignProgress'
+        '400':
+          description: Query parameters are not accepted
+        '401':
+          description: Unauthorized
   /players:
     post:
       summary: Create player

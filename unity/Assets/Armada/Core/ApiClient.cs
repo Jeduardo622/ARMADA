@@ -18,6 +18,7 @@ namespace Armada.Client.Core
     public sealed class ApiClient
     {
         private readonly string _baseUrl;
+        public string BaseUrl => _baseUrl;
         private readonly IAuthProvider _authProvider;
         private JsonSerializerSettings _jsonSettings = new()
         {
@@ -63,7 +64,9 @@ namespace Armada.Client.Core
 
             if (requiresAuth && _authProvider != null && !IsHealthPath(path))
             {
-                var token = await _authProvider.GetTokenAsync().ConfigureAwait(false);
+                // Authentication may refresh asynchronously. Preserve Unity's
+                // synchronization context before sending the native request.
+                var token = await _authProvider.GetTokenAsync();
                 if (!string.IsNullOrWhiteSpace(token))
                 {
                     request.SetRequestHeader("Authorization", $"Bearer {token}");

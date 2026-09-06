@@ -4,7 +4,7 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import { env } from '../config.js';
 import type { AuthUser } from '../types.js';
 
-const PUBLIC_ROUTES = new Set(['/healthz', '/readyz', '/auth/guest']);
+const PUBLIC_ROUTES = new Set(['/healthz', '/readyz', '/auth/guest', '/auth/refresh']);
 
 function extractToken(header?: string) {
   if (!header) return null;

@@ -1,0 +1,2 @@
+# Vite's SSR hashbang parser requires LF even on Windows checkouts.
+scripts/harness/verify-pr-head.mjs text eol=lf

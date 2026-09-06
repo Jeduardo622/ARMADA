@@ -506,6 +506,7 @@ namespace Armada.Client.Tests.PlayMode
                     .SetValue(authService, new AuthState
                     {
                         Token = "test-token",
+                        AccessExpiresAt = System.DateTimeOffset.UtcNow.AddHours(1),
                         Player = new Player { Id = "11111111-1111-1111-1111-111111111111" }
                     });
                 typeof(MissionUIController)
@@ -618,6 +619,7 @@ namespace Armada.Client.Tests.PlayMode
                     .SetValue(authService, new AuthState
                     {
                         Token = "test-token",
+                        AccessExpiresAt = System.DateTimeOffset.UtcNow.AddHours(1),
                         Player = new Player { Id = "11111111-1111-1111-1111-111111111111" }
                     });
                 typeof(MissionUIController)
@@ -733,6 +735,7 @@ namespace Armada.Client.Tests.PlayMode
                     .SetValue(authService, new AuthState
                     {
                         Token = "test-token",
+                        AccessExpiresAt = System.DateTimeOffset.UtcNow.AddHours(1),
                         Player = new Player { Id = "11111111-1111-1111-1111-111111111111" }
                     });
                 typeof(MissionUIController)
@@ -848,6 +851,7 @@ namespace Armada.Client.Tests.PlayMode
                     .SetValue(authService, new AuthState
                     {
                         Token = "test-token",
+                        AccessExpiresAt = System.DateTimeOffset.UtcNow.AddHours(1),
                         Player = new Player { Id = "11111111-1111-1111-1111-111111111111" }
                     });
                 typeof(MissionUIController)
@@ -2959,6 +2963,7 @@ namespace Armada.Client.Tests.PlayMode
                     .SetValue(authService, new AuthState
                     {
                         Token = "test-token",
+                        AccessExpiresAt = System.DateTimeOffset.UtcNow.AddHours(1),
                         Player = new Player { Id = "11111111-1111-1111-1111-111111111111" }
                     });
                 typeof(MissionUIController)
