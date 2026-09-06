@@ -14,6 +14,45 @@ namespace Armada.Client.Tests.EditMode
     public sealed class ArmadaEditModeTests
     {
         [Test]
+        public void GuestAuthRequest_OmitsAbsentFieldsAndPreservesProvidedFields()
+        {
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver()
+            };
+            Assert.That(JsonConvert.SerializeObject(new GuestAuthRequest(), settings), Is.EqualTo("{}"));
+            var supplied = new GuestAuthRequest { ExternalId = "qa-guest", DisplayName = "Captain", Region = "US" };
+            var json = Newtonsoft.Json.Linq.JObject.Parse(JsonConvert.SerializeObject(supplied, settings));
+            Assert.That((string)json["externalId"], Is.EqualTo("qa-guest"));
+            Assert.That((string)json["displayName"], Is.EqualTo("Captain"));
+            Assert.That((string)json["region"], Is.EqualTo("US"));
+        }
+
+        [Test]
+        public void MissionCompleteRequest_OmitsAbsentScoreAndPreservesWinProof()
+        {
+            var settings = new JsonSerializerSettings
+            {
+                ContractResolver = new CamelCasePropertyNamesContractResolver()
+            };
+            var request = new MissionCompleteRequest
+            {
+                PlayerId = "qa-player",
+                Result = new Dictionary<string, object> { ["outcome"] = "win" },
+                Seed = 872,
+                Turns = new List<List<SimOrder>>()
+            };
+            var json = Newtonsoft.Json.Linq.JObject.Parse(JsonConvert.SerializeObject(request, settings));
+            Assert.That(json.Property("bestScore"), Is.Null, "The API accepts an absent score, but rejects null.");
+            Assert.That((int)json["seed"], Is.EqualTo(872));
+            Assert.That(json["turns"].Type, Is.EqualTo(Newtonsoft.Json.Linq.JTokenType.Array));
+            Assert.That((string)json["result"]["outcome"], Is.EqualTo("win"));
+            request.BestScore = 120;
+            json = Newtonsoft.Json.Linq.JObject.Parse(JsonConvert.SerializeObject(request, settings));
+            Assert.That((int)json["bestScore"], Is.EqualTo(120));
+        }
+
+        [Test]
         public void FeatureFlags_AreCaseInsensitiveAndRespectFallbacks()
         {
             var flags = new FeatureFlags(new[]
