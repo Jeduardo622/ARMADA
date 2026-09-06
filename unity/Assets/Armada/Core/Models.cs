@@ -35,6 +35,15 @@ namespace Armada.Client.Core
     {
         public string Token { get; set; }
         public Player Player { get; set; }
+        public string GuestCredential { get; set; }
+        public DateTimeOffset AccessExpiresAt { get; set; }
+        public DateTimeOffset CredentialExpiresAt { get; set; }
+    }
+
+    [Serializable]
+    public sealed class GuestRefreshRequest
+    {
+        [JsonProperty("guestCredential")] public string GuestCredential { get; set; }
     }
 
     [Serializable]

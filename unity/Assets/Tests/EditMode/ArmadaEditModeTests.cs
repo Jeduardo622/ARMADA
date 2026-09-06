@@ -1190,7 +1190,7 @@ namespace Armada.Client.Tests.EditMode
             inFlightField.SetValue(authService, null);
             typeof(AuthService)
                 .GetField("_state", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                .SetValue(authService, new AuthState { Token = "held-token", Player = new Player { Id = "p1" } });
+                .SetValue(authService, new AuthState { Token = "held-token", Player = new Player { Id = "p1" }, AccessExpiresAt = DateTimeOffset.UtcNow.AddHours(1) });
 
             var cached = authService.GetTokenAsync();
             Assert.That(cached.IsCompleted, Is.True);
@@ -1208,13 +1208,11 @@ namespace Armada.Client.Tests.EditMode
             // Port 1 on loopback refuses connections, so the request fails
             // fast without touching the network.
             var apiClient = new ApiClient("http://127.0.0.1:1", null);
-            var authService = new AuthService(apiClient, null);
+            var authService = new AuthService(new GuestAuthTransport(apiClient), new AuthFailureTestStore(), () => DateTimeOffset.UtcNow);
             var inFlightField = typeof(AuthService).GetField(
                 "_inFlightRequest",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            var failureLog = new System.Text.RegularExpressions.Regex(@"\[Auth\] Failed to obtain token");
 
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, failureLog);
             var first = authService.GetTokenAsync();
             // The slot holds the request only while it is pending. On hosts
             // where the refused connection fails synchronously (Linux GameCI:
@@ -1233,9 +1231,9 @@ namespace Armada.Client.Tests.EditMode
 
             Assert.That(first.IsCompleted, Is.True, "first token request never completed");
             Assert.That(first.Result, Is.Null);
+            Assert.That(authService.LastError, Is.EqualTo("offline"));
             Assert.That(inFlightField.GetValue(authService), Is.Null);
 
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, failureLog);
             var second = authService.GetTokenAsync();
             Assert.That(second, Is.Not.SameAs(first));
 
@@ -1454,6 +1452,58 @@ namespace Armada.Client.Tests.EditMode
         {
             // docs/perf-budgets.md: 30 fps target on mid-tier devices.
             Assert.That(Armada.Client.UI.MobilePresentation.MobileTargetFrameRate, Is.EqualTo(30));
+        }
+
+        private sealed class AuthFailureTestStore : IGuestCredentialStore
+        {
+            public bool IsSupported => true;
+            public string Load() => null;
+            public void Save(string credential) => throw new InvalidOperationException("Unexpected registration success");
+        }
+
+        private sealed class PendingAuth : IAuthProvider
+        {
+            public readonly TaskCompletionSource<string> Completion = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            public Task<string> GetTokenAsync() => Completion.Task;
+        }
+
+        private sealed class RecordingAuthContext : System.Threading.SynchronizationContext
+        {
+            private readonly System.Threading.SynchronizationContext _inner;
+            public int ResumeThread;
+            public RecordingAuthContext(System.Threading.SynchronizationContext inner) { _inner = inner; }
+            public override void Post(System.Threading.SendOrPostCallback callback, object state)
+            {
+                _inner.Post(value => {
+                    ResumeThread = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                    callback(value);
+                }, state);
+            }
+        }
+
+        [UnityEngine.TestTools.UnityTest]
+        public System.Collections.IEnumerator ApiClient_DelayedAuthenticationReturnsToUnityContext()
+        {
+            var original = System.Threading.SynchronizationContext.Current;
+            Assert.That(original, Is.Not.Null, "Unity synchronization context required");
+            var context = new RecordingAuthContext(original);
+            var unityThread = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            var auth = new PendingAuth();
+            var api = new ApiClient("http://127.0.0.1:1", auth);
+            Task<ApiResponse<Player>> request;
+            try
+            {
+                System.Threading.SynchronizationContext.SetSynchronizationContext(context);
+                request = api.SendAsync<Player>("/players/me", "GET");
+            }
+            finally { System.Threading.SynchronizationContext.SetSynchronizationContext(original); }
+            // Simulate a delayed credential refresh completing off-thread.
+            var completion = Task.Run(() => auth.Completion.SetResult("test-token"));
+            var deadline = System.Diagnostics.Stopwatch.StartNew();
+            while ((!request.IsCompleted || !completion.IsCompleted) && deadline.Elapsed < TimeSpan.FromSeconds(15)) yield return null;
+            Assert.That(request.IsCompleted, Is.True);
+            Assert.That(request.IsFaulted, Is.False);
+            Assert.That(context.ResumeThread, Is.EqualTo(unityThread));
         }
 
         private static TelemetryEvent Event(string type, string value)
