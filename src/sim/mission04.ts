@@ -1,8 +1,9 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor } from './ai.js';
 import { createDeterministicRng } from './engine.js';
 import { classifyLoss, countBoardings } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState, Wind } from './types.js';
+import { ShipUpgradeTiers, SimOrder, SimState, Wind } from './types.js';
 
 // Mission 04 "Boarding Party" — docs/content/missions/mission-04-boarding-party.md
 export const MISSION_04_CODE = 'mission-04-boarding-party';
@@ -181,8 +182,10 @@ export interface Mission04Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission04(seed: number, playerTurnOrders: SimOrder[][]): Mission04Outcome {
+export function runMission04(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission04Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_04_TURN_LIMIT,
     createState: createMission04State,
     windForTurn: mission04WindForTurn,
@@ -208,7 +211,7 @@ export function runMission04(seed: number, playerTurnOrders: SimOrder[][]): Miss
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
-  const playerBaseHull = PLAYER_BASE_HULL_HP * MISSION_04_PLAYER_SHIP_IDS.length;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull = FRIGATE_HULL_HP * MISSION_04_ENEMY_SHIP_IDS.length;
   const enemyRemainingHp = enemies.reduce((sum, ship) => sum + ship.hp, 0);

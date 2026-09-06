@@ -1,0 +1,23 @@
+{
+  "testOnlySigningKey": "test-only-config-signing-key",
+  "response": {
+    "config": {
+      "id": "config-signature-test",
+      "namespace": "signature-test",
+      "version": 1,
+      "content": {
+        "label": "Starter sails",
+        "enabled": true,
+        "tiers": [
+          1,
+          2,
+          3
+        ]
+      },
+      "checksum": "fixture-etag",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    "signature": "910cb085d10c61a7ae1de2286cfb2b3a0546fc93c554ff8ca04e5a45d23aeb45",
+    "algorithm": "HS256"
+  }
+}

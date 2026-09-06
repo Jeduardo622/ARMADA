@@ -1,3 +1,4 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor } from './ai.js';
 import {
   CHAIN_SHOT_CREW_PERCENT,
@@ -7,7 +8,7 @@ import {
 } from './engine.js';
 import { classifyLoss, countAmmoProfile } from './missionMetrics.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState, Wind } from './types.js';
+import { ShipUpgradeTiers, SimOrder, SimState, Wind } from './types.js';
 
 // Mission 10 "Sail-Cutter" — docs/content/missions/mission-10-sail-cutter.md
 // First mission to adopt modifiers.chainShot: broadside orders may select
@@ -185,8 +186,10 @@ export interface Mission10Outcome {
   turns: MissionTurnRecord[];
 }
 
-export function runMission10(seed: number, playerTurnOrders: SimOrder[][]): Mission10Outcome {
+export function runMission10(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission10Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_10_TURN_LIMIT,
     createState: createMission10State,
     windForTurn: mission10WindForTurn,
@@ -206,12 +209,12 @@ export function runMission10(seed: number, playerTurnOrders: SimOrder[][]): Miss
     turns,
     playerTurnOrders,
     MISSION_10_PLAYER_SHIP_IDS,
-    createMission10State()
+    turns[0].startState
   );
 
   const players = run.finalState.ships.filter((ship) => ship.side === 'player');
   const enemies = run.finalState.ships.filter((ship) => ship.side === 'enemy');
-  const playerBaseHull = PLAYER_HULL_HP * MISSION_10_PLAYER_SHIP_IDS.length;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
   const playerRemainingHp = players.reduce((sum, ship) => sum + ship.hp, 0);
   const enemyBaseHull = CLIPPER_HULL_HP * MISSION_10_ENEMY_SHIP_IDS.length;
   const enemyRemainingHp = enemies.reduce((sum, ship) => sum + ship.hp, 0);

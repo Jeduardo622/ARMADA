@@ -136,6 +136,8 @@ describe('mission metrics', () => {
       {
         turn: 1,
         hash: 'x',
+        startState: finalState([shipAt('p1', 'player', 0, 0, 100), shipAt('e1', 'enemy', 100, 0, 80)]),
+        nextState: finalState([shipAt('p1', 'player', 0, 0, 100), shipAt('e1', 'enemy', 100, 0, 50)]),
         summary: { playerRemaining: 1, enemyRemaining: 1, sunk: [] },
         events: [
           {

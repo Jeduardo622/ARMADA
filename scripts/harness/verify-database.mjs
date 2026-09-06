@@ -13,7 +13,7 @@ export function buildPostgresRunArgs(containerName) {
     '--env', `POSTGRES_USER=${VERIFY_USER}`,
     '--env', `POSTGRES_PASSWORD=${VERIFY_PASSWORD}`,
     '--env', `POSTGRES_DB=${VERIFY_DATABASE}`,
-    '--health-cmd', `pg_isready -U ${VERIFY_USER} -d ${VERIFY_DATABASE}`,
+    '--health-cmd', `pg_isready -h 127.0.0.1 -U ${VERIFY_USER} -d ${VERIFY_DATABASE}`,
     '--health-interval', '1s',
     '--health-timeout', '5s',
     '--health-retries', '30',

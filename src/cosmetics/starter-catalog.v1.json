@@ -1,0 +1,7 @@
+{
+  "catalogVersion": 1,
+  "catalog": [
+    { "sailId": "default", "displayName": "Default", "sailColor": null },
+    { "sailId": "harbor_blue", "displayName": "Harbor Blue", "sailColor": "#6C9FC0" }
+  ]
+}

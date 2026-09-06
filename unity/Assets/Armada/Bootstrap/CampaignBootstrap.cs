@@ -1,0 +1,346 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Armada.Client.Core;
+using Armada.Client.Playback;
+using Armada.Client.Services;
+using Armada.Client.UI;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using UnityEngine;
+
+namespace Armada.Client.Bootstrap
+{
+    /// <summary>One authenticated identity and one campaign navigation owner per scene.</summary>
+    public sealed class CampaignBootstrap : MonoBehaviour
+    {
+        [SerializeField] private ArmadaClientConfig clientConfig;
+        [SerializeField] private Sprite harborArt;
+        [SerializeField] private CampaignUIController view;
+        [SerializeField] private SpectatorRenderer spectator;
+        [SerializeField] private CampaignPlayController play;
+        private AuthService _auth;
+        private ApiClient _api;
+        private TelemetryService _telemetryService;
+        private CampaignTelemetry _telemetry;
+        private float _sessionStarted;
+        private float _perfSeconds;
+        private int _perfFrames;
+        private MissionService _missions;
+        private InventoryService _inventory;
+        private CampaignProgressService _progress;
+        private UpgradesService _upgrades;
+        private CosmeticsService _cosmetics;
+        private CosmeticsResponse _sailCatalog;
+        private CosmeticsPreviewSession _sailPreview;
+        private Rect _battleViewport;
+        private Vector3 _battleCameraPosition;
+        private float _battleCameraSize;
+        private CaptainProgressionService _captain;
+        private readonly HashSet<string> _completed = new();
+        private readonly Dictionary<string, int?> _stars = new();
+        private List<InventoryItem> _items = new();
+        private bool _loading;
+        public string PlayerId => _auth?.CurrentPlayer?.Id;
+        public Task ActiveOperation { get; private set; } = Task.CompletedTask;
+
+        private void Awake()
+        {
+            if (view == null) view = gameObject.AddComponent<CampaignUIController>();
+            view.Initialize(harborArt);
+            if (clientConfig == null || spectator == null || play == null)
+            {
+                view.ShowMessage("PORT CLOSED", "The campaign scene is missing required configuration.", null);
+                return;
+            }
+            var json = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+            var flags = new FeatureFlags(clientConfig.FeatureToggles);
+            var api = new ApiClient(clientConfig.BaseUrl, new AuthProxy(() => _auth?.GetTokenAsync()), json);
+            _api = api;
+            _auth = new AuthService(api, json);
+            _missions = new MissionService(api, flags);
+            _inventory = new InventoryService(api, flags);
+            _progress = new CampaignProgressService(api);
+            _upgrades = new UpgradesService(api, flags);
+            _cosmetics = new CosmeticsService(api);
+            if (Camera.main != null)
+            {
+                _battleViewport = Camera.main.rect;
+                _battleCameraPosition = Camera.main.transform.position;
+                _battleCameraSize = Camera.main.orthographicSize;
+            }
+            _captain = new CaptainProgressionService(api);
+            play.enabled = false;
+        }
+        private void Start() { if (_auth != null) GoHarbor(); }
+        public void GoHarbor() { if (!_loading) ActiveOperation = LoadHarborAsync(); }
+        private async Task LoadHarborAsync()
+        {
+            _loading = true;
+            RestoreBattleCamera();
+            play.enabled = false;
+            view.ShowMessage("WELCOME ABOARD", "Opening your captain's log…", null);
+            try
+            {
+                var token = await _auth.GetTokenAsync();
+                if (this == null) return;
+                if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(PlayerId))
+                {
+                    var message = _auth.LastError == "storage_unsupported"
+                        ? "Secure captain profiles are not yet available on this platform."
+                        : _auth.LastError == "session_invalid"
+                            ? "This captain's sign-in could not be restored. Your saved profile has been kept."
+                            : "Your captain's log could not be opened. Check your connection and retry.";
+                    view.ShowMessage("UNABLE TO SIGN IN", message, GoHarbor);
+                    return;
+                }
+                StartTelemetry();
+                var progress = await _progress.GetAsync();
+                var inventory = await _inventory.ListAsync(PlayerId);
+                var cosmetics = await _cosmetics.GetAsync();
+                if (this == null) return;
+                if (!progress.Success || progress.Data?.Progress == null || !inventory.Success || inventory.Data == null || !cosmetics.Success)
+                {
+                    view.ShowMessage("LOGBOOK UNAVAILABLE", "Your saved progress and supplies could not be loaded. Retry to continue.", GoHarbor);
+                    return;
+                }
+                _completed.Clear();
+                _stars.Clear();
+                foreach (var row in progress.Data.Progress.Where(p => p.Status == "COMPLETED" && p.MissionCode != null))
+                {
+                    _completed.Add(row.MissionCode);
+                    _stars[row.MissionCode] = row.VerifiedStars;
+                }
+                _items = inventory.Data;
+                _sailCatalog = cosmetics.Data;
+                _sailPreview = new CosmeticsPreviewSession(_sailCatalog, spectator.SetPlayerSailCosmetic);
+                view.ShowHarbor(Resources(), ShowChart, ShowShipyard, ShowCaptain, ShowSails);
+            }
+            catch (Exception) { if (this != null) view.ShowMessage("CONNECTION LOST", "Your saved captain is kept. Retry when the connection returns.", GoHarbor); }
+            finally { _loading = false; }
+        }
+        private string Resources() => $"GOLD {Quantity("gold")}     TIMBER {Quantity("timber")}     ORE {Quantity("ore")}     MISSIONS {_completed.Count} / 10";
+        private int Quantity(string key) => _items.Where(i => i.ItemKey == key).Sum(i => i.Quantity);
+        public void ShowChart() { if (!_loading) view.ShowChart(_completed, ShowBriefing, GoHarbor, _stars); }
+        public void ShowBriefing(int number)
+        {
+            if (_loading || number < 1 || number > CampaignCatalog.All.Count) return;
+            var mission = CampaignCatalog.All[number - 1];
+            if (number > 1 && !_completed.Contains(mission.Code) && !_completed.Contains(CampaignCatalog.All[number - 2].Code)) return;
+            view.ShowBriefing(mission, () => Launch(number), ShowChart);
+        }
+        public void Launch(int number)
+        {
+            if (_loading || number < 1 || number > CampaignCatalog.All.Count) return;
+            RestoreBattleCamera();
+            var mission = CampaignCatalog.All[number - 1];
+            if (number > 1 && !_completed.Contains(mission.Code) && !_completed.Contains(CampaignCatalog.All[number - 2].Code)) return;
+            var session = new CampaignBattleSession(mission, new CampaignMissionClient(_missions, _upgrades, _captain));
+            play.Compose(view, spectator, session, () => PlayerId, GoHarbor, next =>
+            {
+                // Only reached from the saved-victory screen. Navigation still refreshes durable progress at harbor.
+                _completed.Add(mission.Code);
+                _stars[mission.Code] = Math.Max(_stars.TryGetValue(mission.Code, out var rating) ? rating ?? 0 : 0, session.Stars);
+                if (next > CampaignCatalog.All.Count) ShowChart(); else ShowBriefing(next);
+            }, _telemetry);
+            play.enabled = true;
+            play.BeginMission();
+        }
+        public void ShowShipyard() { if (!_loading) ActiveOperation = LoadShipyardAsync(null); }
+        public void ShowSails() { if (!_loading) ActiveOperation = LoadSailsAsync(null); }
+
+        private void RestoreBattleCamera()
+        {
+            if (Camera.main == null || _battleCameraSize <= 0) return;
+            Camera.main.rect = _battleViewport;
+            Camera.main.transform.position = _battleCameraPosition;
+            Camera.main.orthographicSize = _battleCameraSize;
+        }
+        private async Task LoadSailsAsync(string notice)
+        {
+            _loading = true;
+            view.ShowMessage("THE SAIL LOFT", "Reading your saved sails…", null);
+            try
+            {
+                var response = await _cosmetics.GetAsync();
+                if (this == null) return;
+                if (!response.Success) throw new InvalidOperationException();
+                _sailCatalog = response.Data;
+                _sailPreview = new CosmeticsPreviewSession(_sailCatalog, spectator.SetPlayerSailCosmetic);
+                foreach (var id in _sailCatalog.OwnedIds) _telemetry?.SailImpression(id);
+                var ship = CampaignCatalog.All[0].StartState().Ships.First(s => s.Side == "player");
+                ship.Position = new SimVector2();
+                spectator.ShowSailPreview(ship);
+                if (Camera.main != null)
+                {
+                    Camera.main.rect = new Rect(0.50f, 0.22f, 0.50f, 0.60f);
+                    Camera.main.transform.position = new Vector3(0, _battleCameraPosition.y, 0);
+                    Camera.main.orthographicSize = 12;
+                }
+                RenderSails(notice);
+            }
+            catch (Exception)
+            {
+                if (this != null) view.ShowMessage("SAILS UNAVAILABLE", "Your saved sails could not be loaded. Retry when connected.", ShowSails, GoHarbor);
+            }
+            finally { _loading = false; }
+        }
+        private void RenderSails(string notice) => view.ShowSails(_sailCatalog, _sailPreview.SelectedId, notice,
+            id => { if (!_loading && _sailPreview.Preview(id)) { _telemetry?.SailClick(id); RenderSails(null); } },
+            id => { if (!_loading) { _telemetry?.SailClick(id); ActiveOperation = EquipSailAsync(id); } },
+            () => { if (!_loading) { _sailPreview.Cancel(); RenderSails(null); } },
+            () => { if (!_loading) { _sailPreview.Cancel(); GoHarbor(); } });
+        private async Task EquipSailAsync(string sailId)
+        {
+            _loading = true;
+            view.ShowMessage("FITTING SAILS", "Confirming your chosen sail…", null);
+            var notice = "The change could not be confirmed. Your saved sail has been refreshed below.";
+            try
+            {
+                var response = await _cosmetics.EquipAsync(sailId);
+                if (response.Success) notice = "Sail equipped. Your appearance is saved.";
+            }
+            catch (Exception) { }
+            finally { _loading = false; }
+            if (this != null) await LoadSailsAsync(notice);
+        }
+        public void ShowCaptain() { if (!_loading) ActiveOperation = LoadCaptainAsync(null); }
+
+        private async Task LoadCaptainAsync(string notice)
+        {
+            _loading = true;
+            view.ShowMessage("CAPTAIN & CREW", "Opening your captain's service record…", null);
+            try
+            {
+                var profile = await _captain.GetAsync();
+                var inventory = await _inventory.ListAsync(PlayerId);
+                if (this == null) return;
+                if (!profile.Success || profile.Data?.Captain == null || profile.Data.Training == null ||
+                    profile.Data.Crew?.Roster == null || !inventory.Success || inventory.Data == null)
+                {
+                    view.ShowMessage("SERVICE RECORD UNAVAILABLE", "Your captain and shard balance could not be read. Retry to refresh them before making changes.", ShowCaptain, GoHarbor);
+                    return;
+                }
+                _items = inventory.Data;
+                view.ShowCaptain(profile.Data, _items, notice, TrainCaptain, AssignCrew, GoHarbor);
+            }
+            catch (Exception)
+            {
+                if (this != null) view.ShowMessage("CONNECTION LOST", "Your captain and crew are kept. Retry to read their current record.", ShowCaptain, GoHarbor);
+            }
+            finally { _loading = false; }
+        }
+
+        private void TrainCaptain(int displayedSequence)
+        {
+            if (!_loading) ActiveOperation = ChangeCaptainAsync(() => _captain.TrainAsync(displayedSequence), "Training confirmed.", true);
+        }
+
+        private void AssignCrew(string firstMate, string gunneryChief)
+        {
+            if (!_loading) ActiveOperation = ChangeCaptainAsync(() => _captain.AssignCrewAsync(firstMate, gunneryChief), "Crew assignments confirmed.");
+        }
+
+        private async Task ChangeCaptainAsync(Func<Task<ApiResponse<CaptainProgressionResponse>>> change, string successNotice, bool training = false)
+        {
+            var previousShards = Quantity("captain_shard");
+            var confirmed = false;
+            _loading = true;
+            view.ShowMessage("UPDATING SERVICE RECORD", "Waiting for the harbor master to confirm…", null);
+            var notice = "The change could not be confirmed. The current captain, crew and shard balance are shown below. Check them before choosing another action.";
+            try
+            {
+                // Exactly one request for the displayed sequence/slots. An
+                // ambiguous response only triggers reads, never another charge.
+                var result = await change();
+                if (result.Success && result.Data?.Captain != null && result.Data.Crew != null) { notice = successNotice; confirmed = true; }
+            }
+            catch (Exception) { }
+            finally { _loading = false; }
+            if (this != null) await LoadCaptainAsync(notice);
+            if (this != null && training && confirmed)
+                _telemetry?.Economy(false, "captain_shard", previousShards - Quantity("captain_shard"), "captain_training");
+        }
+
+        private async Task LoadShipyardAsync(string notice)
+        {
+            _loading = true;
+            view.ShowMessage("SHIPYARD", "Checking stores and available fittings…", null);
+            try
+            {
+                var catalog = await _upgrades.GetUpgradesAsync();
+                var inventory = await _inventory.ListAsync(PlayerId);
+                if (this == null) return;
+                if (!catalog.Success || catalog.Data?.Catalog == null || !inventory.Success || inventory.Data == null)
+                {
+                    view.ShowMessage("SHIPYARD UNAVAILABLE", "The shipwright could not read your fittings and supplies.", ShowShipyard, GoHarbor);
+                    return;
+                }
+                _items = inventory.Data;
+                view.ShowShipyard(catalog.Data, _items, notice, Purchase, GoHarbor);
+            }
+            catch (Exception) { if (this != null) view.ShowMessage("CONNECTION LOST", "The shipyard could not be loaded.", ShowShipyard, GoHarbor); }
+            finally { _loading = false; }
+        }
+        private void Purchase(string component, int tier)
+        {
+            if (!_loading) ActiveOperation = PurchaseAsync(component, tier);
+        }
+        private async Task PurchaseAsync(string component, int tier)
+        {
+            _loading = true;
+            view.ShowMessage("FITTING YOUR SHIP", "The shipwright is confirming your purchase…", null);
+            var notice = "The purchase could not be confirmed. Your fittings and balance have been refreshed below.";
+            try
+            {
+                // Use exactly the tier displayed by the button. Never retry by buying a newly computed next tier.
+                var result = await _upgrades.PurchaseAsync(new UpgradePurchaseRequest { PlayerId = PlayerId, Component = component, Tier = tier });
+                if (result.Success)
+                {
+                    notice = "Fitting installed. Your ship is ready.";
+                    if (result.Data?.Spent != null) foreach (var cost in result.Data.Spent)
+                        _telemetry?.Economy(false, cost.ItemKey, cost.Quantity, "upgrade_" + component);
+                }
+            }
+            catch (Exception) { }
+            finally { _loading = false; }
+            if (this != null) await LoadShipyardAsync(notice);
+        }
+        private void StartTelemetry()
+        {
+            if (_telemetry != null) return;
+            var json = new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() };
+            _telemetryService = new TelemetryService(_api, new TelemetryQueue(json, clientConfig.TelemetryMaxPayloadBytes),
+                clientConfig.TelemetryFlushSeconds, clientConfig.TelemetryMaxBatchSize, clientConfig.TelemetryMaxPayloadBytes, PlayerId);
+            _telemetry = new CampaignTelemetry(_telemetryService);
+            _sessionStarted = Time.realtimeSinceStartup;
+            var platform = Application.isEditor ? "editor" : Application.platform == RuntimePlatform.Android ? "android"
+                : Application.platform == RuntimePlatform.IPhonePlayer ? "ios" : Application.platform == RuntimePlatform.WindowsPlayer ? "windows"
+                : Application.platform == RuntimePlatform.OSXPlayer ? "mac" : "linux";
+            _telemetry.SessionStart(platform, SystemInfo.systemMemorySize);
+            _telemetryService.Start();
+        }
+        private void Update()
+        {
+            if (_telemetry == null) return;
+            _perfSeconds += Time.unscaledDeltaTime;
+            _perfFrames++;
+            if (_perfSeconds < 30) return;
+            _telemetry.Performance(_perfFrames / _perfSeconds, _perfSeconds * 1000 / _perfFrames);
+            _perfSeconds = 0; _perfFrames = 0;
+        }
+        private void OnApplicationQuit() => _telemetry?.SessionEnd(Time.realtimeSinceStartup - _sessionStarted);
+        private void OnDestroy()
+        {
+            _telemetry?.SessionEnd(Time.realtimeSinceStartup - _sessionStarted);
+            _telemetryService?.Dispose();
+        }
+        private sealed class AuthProxy : IAuthProvider
+        {
+            private readonly Func<Task<string>> _get;
+            public AuthProxy(Func<Task<string>> get) { _get = get; }
+            public Task<string> GetTokenAsync() => _get() ?? Task.FromResult<string>(null);
+        }
+    }
+}

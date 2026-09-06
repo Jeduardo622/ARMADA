@@ -35,6 +35,15 @@ namespace Armada.Client.Core
     {
         public string Token { get; set; }
         public Player Player { get; set; }
+        public string GuestCredential { get; set; }
+        public DateTimeOffset AccessExpiresAt { get; set; }
+        public DateTimeOffset CredentialExpiresAt { get; set; }
+    }
+
+    [Serializable]
+    public sealed class GuestRefreshRequest
+    {
+        [JsonProperty("guestCredential")] public string GuestCredential { get; set; }
     }
 
     [Serializable]
@@ -90,6 +99,8 @@ namespace Armada.Client.Core
         // against the player's owned upgrades before granting rewards.
         [JsonProperty("upgrades", NullValueHandling = NullValueHandling.Ignore)]
         public SimShipUpgrades Upgrades { get; set; }
+        [JsonProperty("loadout", NullValueHandling = NullValueHandling.Ignore)]
+        public CampaignCombatLoadout Loadout { get; set; }
     }
 
     [Serializable]
@@ -173,7 +184,9 @@ namespace Armada.Client.Core
     public sealed class TelemetryIngestRequest
     {
         public int SchemaVersion { get; set; } = 1;
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string PlayerId { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string MissionCode { get; set; }
         public Dictionary<string, object> Payload { get; set; }
     }
@@ -254,9 +267,11 @@ namespace Armada.Client.Core
     {
         public string ShipId { get; set; }
         public string Action { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string TargetShipId { get; set; }
         public int TurnDelta { get; set; }
         public int SpeedDelta { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string Side { get; set; }
         // Optional per-order ammo selection ("round"/"chain"), only read by
         // the server when modifiers.chainShot is on. Null is omitted so
@@ -412,10 +427,11 @@ namespace Armada.Client.Core
         [JsonProperty("schemaVersion")] public int SchemaVersion { get; set; } = 1;
         public int Seed { get; set; }
         public List<List<SimOrder>> Turns { get; set; }
-        // Only accepted by missions that support upgrades (07 onward); leave
-        // null elsewhere so the payload matches the strict backend schemas.
+        // Optional frozen owned tiers, supported by all campaign missions.
         [JsonProperty("upgrades", NullValueHandling = NullValueHandling.Ignore)]
         public SimShipUpgrades Upgrades { get; set; }
+        [JsonProperty("loadout", NullValueHandling = NullValueHandling.Ignore)]
+        public CampaignCombatLoadout Loadout { get; set; }
     }
 
     [Serializable]
@@ -442,6 +458,9 @@ namespace Armada.Client.Core
         public string Hash { get; set; }
         public SimSummary Summary { get; set; }
         public List<SimEvent> Events { get; set; }
+        // Planning state includes this turn's wind and scripted arrivals.
+        public SimState StartState { get; set; }
+        public SimState NextState { get; set; }
     }
 
     [Serializable]

@@ -1,7 +1,8 @@
+import type { CampaignLoadout } from './campaignLoadout.js';
 import { aiOrderFor } from './ai.js';
 import { createDeterministicRng } from './engine.js';
 import { MissionTurnRecord, runMissionLoop } from './missionRunner.js';
-import { SimOrder, SimState } from './types.js';
+import { ShipUpgradeTiers, SimOrder, SimState } from './types.js';
 
 // Mission 01 "Fair Wind" — docs/content/missions/mission-01-fair-wind.md
 export const MISSION_01_CODE = 'mission-01-fair-wind';
@@ -139,8 +140,10 @@ export interface Mission01Outcome {
   turns: Mission01TurnRecord[];
 }
 
-export function runMission01(seed: number, playerTurnOrders: SimOrder[][]): Mission01Outcome {
+export function runMission01(seed: number, playerTurnOrders: SimOrder[][], upgrades?: ShipUpgradeTiers, loadout?: CampaignLoadout): Mission01Outcome {
   const run = runMissionLoop(seed, playerTurnOrders, {
+    ...(upgrades ? { upgrades } : {}),
+    ...(loadout ? { loadout } : {}),
     turnLimit: MISSION_01_TURN_LIMIT,
     createState: createMission01State,
     windForTurn: (windSeed, turn) => ({
@@ -161,8 +164,9 @@ export function runMission01(seed: number, playerTurnOrders: SimOrder[][]): Miss
 
   const player = run.finalState.ships.find((ship) => ship.id === MISSION_01_PLAYER_SHIP_ID);
   const enemy = run.finalState.ships.find((ship) => ship.id === MISSION_01_ENEMY_SHIP_ID);
-  const playerHullDamage = PLAYER_BASE_HULL_HP - (player?.hp ?? 0);
-  const playerHullDamageFraction = Math.round((playerHullDamage / PLAYER_BASE_HULL_HP) * 100) / 100;
+  const playerBaseHull = turns[0].startState.ships.filter(ship => ship.side === 'player').reduce((sum, ship) => sum + ship.hp, 0);
+  const playerHullDamage = playerBaseHull - (player?.hp ?? 0);
+  const playerHullDamageFraction = Math.round((playerHullDamage / playerBaseHull) * 100) / 100;
 
   return {
     missionCode: MISSION_01_CODE,
@@ -174,7 +178,7 @@ export function runMission01(seed: number, playerTurnOrders: SimOrder[][]): Miss
     bonusObjectives: {
       underHullDamageThreshold:
         result === 'win' &&
-        playerHullDamage < PLAYER_BASE_HULL_HP * MISSION_01_BONUS_HULL_DAMAGE_FRACTION,
+        playerHullDamage < playerBaseHull * MISSION_01_BONUS_HULL_DAMAGE_FRACTION,
       withinTurnTarget: result === 'win' && turnCount <= MISSION_01_BONUS_TURN_TARGET
     },
     damageProfile: {

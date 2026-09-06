@@ -35,6 +35,35 @@ function databaseRunner(failAt?: string) {
 }
 
 describe('database verifier failure injection', () => {
+  it('waits through the socket-only init server before running TCP migrations', () => {
+    const runner = databaseRunner();
+    let tcpProbe = false;
+    let tcpReady = false;
+    let sleeps = 0;
+    const runCommand = (command: string, args: string[]) => {
+      if (command === 'docker' && args[0] === 'run') {
+        const health = args[args.indexOf('--health-cmd') + 1]!;
+        tcpProbe = /(?:^|\s)-h\s+127\.0\.0\.1(?:\s|$)/.test(health);
+      }
+      if (command === 'docker' && args[0] === 'inspect') {
+        return result(0, tcpProbe && !tcpReady ? 'starting\n' : 'healthy\n');
+      }
+      if (args.slice(-2).join(' ') === 'migrate deploy' && !tcpReady) {
+        return result(1, '', 'TCP listener unavailable during init scripts');
+      }
+      return runner.runCommand(command, args);
+    };
+    const verification = createDatabaseVerifier({
+      runCommand,
+      now: () => sleeps * 1000,
+      sleep: () => { sleeps++; tcpReady = true; }
+    })('C:/repo');
+    expect(verification.status).toBe('passed');
+    expect(sleeps).toBe(1);
+    expect(runner.calls.filter((stage) => stage === 'migrate-deploy')).toHaveLength(1);
+    expect(runner.calls.filter((stage) => stage === 'cleanup')).toHaveLength(1);
+  });
+
   it('fails without attempting cleanup when Docker is unavailable', () => {
     const calls: string[] = [];
     const verify = createDatabaseVerifier({

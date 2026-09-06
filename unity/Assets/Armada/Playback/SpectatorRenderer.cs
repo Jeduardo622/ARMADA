@@ -100,6 +100,7 @@ namespace Armada.Client.Playback
             public Transform Transform;
             public Renderer Renderer;
             public Color BaseColor;
+            public bool IsPlayer;
             public Vector3 MoveFrom;
             public Vector3 MoveTo;
             public Transform HullBar;
@@ -109,6 +110,7 @@ namespace Armada.Client.Playback
         }
 
         private readonly Dictionary<string, Marker> _markers = new();
+        private Color? _playerSailCosmetic;
         private readonly List<GameObject> _boardFeatures = new();
         private Transform _windArrow;
         private SimWind _wind;
@@ -139,6 +141,16 @@ namespace Armada.Client.Playback
 
         /// <summary>Scales elapsed time while a step animates; 1 is real time.</summary>
         public float SpeedMultiplier { get; private set; } = 1f;
+
+        /// <summary>Presentation only; retained when a board is rebuilt or new player markers spawn.</summary>
+        public void SetPlayerSailCosmetic(Color? color)
+        {
+            _playerSailCosmetic = color;
+            foreach (var marker in _markers.Values)
+            {
+                if (marker.IsPlayer && marker.View != null) marker.View.SetSailCosmetic(color);
+            }
+        }
 
         public void Pause()
         {
@@ -313,6 +325,16 @@ namespace Armada.Client.Playback
             {
                 SpawnMarker(ship, baselineById.TryGetValue(ship.Id ?? string.Empty, out var baseline) ? baseline : ship);
             }
+        }
+
+        /// <summary>Presentation-only enlarged model; a normal board recreates standard instances.</summary>
+        public void ShowSailPreview(SimShip ship)
+        {
+            ShowBoard(new List<SimShip> { ship }, "Sail preview");
+            if (ship?.Id == null || !_markers.TryGetValue(ship.Id, out var marker)) return;
+            marker.View.ApplyUniformScale(6);
+            marker.HullBar.gameObject.SetActive(false);
+            marker.SailBar.gameObject.SetActive(false);
         }
 
         public bool TryGetMarkerPosition(string shipId, out Vector3 position)
@@ -774,6 +796,7 @@ namespace Armada.Client.Playback
             var baseColor = ship.Side == "player" ? playerColor : enemyColor;
             var accentColor = ship.Side == "player" ? playerAccentColor : enemyAccentColor;
             view.SetBaseTint(baseColor, accentColor);
+            if (ship.Side == "player") view.SetSailCosmetic(_playerSailCosmetic);
 
             var marker = new Marker
             {
@@ -781,6 +804,7 @@ namespace Armada.Client.Playback
                 Transform = view.transform,
                 Renderer = view.TintRenderer,
                 BaseColor = baseColor,
+                IsPlayer = ship.Side == "player",
                 MaxHull = Mathf.Max(1, baselineShip.Hp),
                 MaxSail = Mathf.Max(1, baselineShip.Sail),
                 HullBar = SpawnBar($"hull-bar-{ship.Id}", hullBarColor),

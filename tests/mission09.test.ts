@@ -146,7 +146,8 @@ describe('ramming modifier', () => {
     const rams = result.events.filter((event) => event.type === 'ram');
     expect(rams[0]).toMatchObject({ hullDamage: 18, targetRemaining: { hp: 0 } });
 
-    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events }];
+    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events,
+      startState: structuredClone(state), nextState: structuredClone(result.nextState) }];
     expect(countRamProfile(turns, ['ship-a'], state)).toEqual({
       ramsInflicted: 0,
       ramsSuffered: 1,
@@ -173,7 +174,8 @@ describe('ramming modifier', () => {
     const ram = result.events.find((event) => event.type === 'ram');
     expect(ram).toMatchObject({ hullDamage: 18, targetRemaining: { hp: 0 } });
 
-    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events }];
+    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events,
+      startState: structuredClone(state), nextState: structuredClone(result.nextState) }];
     expect(countRamProfile(turns, ['ship-a'], state)).toEqual({
       ramsInflicted: 0,
       ramsSuffered: 1,
@@ -330,7 +332,7 @@ describe('mission 09 routes', () => {
     expect(res.json().error).toBe('invalid_order_ship');
   });
 
-  it('rejects upgrade tiers because the mission does not support them', async () => {
+  it('rejects upgrade tiers the player does not own', async () => {
     const res = await app.inject({
       method: 'POST',
       url: `/missions/${MISSION_09_CODE}/resolve`,
@@ -341,6 +343,7 @@ describe('mission 09 routes', () => {
         upgrades: { cannon: 1 }
       }
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('upgrade_tiers_exceed_owned');
   });
 });

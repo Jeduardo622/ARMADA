@@ -1,39 +1,68 @@
 import { FastifyInstance } from 'fastify';
-import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { env } from '../config.js';
+import { accessSession, guestCredentialDigest, issueGuestCredential } from '../auth/guestCredentials.js';
 
 const guestSchema = z.object({
   externalId: z.string().optional(),
-  displayName: z.string().optional(),
-  region: z.string().optional()
-});
+  displayName: z.string().max(32).optional(),
+  region: z.string().max(10).optional()
+}).strict();
+
+const refreshSchema = z.object({
+  guestCredential: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+}).strict();
 
 export function registerAuthRoutes(app: FastifyInstance) {
   app.post('/auth/guest', async (request, reply) => {
-    const parsed = guestSchema.safeParse(request.body);
+    reply.header('Cache-Control', 'no-store');
+    const parsed = guestSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.format() });
     }
 
-    const player =
-      (parsed.data.externalId &&
-        (await app.prisma.player.findUnique({ where: { externalId: parsed.data.externalId } }))) ||
-      (await app.prisma.player.create({
+    // Public identifiers are not credentials. Never resume or link an identity
+    // through this unauthenticated registration endpoint.
+    if (parsed.data.externalId) {
+      return reply.status(400).send({ error: 'external_id_not_supported' });
+    }
+
+    return app.prisma.$transaction(async (tx) => {
+      const player = await tx.player.create({
         data: {
-          externalId: parsed.data.externalId,
           displayName: parsed.data.displayName,
           region: parsed.data.region
         }
-      }));
+      });
+      return { ...accessSession(player), ...await issueGuestCredential(tx, player.id) };
+    });
+  });
 
-    const token = jwt.sign(
-      { sub: player.id, externalId: player.externalId },
-      env.JWT_SECRET,
-      { expiresIn: `${env.TOKEN_TTL_HOURS}h` }
-    );
+  app.post('/auth/refresh', async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = refreshSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(401).send({ error: 'unauthorized' });
+    const credential = await app.prisma.guestCredential.findUnique({
+      where: { digest: guestCredentialDigest(parsed.data.guestCredential) },
+      include: { player: true }
+    });
+    if (!credential || credential.revokedAt || credential.expiresAt.getTime() <= Date.now() || !credential.player) {
+      return reply.status(401).send({ error: 'unauthorized' });
+    }
+    return { ...accessSession(credential.player), credentialExpiresAt: credential.expiresAt.toISOString() };
+  });
 
-    return { token, player };
+  // Existing, unexpired JWTs can enroll without trusting a caller-supplied ID.
+  app.post('/auth/guest/credential', async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    if (!request.user?.id) return reply.status(401).send({ error: 'unauthorized' });
+    if (!z.object({}).strict().safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: 'invalid_request' });
+    }
+    const player = await app.prisma.player.findUnique({ where: { id: request.user.id } });
+    if (!player) return reply.status(401).send({ error: 'unauthorized' });
+    return app.prisma.$transaction(async (tx) => ({
+      ...accessSession(player), ...await issueGuestCredential(tx, player.id)
+    }));
   });
 }
 

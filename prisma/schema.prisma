@@ -26,6 +26,38 @@ model Player {
   telemetry   TelemetryEvent[]
   upgrades    PlayerShipUpgrade[]
   matchSeats  MatchParticipant[]
+  guestCredentials GuestCredential[]
+  progression PlayerProgression?
+  cosmetics PlayerCosmetics?
+}
+
+model PlayerProgression {
+  playerId String @id
+  xp Int @default(0)
+  trainingSequence Int @default(0)
+  firstMate String?
+  gunneryChief String?
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model PlayerCosmetics {
+  playerId     String @id
+  player       Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  equippedSail String @default("default")
+}
+
+// Opaque bearer credentials: only a SHA-256 digest is stored. They grant
+// access to one guest identity and are never recoverable from public IDs.
+model GuestCredential {
+  id        String   @id @default(uuid())
+  playerId  String
+  digest    String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
 }
 
 // Server-authoritative PvP match lifecycle (pvp_api routes). Status/side/
@@ -120,6 +152,11 @@ model MissionProgress {
   status      MissionStatus @default(NOT_STARTED)
   bestScore   Int?
   lastResult  Json?
+  // Dedicated server-owned fields. Legacy lastResult/bestScore are client
+  // metadata and must never be promoted into verified stars.
+  verifiedResult Json?
+  verifiedStars Int?
+  captainXpGranted Boolean @default(false)
   updatedAt   DateTime      @updatedAt
   createdAt   DateTime      @default(now())
   player      Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)

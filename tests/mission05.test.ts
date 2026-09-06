@@ -202,6 +202,9 @@ describe('mission 05 scenario', () => {
     const record = (turn: number, sunk: string[], events: ReturnType<typeof kill>[]) => ({
       turn,
       hash: 'x',
+      // This event-ordering fixture deliberately tests events over state order.
+      startState: createMission05State(),
+      nextState: createMission05State(),
       summary: { playerRemaining: 3, enemyRemaining: 2, sunk },
       events
     });

@@ -11,6 +11,38 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    PlayerCosmetics:
+      type: object
+      additionalProperties: false
+      required: [catalogVersion, catalog, ownedIds, equippedId]
+      properties:
+        catalogVersion:
+          type: integer
+          example: 1
+        catalog:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [sailId, displayName, sailColor]
+            properties:
+              sailId:
+                type: string
+              displayName:
+                type: string
+              sailColor:
+                type: string
+                nullable: true
+                description: Null preserves the default authored sail appearance. Presentation only.
+                example: '#6C9FC0'
+        ownedIds:
+          type: array
+          description: Both starter sails are free test content; no purchased entitlement or charge.
+          items:
+            type: string
+        equippedId:
+          type: string
+          enum: [default, harbor_blue]
     ErrorResponse:
       type: object
       properties:
@@ -39,20 +71,149 @@ components:
           format: date-time
     GuestAuthRequest:
       type: object
+      additionalProperties: false
       properties:
         externalId:
           type: string
+          maxLength: 0
+          description: Legacy empty value only. Nonempty public IDs cannot authenticate or link a player.
         displayName:
           type: string
+          maxLength: 32
         region:
           type: string
+          maxLength: 10
     GuestAuthResponse:
       type: object
+      required: [token, player, guestCredential, accessExpiresAt, credentialExpiresAt]
       properties:
         token:
           type: string
         player:
           $ref: '#/components/schemas/Player'
+        guestCredential:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          description: Opaque bearer secret returned only at issuance. Persist in protected client storage; never log it.
+        accessExpiresAt:
+          type: string
+          format: date-time
+        credentialExpiresAt:
+          type: string
+          format: date-time
+          description: Absolute expiry 180 days after issuance; refresh does not extend it.
+    GuestRefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [guestCredential]
+      properties:
+        guestCredential:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+    GuestRefreshResponse:
+      type: object
+      required: [token, player, accessExpiresAt, credentialExpiresAt]
+      properties:
+        token:
+          type: string
+        player:
+          $ref: '#/components/schemas/Player'
+        accessExpiresAt:
+          type: string
+          format: date-time
+        credentialExpiresAt:
+          type: string
+          format: date-time
+    OwnedCampaignProgress:
+      type: object
+      required: [progress]
+      properties:
+        progress:
+          type: array
+          description: Persisted records for the authenticated player, sorted by mission code. An absent record means no saved progress. Client-claimed bestScore is deliberately excluded.
+          items:
+            type: object
+            required: [missionCode, status, lastResult, verifiedResult, verifiedStars]
+            properties:
+              missionCode:
+                type: string
+              status:
+                type: string
+                enum: [NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED]
+              lastResult:
+                type: object
+                nullable: true
+                additionalProperties: true
+                description: Persisted client result metadata, not an authoritative star rating. Completion status is server-validated separately.
+              verifiedResult:
+                $ref: '#/components/schemas/VerifiedMissionResult'
+              verifiedStars:
+                type: integer
+                nullable: true
+                minimum: 1
+                maximum: 3
+                description: Server-replayed best star count. Null for legacy or unverified records; never infer stars from lastResult.
+    StarterProgression:
+      type: object
+      required: [captain, training, crew]
+      description: Owned starter profile. Levels derive from cumulative XP thresholds 0/100/250/450/700. Battle effects require an explicit validated PvE loadout; this read does not mutate a battle.
+      properties:
+        captain:
+          type: object
+          required: [id, name, rarity, xp, level, nextLevelXp]
+          properties:
+            id: { type: string, enum: [aurora_black] }
+            name: { type: string, enum: [Aurora Black] }
+            rarity: { type: string, enum: [Rare] }
+            xp: { type: integer, minimum: 0, maximum: 700 }
+            level: { type: integer, minimum: 1, maximum: 5 }
+            nextLevelXp: { type: integer, nullable: true }
+        training:
+          type: object
+          required: [sequence, nextSequence, shardCost, xpPerTraining]
+          properties:
+            sequence: { type: integer, minimum: 0, description: Last consumed training sequence. }
+            nextSequence: { type: integer, minimum: 1 }
+            shardCost: { type: integer, enum: [1] }
+            xpPerTraining: { type: integer, enum: [25] }
+        crew:
+          type: object
+          required: [firstMate, gunneryChief, roster]
+          properties:
+            firstMate: { type: string, nullable: true, enum: [calico_jim, null] }
+            gunneryChief: { type: string, nullable: true, enum: [one_eyed_ella, null] }
+            roster:
+              type: array
+              description: Both starter crew are owned by every profile. Each can equip only its named slot.
+              items:
+                type: object
+                required: [id, name, slot]
+                properties:
+                  id: { type: string, enum: [calico_jim, one_eyed_ella] }
+                  name: { type: string }
+                  slot: { type: string, enum: [firstMate, gunneryChief] }
+    VerifiedMissionResult:
+      type: object
+      nullable: true
+      description: Server-owned best winning replay metadata. Updated atomically with verifiedStars only when the score improves; ties retain the earlier result.
+      required: [schemaVersion, result, seed, turnCount, bonusObjectives]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        result:
+          type: string
+          enum: [win]
+        seed:
+          type: integer
+          minimum: 0
+        turnCount:
+          type: integer
+          minimum: 1
+        bonusObjectives:
+          type: object
+          additionalProperties:
+            type: boolean
     CreatePlayerRequest:
       type: object
       properties:
@@ -103,6 +264,17 @@ components:
           type: object
           additionalProperties: true
           nullable: true
+        verifiedStars:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 3
+          description: One star for a verified win plus one per satisfied bonus. Legacy records remain null until replay. Lower or tied repeat runs retain the prior best metadata.
+        captainXpGranted:
+          type: boolean
+          description: Server-owned once-per-mission XP marker. First verified replay under progression grants 25 XP up to 700 independently of legacy resource completion; retries never grant XP again.
+        verifiedResult:
+          $ref: '#/components/schemas/VerifiedMissionResult'
     RewardGrant:
       type: object
       required: [itemKey, quantity]
@@ -113,19 +285,65 @@ components:
         quantity:
           type: integer
           minimum: 1
+    Mission01ResolveRequest:
+      type: object
+      additionalProperties: false
+      required: [seed, turns]
+      properties:
+        schemaVersion: { type: integer, enum: [1], default: 1 }
+        seed: { type: integer, minimum: 0 }
+        loadout: { $ref: '#/components/schemas/CampaignLoadout' }
+        upgrades: { $ref: '#/components/schemas/ShipUpgradeTiers' }
+        turns:
+          type: array
+          maxItems: 8
+          items:
+            type: array
+            maxItems: 2
+            items: { $ref: '#/components/schemas/SimOrder' }
+    Mission02ResolveRequest:
+      type: object
+      additionalProperties: false
+      required: [seed, turns]
+      properties:
+        schemaVersion: { type: integer, enum: [1], default: 1 }
+        seed: { type: integer, minimum: 0 }
+        loadout: { $ref: '#/components/schemas/CampaignLoadout' }
+        upgrades: { $ref: '#/components/schemas/ShipUpgradeTiers' }
+        turns:
+          type: array
+          maxItems: 9
+          items:
+            type: array
+            maxItems: 4
+            items: { $ref: '#/components/schemas/SimOrder' }
+    CampaignLoadout:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, captainLevel, firstMate, gunneryChief]
+      description: Frozen owned PvE snapshot, revalidated independently on resolve and complete. No binding to a prior resolve call. Server derives player gun damage scale as 1 plus 1% per captain level above one plus 2% for the starter pair; enemy scaling stays unchanged. Clients retain exactly this snapshot and upgrades for the battle.
+      properties:
+        schemaVersion: { type: integer, enum: [1] }
+        captainLevel: { type: integer, minimum: 1, maximum: 5 }
+        firstMate: { type: string, nullable: true, enum: [calico_jim, null] }
+        gunneryChief: { type: string, nullable: true, enum: [one_eyed_ella, null] }
     MissionCompleteRequest:
       type: object
       required: [playerId]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
         playerId:
           type: string
           format: uuid
         result:
           type: object
           additionalProperties: true
+          description: Legacy client metadata only; cannot set verifiedResult or verifiedStars.
         bestScore:
           type: integer
           minimum: 1
+          description: Legacy client metadata only; not the authoritative star count.
         seed:
           type: integer
           minimum: 0
@@ -707,8 +925,16 @@ components:
           type: string
     MissionTurnRecord:
       type: object
-      required: [turn, hash, summary, events]
+      required: [turn, hash, summary, events, startState, nextState]
       properties:
+        startState:
+          description: Authoritative planning state after scripted spawns and wind, including effective opening hull upgrades. This is display state, not an engine replay input; never apply hull upgrades again to it.
+          allOf:
+            - $ref: '#/components/schemas/SimState'
+        nextState:
+          description: Engine result before the following turn's scripted changes. Future resolved turns remain an unsubmitted forecast until their orders are authored.
+          allOf:
+            - $ref: '#/components/schemas/SimState'
         turn:
           type: integer
           minimum: 1
@@ -854,6 +1080,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -985,6 +1215,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1098,6 +1332,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1221,6 +1459,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1354,6 +1596,8 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1473,6 +1717,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1588,6 +1836,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1709,6 +1961,10 @@ components:
       type: object
       required: [seed, turns]
       properties:
+        loadout:
+          $ref: '#/components/schemas/CampaignLoadout'
+        upgrades:
+          $ref: '#/components/schemas/ShipUpgradeTiers'
         schemaVersion:
           type: integer
           enum: [1]
@@ -1812,6 +2068,56 @@ components:
         algorithm:
           type: string
 paths:
+  /players/me/cosmetics:
+    get:
+      summary: Read owned starter sails and saved equipment for the authenticated player
+      description: No query parameters. Returns default equipment without writing if no selection exists. Cache-Control is no-store.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Versioned presentation-only catalog and saved equipment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerCosmetics'
+        '400':
+          description: Unexpected query parameter
+        '401':
+          description: Authentication required
+        '404':
+          description: Player not found
+  /players/me/cosmetics/equip:
+    post:
+      summary: Persist a free owned starter sail for the authenticated player
+      description: No query parameters, payments, combat fields, or client-selected player IDs. Repeating the same selection is safe. Cache-Control is no-store.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sailId]
+              properties:
+                sailId:
+                  type: string
+                  enum: [default, harbor_blue]
+      responses:
+        '200':
+          description: Saved equipment and versioned catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerCosmetics'
+        '400':
+          description: Unknown sail or malformed request
+        '401':
+          description: Authentication required
+        '404':
+          description: Player not found
   /healthz:
     get:
       summary: Liveness probe
@@ -1826,7 +2132,8 @@ paths:
           description: Ready
   /auth/guest:
     post:
-      summary: Guest auth placeholder
+      summary: Register a new guest and issue a durable credential
+      description: Creates a new identity atomically with its credential. Never resumes by externalId. Responses are no-store. Use HTTPS outside loopback development.
       requestBody:
         required: false
         content:
@@ -1835,7 +2142,7 @@ paths:
               $ref: '#/components/schemas/GuestAuthRequest'
       responses:
         '200':
-          description: Guest token issued
+          description: New player, access token and one-time credential issued
           content:
             application/json:
               schema:
@@ -1846,6 +2153,136 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /auth/refresh:
+    post:
+      summary: Restore a guest session with its opaque credential
+      description: Does not rotate or extend the credential. Missing, malformed, unknown, expired and revoked credentials return the same unauthorized response. Responses are no-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestRefreshRequest'
+      responses:
+        '200':
+          description: Access token issued for the credential owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestRefreshResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/guest/credential:
+    post:
+      summary: Enroll a durable credential for an existing authenticated session
+      description: Uses only the verified JWT subject. Existing unexpired tokens remain compatible. Expired legacy sessions cannot recover by public ID. Responses are no-store.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: New credential for the authenticated player
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestAuthResponse'
+        '400':
+          description: Body must be empty; identity selectors are rejected
+        '401':
+          description: Unauthorized or player no longer exists
+  /players/me/progression:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Read the authenticated player's starter captain and owned crew
+      description: Lazily creates the default profile if absent. No query parameters or other player IDs accepted. Responses are no-store.
+      responses:
+        '200':
+          description: Owned progression
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StarterProgression' }
+        '400': { description: Invalid request }
+        '401': { description: Authentication required }
+        '404': { description: Player no longer exists }
+  /players/me/progression/train:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Spend one captain_shard for 25 XP, capped at 700
+      description: Exact next sequence required; any already consumed sequence returns current profile without charge. At cap no shard is spent. No XP, level or player ID is accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sequence]
+              properties:
+                sequence: { type: integer, minimum: 1, maximum: 2147483647 }
+      responses:
+        '200':
+          description: Updated profile or harmless retry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StarterProgression' }
+        '400': { description: Invalid request }
+        '401': { description: Authentication required }
+        '404': { description: Player no longer exists }
+        '409': { description: training_sequence_conflict, captain_at_cap or insufficient_shards }
+  /players/me/progression/crew:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Assign or clear the authenticated player's starter crew slots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [firstMate, gunneryChief]
+              properties:
+                firstMate: { type: string, nullable: true, enum: [calico_jim, null] }
+                gunneryChief: { type: string, nullable: true, enum: [one_eyed_ella, null] }
+      responses:
+        '200':
+          description: Persisted owned profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StarterProgression' }
+        '400': { description: Invalid or unowned crew, wrong slot, or extra fields }
+        '401': { description: Authentication required }
+        '404': { description: Player no longer exists }
+  /players/me/progress:
+    get:
+      summary: Read the authenticated player's persisted campaign progress
+      description: No player selector or query parameters are accepted. Responses are no-store.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Owned persisted mission records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnedCampaignProgress'
+        '400':
+          description: Query parameters are not accepted
+        '401':
+          description: Unauthorized
   /players:
     post:
       summary: Create player
@@ -2126,6 +2563,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /missions/mission-01-fair-wind/resolve:
+    post:
+      summary: Resolve Mission 01 with optional owned frozen loadout and upgrades
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Mission01ResolveRequest' }
+      responses:
+        '200': { description: Authoritative outcome and turn records }
+        '400': { description: Invalid orders or loadout }
+        '401': { description: Authentication required }
+        '403': { description: Feature disabled }
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
+  /missions/mission-02-weather-gage/resolve:
+    post:
+      summary: Resolve Mission 02 with optional owned frozen loadout and upgrades
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Mission02ResolveRequest' }
+      responses:
+        '200': { description: Authoritative outcome and turn records }
+        '400': { description: Invalid orders or loadout }
+        '401': { description: Authentication required }
+        '403': { description: Feature disabled }
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
   /missions/{code}/complete:
     post:
       summary: Mark mission completion
@@ -2184,7 +2653,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: >-
-            Proof upgrade tiers exceed the player's owned tiers
+            Frozen captain level exceeds owned level (captain_level_exceeds_owned) or proof upgrade tiers exceed the player's owned tiers
             (upgrade_tiers_exceed_owned; the body names the offending
             component with the claimed and owned tier).
           content:
@@ -2239,6 +2708,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission03ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with telemetry
           content:
@@ -2315,6 +2785,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission04ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with boarding telemetry
           content:
@@ -2391,6 +2862,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission05ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with first-sink and choke telemetry
           content:
@@ -2467,6 +2939,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission06ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with boss-phase and enrage telemetry
           content:
@@ -2543,6 +3016,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission07ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with fire and slow telemetry
           content:
@@ -2619,6 +3093,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission08ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with clamped-maneuver telemetry
           content:
@@ -2695,6 +3170,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission09ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with ram telemetry
           content:
@@ -2771,6 +3247,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Mission10ResolveRequest'
       responses:
+        '409': { description: upgrade_tiers_exceed_owned or captain_level_exceeds_owned }
         '200':
           description: Deterministic mission outcome with ammo telemetry
           content:

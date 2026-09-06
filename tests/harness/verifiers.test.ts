@@ -99,7 +99,7 @@ describe('repository verifiers', () => {
       '--env',
       'POSTGRES_DB=armada_verify',
       '--health-cmd',
-      'pg_isready -U armada_verify -d armada_verify',
+      'pg_isready -h 127.0.0.1 -U armada_verify -d armada_verify',
       '--health-interval',
       '1s',
       '--health-timeout',

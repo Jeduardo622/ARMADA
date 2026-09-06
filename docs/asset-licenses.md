@@ -1,5 +1,11 @@
 # Third-Party Asset License Ledger
 
+## Original generated campaign artwork
+
+`unity/Assets/Art/UI/ui-harbor-dawn.png` was generated with OpenAI image generation on 2026-09-06 for this project: an original painterly dawn harbor, sailing ship to the right, and quiet left space for the campaign menu. It is generated project artwork, not a third-party stock asset and not represented as CC0. Imported as a single sprite, max dimension 2048, without mipmaps. No reference image or third-party character was supplied to generation.
+
+## Third-party assets
+
 Every third-party asset in the repository has a row here, its license
 file committed beside it, and a compatibility check recorded in the PR
 that introduced it (docs/design/asset-pipeline.md §6).

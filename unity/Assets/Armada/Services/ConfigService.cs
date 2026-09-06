@@ -57,9 +57,9 @@ namespace Armada.Client.Services
             return response.Data.Config;
         }
 
-        private static bool VerifySignature(string payload, string signatureBase64, string secret)
+        private static bool VerifySignature(string payload, string signatureHex, string secret)
         {
-            if (string.IsNullOrWhiteSpace(signatureBase64) || string.IsNullOrWhiteSpace(secret))
+            if (string.IsNullOrWhiteSpace(signatureHex) || string.IsNullOrWhiteSpace(secret))
             {
                 return false;
             }
@@ -69,8 +69,9 @@ namespace Armada.Client.Services
                 var key = Encoding.UTF8.GetBytes(secret);
                 using var hmac = new HMACSHA256(key);
                 var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload ?? string.Empty));
-                var computed = Convert.ToBase64String(hash);
-                return string.Equals(computed, signatureBase64, StringComparison.Ordinal);
+                // The config endpoint sends Node's digest('hex'), not Base64.
+                var computed = BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+                return string.Equals(computed, signatureHex, StringComparison.Ordinal);
             }
             catch (Exception ex)
             {
