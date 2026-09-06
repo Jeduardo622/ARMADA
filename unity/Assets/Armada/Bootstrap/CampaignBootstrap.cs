@@ -25,6 +25,7 @@ namespace Armada.Client.Bootstrap
         private InventoryService _inventory;
         private CampaignProgressService _progress;
         private UpgradesService _upgrades;
+        private CaptainProgressionService _captain;
         private readonly HashSet<string> _completed = new();
         private readonly Dictionary<string, int?> _stars = new();
         private List<InventoryItem> _items = new();
@@ -49,6 +50,7 @@ namespace Armada.Client.Bootstrap
             _inventory = new InventoryService(api, flags);
             _progress = new CampaignProgressService(api);
             _upgrades = new UpgradesService(api, flags);
+            _captain = new CaptainProgressionService(api);
             play.enabled = false;
         }
         private void Start() { if (_auth != null) GoHarbor(); }
@@ -88,7 +90,7 @@ namespace Armada.Client.Bootstrap
                     _stars[row.MissionCode] = row.VerifiedStars;
                 }
                 _items = inventory.Data;
-                view.ShowHarbor(Resources(), ShowChart, ShowShipyard);
+                view.ShowHarbor(Resources(), ShowChart, ShowShipyard, ShowCaptain);
             }
             catch (Exception) { if (this != null) view.ShowMessage("CONNECTION LOST", "Your saved captain is kept. Retry when the connection returns.", GoHarbor); }
             finally { _loading = false; }
@@ -120,6 +122,60 @@ namespace Armada.Client.Bootstrap
             play.BeginMission();
         }
         public void ShowShipyard() { if (!_loading) ActiveOperation = LoadShipyardAsync(null); }
+        public void ShowCaptain() { if (!_loading) ActiveOperation = LoadCaptainAsync(null); }
+
+        private async Task LoadCaptainAsync(string notice)
+        {
+            _loading = true;
+            view.ShowMessage("CAPTAIN & CREW", "Opening your captain's service record…", null);
+            try
+            {
+                var profile = await _captain.GetAsync();
+                var inventory = await _inventory.ListAsync(PlayerId);
+                if (this == null) return;
+                if (!profile.Success || profile.Data?.Captain == null || profile.Data.Training == null ||
+                    profile.Data.Crew?.Roster == null || !inventory.Success || inventory.Data == null)
+                {
+                    view.ShowMessage("SERVICE RECORD UNAVAILABLE", "Your captain and shard balance could not be read. Retry to refresh them before making changes.", ShowCaptain, GoHarbor);
+                    return;
+                }
+                _items = inventory.Data;
+                view.ShowCaptain(profile.Data, _items, notice, TrainCaptain, AssignCrew, GoHarbor);
+            }
+            catch (Exception)
+            {
+                if (this != null) view.ShowMessage("CONNECTION LOST", "Your captain and crew are kept. Retry to read their current record.", ShowCaptain, GoHarbor);
+            }
+            finally { _loading = false; }
+        }
+
+        private void TrainCaptain(int displayedSequence)
+        {
+            if (!_loading) ActiveOperation = ChangeCaptainAsync(() => _captain.TrainAsync(displayedSequence), "Training confirmed.");
+        }
+
+        private void AssignCrew(string firstMate, string gunneryChief)
+        {
+            if (!_loading) ActiveOperation = ChangeCaptainAsync(() => _captain.AssignCrewAsync(firstMate, gunneryChief), "Crew assignments confirmed.");
+        }
+
+        private async Task ChangeCaptainAsync(Func<Task<ApiResponse<CaptainProgressionResponse>>> change, string successNotice)
+        {
+            _loading = true;
+            view.ShowMessage("UPDATING SERVICE RECORD", "Waiting for the harbor master to confirm…", null);
+            var notice = "The change could not be confirmed. The current captain, crew and shard balance are shown below. Check them before choosing another action.";
+            try
+            {
+                // Exactly one request for the displayed sequence/slots. An
+                // ambiguous response only triggers reads, never another charge.
+                var result = await change();
+                if (result.Success && result.Data?.Captain != null && result.Data.Crew != null) notice = successNotice;
+            }
+            catch (Exception) { }
+            finally { _loading = false; }
+            if (this != null) await LoadCaptainAsync(notice);
+        }
+
         private async Task LoadShipyardAsync(string notice)
         {
             _loading = true;

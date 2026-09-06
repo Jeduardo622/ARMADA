@@ -131,7 +131,7 @@ namespace Armada.Client.UI
             _safe.gameObject.AddComponent<SafeAreaInsets>();
         }
 
-        public void ShowHarbor(string resources, Action chart, Action shipyard)
+        public void ShowHarbor(string resources, Action chart, Action shipyard, Action captain = null, Action sails = null)
         {
             BeginScreen("Harbor");
             Panel("MenuShade", _screen, 0, 0, 0.49f, 1, new Color(0.02f, 0.05f, 0.085f, 0.58f));
@@ -141,11 +141,61 @@ namespace Armada.Client.UI
             title.characterSpacing = 9;
             Label("Subtitle", _screen, "Chart a course. Command the seas.", 32, Parchment, 0.065f, 0.57f, 0.58f, 0.66f);
             Button("Chart", _screen, "SET SAIL", chart, 0.065f, 0.38f, 0.40f, 0.51f, true);
-            Button("Shipyard", _screen, "SHIPYARD", shipyard, 0.065f, 0.22f, 0.40f, 0.35f);
+            Button("Shipyard", _screen, "SHIPYARD", shipyard, 0.43f, 0.38f, 0.765f, 0.51f);
+            if (captain != null) Button("Captain", _screen, "CAPTAIN & CREW", captain, 0.065f, 0.22f, 0.40f, 0.35f);
+            if (sails != null) Button("Sails", _screen, "SAILS", sails, 0.43f, 0.22f, 0.765f, 0.35f);
             Label("Resources", _screen, resources, 28, Parchment, 0.065f, 0.07f, 0.75f, 0.16f);
             var audio = GetComponent<CampaignAudio>();
             if (audio != null) Button("Sound", _screen, audio.Muted ? "SOUND OFF" : "SOUND ON",
-                () => { audio.ToggleMuted(); ShowHarbor(resources, chart, shipyard); }, 0.82f, 0.065f, 0.97f, 0.19f);
+                () => { audio.ToggleMuted(); ShowHarbor(resources, chart, shipyard, captain, sails); }, 0.82f, 0.065f, 0.97f, 0.19f);
+        }
+
+        public void ShowCaptain(CaptainProgressionResponse data, List<InventoryItem> inventory, string notice,
+            Action<int> train, Action<string, string> assignCrew, Action back)
+        {
+            BeginScreen("Captain");
+            Panel("Shade", _screen, 0, 0, 1, 1, new Color(Navy.r, Navy.g, Navy.b, 0.95f));
+            Label("Title", _screen, "CAPTAIN & CREW", 48, Brass, 0.05f, 0.84f, 0.75f, 0.97f);
+            Button("Back", _screen, "HARBOR", back, 0.80f, 0.85f, 0.96f, 0.98f);
+            var captain = data.Captain;
+            var training = data.Training;
+            var shards = (inventory ?? new List<InventoryItem>()).Where(i => i.ItemKey == "captain_shard").Sum(i => i.Quantity);
+            var capped = captain.Level >= 5 || captain.Xp >= 700 || !captain.NextLevelXp.HasValue;
+            Panel("CaptainCard", _screen, 0.05f, 0.23f, 0.49f, 0.81f, new Color(0.075f, 0.15f, 0.21f));
+            Label("CaptainName", _screen, captain.Name.ToUpperInvariant(), 39, Parchment, 0.075f, 0.70f, 0.465f, 0.79f);
+            Label("CaptainLevel", _screen, $"{captain.Rarity.ToUpperInvariant()}  /  LEVEL {captain.Level} OF 5", 29, Brass, 0.075f, 0.62f, 0.465f, 0.70f);
+            Label("CaptainXp", _screen, capped ? $"{captain.Xp} XP  /  MAXIMUM LEVEL" : $"{captain.Xp} XP  /  NEXT LEVEL AT {captain.NextLevelXp} XP", 29, Parchment, 0.075f, 0.54f, 0.465f, 0.62f);
+            Label("TrainingCost", _screen, $"CAPTAIN SHARDS: {shards}\nTrain: {training.ShardCost} shard for {training.XpPerTraining} XP", 29, Parchment, 0.075f, 0.41f, 0.465f, 0.54f);
+            // Capture the exact offer on screen. Refreshing a profile must not
+            // turn a retry into a second paid training sequence.
+            var displayedSequence = training.NextSequence;
+            var canTrain = !capped && training.ShardCost > 0 && shards >= training.ShardCost && displayedSequence > 0;
+            var trainButton = Button("TrainCaptain", _screen, capped ? "MAXIMUM LEVEL" : "TRAIN CAPTAIN", () => train(displayedSequence),
+                0.075f, 0.255f, 0.465f, 0.39f, canTrain);
+            trainButton.interactable = canTrain;
+            var firstMate = data.Crew.FirstMate;
+            var gunneryChief = data.Crew.GunneryChief;
+            ShowCrewSlot("firstMate", "FIRST MATE", "calico_jim", "Calico Jim", firstMate,
+                data.Crew.Roster, 0.79f, () => assignCrew(firstMate == "calico_jim" ? null : "calico_jim", gunneryChief));
+            ShowCrewSlot("gunneryChief", "GUNNERY CHIEF", "one_eyed_ella", "One-Eyed Ella", gunneryChief,
+                data.Crew.Roster, 0.50f, () => assignCrew(firstMate, gunneryChief == "one_eyed_ella" ? null : "one_eyed_ella"));
+            var pair = firstMate == "calico_jim" && gunneryChief == "one_eyed_ella";
+            Label("CaptainBonuses", _screen, $"Captain's command: +{captain.Level - 1}% gun damage.  Crew pair: {(pair ? "+2% active" : "+2% when both assigned")}.\nApplies to your next campaign battle; current battles keep their starting crew and level.",
+                25, Brass, 0.05f, 0.105f, 0.95f, 0.22f);
+            Label("Notice", _screen, notice ?? "First verified mission clears earn 25 XP. Train with captain shards to continue your captain's growth.",
+                24, Parchment, 0.05f, 0.015f, 0.95f, 0.10f);
+        }
+
+        private void ShowCrewSlot(string slot, string heading, string id, string name, string assigned,
+            List<CaptainCrewMember> roster, float top, Action toggle)
+        {
+            Panel("CrewCard_" + slot, _screen, 0.52f, top - 0.265f, 0.95f, top + 0.02f, new Color(0.075f, 0.15f, 0.21f));
+            Label("CrewLabel", _screen, $"{heading}  /  {name}\n{(assigned == id ? "ASSIGNED" : "UNASSIGNED")}", 28, Parchment,
+                0.54f, top - 0.10f, 0.93f, top);
+            var owned = roster != null && roster.Any(member => member.Id == id && member.Slot == slot);
+            var button = Button("Crew_" + slot, _screen, assigned == id ? "UNASSIGN" : "ASSIGN", toggle,
+                0.54f, top - 0.245f, 0.93f, top - 0.115f, assigned != id && owned);
+            button.interactable = owned;
         }
 
         public void ShowChart(ISet<string> completed, Action<int> launch, Action back, IReadOnlyDictionary<string, int?> stars = null)
