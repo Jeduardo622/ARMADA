@@ -17,6 +17,10 @@ export interface MissionTurnRecord {
   hash: string;
   summary: SimSummary;
   events: SimEvent[];
+  // Authoritative planning state, after scripted spawns and this turn's wind.
+  startState: SimState;
+  // Engine result before the following turn's scripted changes.
+  nextState: SimState;
 }
 
 export interface MissionRunConfig {
@@ -64,6 +68,7 @@ export function runMissionLoop(
       turn,
       wind: config.windForTurn(seed, turn)
     };
+    const startState = structuredClone(turnState);
     const orders = [...(playerTurnOrders[turn - 1] ?? []), ...config.enemyOrders(turnState)];
     const modifiers =
       typeof config.modifiers === 'function'
@@ -81,7 +86,15 @@ export function runMissionLoop(
       ...(config.upgrades ? { upgrades: config.upgrades } : {})
     });
 
-    turns.push({ turn, hash: preview.hash, summary: preview.summary, events: preview.events });
+    turns.push({
+      turn,
+      hash: preview.hash,
+      summary: preview.summary,
+      events: preview.events,
+      startState,
+      // Neither later onTurnStart hooks nor callers may mutate a saved turn.
+      nextState: structuredClone(preview.nextState)
+    });
     state = preview.nextState;
 
     if (preview.summary.enemyRemaining === 0) {
