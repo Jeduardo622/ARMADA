@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import vitestConfig from '../../vitest.config';
 
 // Agent worktrees are full checkouts parked inside the repository: Codex uses
@@ -31,14 +31,22 @@ const WORKTREE_PATHS = [
 const REPOSITORY_PATHS = ['src/index.ts', 'tests/harness/worktree-isolation.test.ts'];
 
 describe('agent worktree isolation', () => {
-  it('excludes both worktree roots from eslint', async () => {
+  let eslint: ESLint;
+
+  beforeAll(async () => {
     // `overrideConfigFile` pins the root config and disables config discovery.
     // Without it this assertion depends on local state: a real worktree carries
     // its own eslint.config.js, and discovery resolves paths under it against
     // that nested config instead, so the check would pass on a clean CI clone
     // and fail on the very machine that has the worktree it is guarding.
-    const eslint = new ESLint({ cwd: process.cwd(), overrideConfigFile: 'eslint.config.js' });
+    eslint = new ESLint({ cwd: process.cwd(), overrideConfigFile: 'eslint.config.js' });
+    // Cold loading of the TypeScript ESLint config can exceed the assertion
+    // timeout on Windows. Bound that setup separately; keep test timeouts and
+    // all positive/negative path assertions unchanged.
+    await eslint.calculateConfigForFile(REPOSITORY_PATHS[0]);
+  }, 30_000);
 
+  it('excludes both worktree roots from eslint', async () => {
     for (const path of WORKTREE_PATHS) {
       expect(await eslint.isPathIgnored(path), path).toBe(true);
     }
