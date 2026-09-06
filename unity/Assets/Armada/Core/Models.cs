@@ -263,9 +263,11 @@ namespace Armada.Client.Core
     {
         public string ShipId { get; set; }
         public string Action { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string TargetShipId { get; set; }
         public int TurnDelta { get; set; }
         public int SpeedDelta { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string Side { get; set; }
         // Optional per-order ammo selection ("round"/"chain"), only read by
         // the server when modifiers.chainShot is on. Null is omitted so
