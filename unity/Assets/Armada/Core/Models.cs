@@ -22,8 +22,11 @@ namespace Armada.Client.Core
     [Serializable]
     public sealed class GuestAuthRequest
     {
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string ExternalId { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string DisplayName { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string Region { get; set; }
     }
 
@@ -75,6 +78,7 @@ namespace Armada.Client.Core
     {
         public string PlayerId { get; set; }
         public Dictionary<string, object> Result { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public int? BestScore { get; set; }
         // Win proof: the backend re-simulates seed + turns and rejects
         // completion of reward-bearing missions without a verified win.

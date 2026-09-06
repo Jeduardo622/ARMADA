@@ -101,16 +101,21 @@ export function buildServer(options?: BuildOptions) {
     app.register(authPlugin);
   }
 
-  registerHealthRoutes(app);
-  registerAuthRoutes(app);
-  registerPlayerRoutes(app);
-  registerInventoryRoutes(app);
-  registerUpgradeRoutes(app);
-  registerMissionRoutes(app);
-  registerPvpRoutes(app);
-  registerSimRoutes(app);
-  registerTelemetryRoutes(app);
-  registerConfigRoutes(app);
+  // Plugins register asynchronously. Install routes only after their onRoute
+  // hooks are ready, so authentication is attached to every protected route.
+  app.after((error) => {
+    if (error) throw error;
+    registerHealthRoutes(app);
+    registerAuthRoutes(app);
+    registerPlayerRoutes(app);
+    registerInventoryRoutes(app);
+    registerUpgradeRoutes(app);
+    registerMissionRoutes(app);
+    registerPvpRoutes(app);
+    registerSimRoutes(app);
+    registerTelemetryRoutes(app);
+    registerConfigRoutes(app);
+  });
 
   return app;
 }
