@@ -120,6 +120,46 @@ describe.runIf(Boolean(url))('guest credentials on isolated PostgreSQL', () => {
       })).rejects.toThrow();
       const saved = await prisma.missionProgress.findUnique({ where: { playerId_missionId: { playerId: alice.player.id, missionId: mission.id } } });
       expect(saved?.verifiedStars).toBe(3);
+      expect((await prisma.playerProgression.findUnique({ where: { playerId: alice.player.id } }))?.xp).toBe(25);
+      const bobProfile = await app.inject({ url: '/players/me/progression', headers: { authorization: `Bearer ${bob.token}` } });
+      expect(bobProfile.json().captain.xp).toBe(0);
+      expect((await app.inject({ url: `/players/me/progression?playerId=${alice.player.id}`, headers: { authorization: `Bearer ${bob.token}` } })).statusCode).toBe(400);
+    } finally { await app.close(); }
+  });
+
+  it('serializes duplicate training, legacy clear XP and concurrent training without double spending or lost XP', async () => {
+    const app = await server();
+    try {
+      const session = (await app.inject({ method: 'POST', url: '/auth/guest', payload: {} })).json();
+      const playerId = session.player.id; playerIds.push(playerId);
+      const headers = { authorization: `Bearer ${session.token}` };
+      const fixture = campaignWinFixtures[1]; missionCodes.push(fixture.code);
+      const mission = await prisma.mission.create({ data: { code: fixture.code, name: 'Legacy XP fixture' } });
+      await prisma.missionProgress.create({ data: { playerId, missionId: mission.id, status: 'COMPLETED', lastResult: { xp: 700 } } });
+      await prisma.inventoryItem.create({ data: { playerId, itemKey: 'captain_shard', quantity: 3 } });
+      const train = (sequence: number) => app.inject({ method: 'POST', url: '/players/me/progression/train', headers, payload: { sequence } });
+      const clear = () => app.inject({ method: 'POST', url: `/missions/${fixture.code}/complete`, headers,
+        payload: { playerId, seed: fixture.seed, turns: fixture.turns } });
+      const results = await Promise.all([train(1), train(1), clear(), clear()]);
+      expect(results.map(result => result.statusCode)).toEqual([200, 200, 200, 200]);
+      expect(results.slice(2).map(result => result.json().rewardsGranted)).toEqual([[], []]);
+      const profile = await prisma.playerProgression.findUniqueOrThrow({ where: { playerId } });
+      expect(profile).toMatchObject({ xp: 50, trainingSequence: 1 });
+      expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { playerId_itemKey: { playerId, itemKey: 'captain_shard' } } })).quantity).toBe(2);
+      expect((await prisma.missionProgress.findUniqueOrThrow({ where: { playerId_missionId: { playerId, missionId: mission.id } } })).captainXpGranted).toBe(true);
+      expect((await train(3)).statusCode).toBe(409);
+      expect((await train(1)).statusCode).toBe(200);
+      await app.inject({ method: 'POST', url: '/players/me/progression/crew', headers, payload: { firstMate: 'calico_jim', gunneryChief: 'one_eyed_ella' } });
+      // A fresh authenticated server reads the same persisted profile.
+      const reopened = await server();
+      try {
+        const read = await reopened.inject({ url: '/players/me/progression', headers });
+        expect(read.json()).toMatchObject({ captain: { xp: 50, level: 1 }, crew: { firstMate: 'calico_jim', gunneryChief: 'one_eyed_ella' } });
+      } finally { await reopened.close(); }
+      await prisma.playerProgression.update({ where: { playerId }, data: { xp: 675 } });
+      expect((await train(2)).json().captain.xp).toBe(700);
+      expect((await train(3)).json().error).toBe('captain_at_cap');
+      expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { playerId_itemKey: { playerId, itemKey: 'captain_shard' } } })).quantity).toBe(1);
     } finally { await app.close(); }
   });
 });

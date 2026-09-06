@@ -121,6 +121,45 @@ components:
                 minimum: 1
                 maximum: 3
                 description: Server-replayed best star count. Null for legacy or unverified records; never infer stars from lastResult.
+    StarterProgression:
+      type: object
+      required: [captain, training, crew]
+      description: Owned starter profile. Levels derive from cumulative XP thresholds 0/100/250/450/700. No combat effects are active in this contract.
+      properties:
+        captain:
+          type: object
+          required: [id, name, rarity, xp, level, nextLevelXp]
+          properties:
+            id: { type: string, enum: [aurora_black] }
+            name: { type: string, enum: [Aurora Black] }
+            rarity: { type: string, enum: [Rare] }
+            xp: { type: integer, minimum: 0, maximum: 700 }
+            level: { type: integer, minimum: 1, maximum: 5 }
+            nextLevelXp: { type: integer, nullable: true }
+        training:
+          type: object
+          required: [sequence, nextSequence, shardCost, xpPerTraining]
+          properties:
+            sequence: { type: integer, minimum: 0, description: Last consumed training sequence. }
+            nextSequence: { type: integer, minimum: 1 }
+            shardCost: { type: integer, enum: [1] }
+            xpPerTraining: { type: integer, enum: [25] }
+        crew:
+          type: object
+          required: [firstMate, gunneryChief, roster]
+          properties:
+            firstMate: { type: string, nullable: true, enum: [calico_jim, null] }
+            gunneryChief: { type: string, nullable: true, enum: [one_eyed_ella, null] }
+            roster:
+              type: array
+              description: Both starter crew are owned by every profile. Each can equip only its named slot.
+              items:
+                type: object
+                required: [id, name, slot]
+                properties:
+                  id: { type: string, enum: [calico_jim, one_eyed_ella] }
+                  name: { type: string }
+                  slot: { type: string, enum: [firstMate, gunneryChief] }
     VerifiedMissionResult:
       type: object
       nullable: true
@@ -199,6 +238,9 @@ components:
           minimum: 1
           maximum: 3
           description: One star for a verified win plus one per satisfied bonus. Legacy records remain null until replay. Lower or tied repeat runs retain the prior best metadata.
+        captainXpGranted:
+          type: boolean
+          description: Server-owned once-per-mission XP marker. First verified replay under progression grants 25 XP up to 700 independently of legacy resource completion; retries never grant XP again.
         verifiedResult:
           $ref: '#/components/schemas/VerifiedMissionResult'
     RewardGrant:
@@ -2002,6 +2044,72 @@ paths:
           description: Body must be empty; identity selectors are rejected
         '401':
           description: Unauthorized or player no longer exists
+  /players/me/progression:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Read the authenticated player's starter captain and owned crew
+      description: Lazily creates the default profile if absent. No query parameters or other player IDs accepted. Responses are no-store.
+      responses:
+        '200':
+          description: Owned progression
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StarterProgression' }
+        '400': { description: Invalid request }
+        '401': { description: Authentication required }
+        '404': { description: Player no longer exists }
+  /players/me/progression/train:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Spend one captain_shard for 25 XP, capped at 700
+      description: Exact next sequence required; any already consumed sequence returns current profile without charge. At cap no shard is spent. No XP, level or player ID is accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sequence]
+              properties:
+                sequence: { type: integer, minimum: 1, maximum: 2147483647 }
+      responses:
+        '200':
+          description: Updated profile or harmless retry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StarterProgression' }
+        '400': { description: Invalid request }
+        '401': { description: Authentication required }
+        '404': { description: Player no longer exists }
+        '409': { description: training_sequence_conflict, captain_at_cap or insufficient_shards }
+  /players/me/progression/crew:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Assign or clear the authenticated player's starter crew slots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [firstMate, gunneryChief]
+              properties:
+                firstMate: { type: string, nullable: true, enum: [calico_jim, null] }
+                gunneryChief: { type: string, nullable: true, enum: [one_eyed_ella, null] }
+      responses:
+        '200':
+          description: Persisted owned profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StarterProgression' }
+        '400': { description: Invalid or unowned crew, wrong slot, or extra fields }
+        '401': { description: Authentication required }
+        '404': { description: Player no longer exists }
   /players/me/progress:
     get:
       summary: Read the authenticated player's persisted campaign progress

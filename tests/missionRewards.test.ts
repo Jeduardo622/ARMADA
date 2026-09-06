@@ -90,9 +90,11 @@ type ProgressRow = {
   lastResult?: unknown;
   verifiedStars?: number | null;
   verifiedResult?: unknown;
+  captainXpGranted?: boolean;
 };
 const progressStore = new Map<string, ProgressRow>();
 const inventoryStore = new Map<string, number>();
+let captainXp = 0;
 let transactionCalls = 0;
 let inTransaction = false;
 let inventoryUpsertArgs: Array<Record<string, unknown>> = [];
@@ -104,6 +106,13 @@ let ownedUpgrades: Array<{ component: string; tier: number }> = [];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const prisma = app.prisma as any;
+prisma.playerProgression = {
+  upsert: async () => ({}),
+  findUniqueOrThrow: async () => ({ xp: captainXp }),
+  update: async ({ data }: any) => { captainXp = data.xp; return { xp: captainXp }; }
+};
+prisma.$queryRaw = async () => [];
+prisma.$executeRaw = async () => 1;
 prisma.mission.findFirst = async (args: any) => {
   const code = args?.where?.code as string;
   return ALL_MISSION_CODES.includes(code) ? { id: missionIdFor(code), code } : null;
@@ -118,6 +127,10 @@ prisma.missionProgress.updateMany = async (args: any) => {
   updateManyArgs.push(args);
   const key = `${args.where.playerId}|${args.where.missionId}`;
   const row = progressStore.get(key);
+  if (args.where.captainXpGranted === false) {
+    if (!row || row.captainXpGranted) return { count: 0 };
+    row.captainXpGranted = true; return { count: 1 };
+  }
   if (args.where.OR) {
     if (!row || (row.verifiedStars != null && row.verifiedStars >= args.data.verifiedStars)) return { count: 0 };
     row.verifiedStars = args.data.verifiedStars;
@@ -214,6 +227,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   progressStore.clear();
+  captainXp = 0;
   inventoryStore.clear();
   transactionCalls = 0;
   inventoryUpsertArgs = [];
@@ -401,6 +415,9 @@ describe('mission completion rewards', () => {
     expect(completed.statusCode).toBe(200);
     const expectedStars = 1 + Object.values(outcome.bonusObjectives).filter((value) => value === true).length;
     expect(completed.json().progress.verifiedStars).toBe(expectedStars);
+    expect(captainXp).toBe(25);
+    expect((await complete(code, { seed, turns })).statusCode).toBe(200);
+    expect(captainXp).toBe(25);
     expect(completed.json().progress.verifiedResult).toEqual({
       schemaVersion: 1, result: 'win', seed, turnCount: outcome.turnCount, bonusObjectives: outcome.bonusObjectives
     });
@@ -447,6 +464,9 @@ describe('mission completion rewards', () => {
     expect(legacy.json().progress[0].verifiedResult).toBeNull();
     const replay = await complete(MISSION_01_CODE);
     expect(replay.json().progress.verifiedStars).toBe(2);
+    expect(captainXp).toBe(25);
+    await complete(MISSION_01_CODE);
+    expect(captainXp).toBe(25);
     expect(replay.json().rewardsGranted).toEqual([]);
     expect(inventoryStore.size).toBe(0);
   });

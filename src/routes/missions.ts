@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { grantVerifiedClearXp } from '../services/progression.js';
 import { z } from 'zod';
 import { ensureFlag, ensurePlayerOwnership, validateJsonLimit } from './utils.js';
 import {
@@ -1168,6 +1169,7 @@ export function registerMissionRoutes(app: FastifyInstance) {
           });
         }
 
+        if (verifiedResult) await grantVerifiedClearXp(tx, player.id, mission.id);
         const rewardsGranted = firstCompletion ? rewards : [];
         for (const reward of rewardsGranted) {
           await tx.inventoryItem.upsert({
