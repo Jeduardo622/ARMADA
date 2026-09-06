@@ -81,7 +81,7 @@ namespace Armada.Client.Tests.EditMode
 
             Assert.That(queue.Enqueue(first), Is.True);
             Assert.That(queue.Enqueue(second), Is.True);
-            Assert.That(queue.DequeueBatch(2), Is.EqualTo(new[] { first, second }));
+            Assert.That(JsonConvert.SerializeObject(queue.DequeueBatch(2)), Is.EqualTo(JsonConvert.SerializeObject(new[] { first, second })));
 
             var bounded = new TelemetryQueue(settings, 32);
             Assert.That(bounded.Enqueue(Event("oversized", new string('x', 128))), Is.False);

@@ -14,42 +14,42 @@ namespace Armada.Client.Core
 
     public sealed class TelemetryQueue
     {
-        private readonly Queue<TelemetryEvent> _events = new();
+        private readonly Queue<(string Json, int Bytes)> _events = new();
+        private readonly object _gate = new();
         private readonly JsonSerializerSettings _options;
         private readonly int _maxPayloadBytes;
-
+        private int _bytes;
         public TelemetryQueue(JsonSerializerSettings options, int maxPayloadBytes)
-        {
-            _options = options;
-            _maxPayloadBytes = maxPayloadBytes;
-        }
-
-        public int Count => _events.Count;
-
+        { _options = options; _maxPayloadBytes = maxPayloadBytes; }
+        public int Count { get { lock (_gate) return _events.Count; } }
         public bool Enqueue(TelemetryEvent evt)
         {
             if (evt == null) return false;
-            var asJson = JsonConvert.SerializeObject(evt, _options);
-            var size = Encoding.UTF8.GetByteCount(asJson);
-            if (size > _maxPayloadBytes)
+            try
             {
-                return false;
+                var json = JsonConvert.SerializeObject(evt, _options);
+                var bytes = Encoding.UTF8.GetByteCount(json);
+                lock (_gate)
+                {
+                    if (bytes > _maxPayloadBytes || _events.Count >= 256 || _bytes + bytes > 256_000) return false;
+                    _events.Enqueue((json, bytes)); _bytes += bytes;
+                    return true;
+                }
             }
-
-            _events.Enqueue(evt);
-            return true;
+            catch (Exception) { return false; }
         }
-
         public List<TelemetryEvent> DequeueBatch(int max)
         {
-            var list = new List<TelemetryEvent>(Math.Min(max, _events.Count));
-            while (list.Count < max && _events.Count > 0)
+            var list = new List<TelemetryEvent>();
+            lock (_gate)
             {
-                list.Add(_events.Dequeue());
+                while (list.Count < max && _events.Count > 0)
+                {
+                    var item = _events.Dequeue(); _bytes -= item.Bytes;
+                    list.Add(JsonConvert.DeserializeObject<TelemetryEvent>(item.Json, _options));
+                }
             }
-
             return list;
         }
     }
 }
-
