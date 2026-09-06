@@ -7,13 +7,18 @@ import { buildServer } from '../src/app.js';
 vi.mock('../src/plugins/prisma.js', async () => {
   const { default: fp } = await import('fastify-plugin');
   return { prismaPlugin: fp(async (app) => {
-    app.decorate('prisma', {
+    const prisma = {
       player: {
         create: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
         findUnique: async ({ where }: { where: { id: string } }) => ({ id: where.id })
       },
+      guestCredential: { create: async () => ({}) },
       mission: { findMany: async () => [] },
       $queryRaw: async () => [{ value: 1 }]
+    };
+    app.decorate('prisma', {
+      ...prisma,
+      $transaction: async (execute: (tx: typeof prisma) => Promise<unknown>) => execute(prisma)
     } as unknown as typeof app.prisma);
   }) };
 });
