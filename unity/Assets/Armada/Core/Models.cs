@@ -442,6 +442,9 @@ namespace Armada.Client.Core
         public string Hash { get; set; }
         public SimSummary Summary { get; set; }
         public List<SimEvent> Events { get; set; }
+        // Planning state includes this turn's wind and scripted arrivals.
+        public SimState StartState { get; set; }
+        public SimState NextState { get; set; }
     }
 
     [Serializable]

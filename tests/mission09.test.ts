@@ -146,7 +146,8 @@ describe('ramming modifier', () => {
     const rams = result.events.filter((event) => event.type === 'ram');
     expect(rams[0]).toMatchObject({ hullDamage: 18, targetRemaining: { hp: 0 } });
 
-    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events }];
+    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events,
+      startState: structuredClone(state), nextState: structuredClone(result.nextState) }];
     expect(countRamProfile(turns, ['ship-a'], state)).toEqual({
       ramsInflicted: 0,
       ramsSuffered: 1,
@@ -173,7 +174,8 @@ describe('ramming modifier', () => {
     const ram = result.events.find((event) => event.type === 'ram');
     expect(ram).toMatchObject({ hullDamage: 18, targetRemaining: { hp: 0 } });
 
-    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events }];
+    const turns = [{ turn: 1, hash: result.hash, summary: result.summary, events: result.events,
+      startState: structuredClone(state), nextState: structuredClone(result.nextState) }];
     expect(countRamProfile(turns, ['ship-a'], state)).toEqual({
       ramsInflicted: 0,
       ramsSuffered: 1,

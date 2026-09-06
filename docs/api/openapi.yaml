@@ -707,8 +707,16 @@ components:
           type: string
     MissionTurnRecord:
       type: object
-      required: [turn, hash, summary, events]
+      required: [turn, hash, summary, events, startState, nextState]
       properties:
+        startState:
+          description: Authoritative planning state after scripted spawns and this turn's wind.
+          allOf:
+            - $ref: '#/components/schemas/SimState'
+        nextState:
+          description: Engine result before the following turn's scripted changes. Future resolved turns remain an unsubmitted forecast until their orders are authored.
+          allOf:
+            - $ref: '#/components/schemas/SimState'
         turn:
           type: integer
           minimum: 1
