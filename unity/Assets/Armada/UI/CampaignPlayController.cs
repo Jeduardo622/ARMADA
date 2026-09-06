@@ -87,7 +87,7 @@ namespace Armada.Client.UI
                 _renderer.Resume();
                 _renderer.BeginTurns(state.Ships, new List<Mission01TurnRecord> { record }, Session.Mission.TurnLimit,
                     $"Turn {record.Turn}: the fleet answers your orders.", "Turn complete.",
-                    Session.Mission.StartState().Ships, state.Obstacles, state.SlowZones, state.Wind);
+                    Session.OpeningState.Ships, state.Obstacles, state.SlowZones, state.Wind);
             }
             else await AdvanceAsync();
         }
@@ -138,7 +138,7 @@ namespace Armada.Client.UI
         private void ShowBoard()
         {
             var s = Session.State;
-            _renderer?.ShowBoard(s.Ships, "Awaiting your orders.", Session.Mission.StartState().Ships, s.Obstacles, s.SlowZones, s.Wind);
+            _renderer?.ShowBoard(s.Ships, "Awaiting your orders.", Session.OpeningState.Ships, s.Obstacles, s.SlowZones, s.Wind);
         }
         private void Render()
         {

@@ -21,6 +21,7 @@ namespace Armada.Client.Services
         public CampaignMissionDefinition Mission { get; }
         public CampaignPhase Phase { get; private set; }
         public SimState State { get; private set; }
+        public SimState OpeningState { get; private set; }
         public CampaignOrderSession Orders { get; private set; }
         public Mission01TurnRecord ActiveRecord { get; private set; }
         public CampaignOutcome Outcome { get; private set; }
@@ -52,6 +53,7 @@ namespace Armada.Client.Services
                 return;
             }
             State = Copy(run.Outcome.Turns[0].StartState);
+            OpeningState = Copy(State);
             _planning.Add(Copy(State));
             BeginOrders();
         }

@@ -110,7 +110,7 @@ namespace Armada.Client.Bootstrap
             if (_loading || number < 1 || number > CampaignCatalog.All.Count) return;
             var mission = CampaignCatalog.All[number - 1];
             if (number > 1 && !_completed.Contains(mission.Code) && !_completed.Contains(CampaignCatalog.All[number - 2].Code)) return;
-            var session = new CampaignBattleSession(mission, new CampaignMissionClient(_missions, _upgrades));
+            var session = new CampaignBattleSession(mission, new CampaignMissionClient(_missions, _upgrades, _captain));
             play.Compose(view, spectator, session, () => PlayerId, GoHarbor, next =>
             {
                 // Only reached from the saved-victory screen. Navigation still refreshes durable progress at harbor.

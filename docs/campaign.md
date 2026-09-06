@@ -8,7 +8,9 @@ Complete missions in sequence. Select each surviving ship, set its target/action
 
 Undo rewinds the previous turn while entering orders. It is unavailable during requests/playback. A victory unlocks the next mission only after completion succeeds. Failed saves retain the frozen winning proof for retry and allow an explicit abandon confirmation. Defeat can be retried. First-clear rewards remain server-controlled; replays do not duplicate them.
 
-The shipyard displays authoritative costs and balances and purchases exactly the tier shown. Existing component upgrades currently affect Burning Seas; they are not presented as universal campaign bonuses. Captain/crew progression and sail cosmetics are subsequent MVP slices.
+The shipyard displays authoritative costs and balances and purchases exactly the tier shown. Component upgrades apply across all ten campaign missions. Captain & Crew shows Aurora Black's XP, training cost and owned crew assignments. Training submits the displayed sequence once, then refreshes the authoritative profile and supplies.
+
+Each battle reads owned component tiers and captain/crew once. That defensive snapshot accompanies every resolution and completion request, including retries and undo. An opening fetch failure blocks sailing and can be retried; successful snapshots remain frozen for the battle. Hull readouts use the server's upgraded opening state as their maximum. See `campaign-loadouts.md` for the server validation and stateless replay limits.
 
 ## Evidence and verification
 

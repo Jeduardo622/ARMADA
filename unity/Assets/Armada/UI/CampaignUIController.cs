@@ -110,7 +110,7 @@ namespace Armada.Client.UI
                     () => { if (next != null) purchase(entry.Component, next.Tier); }, 0.72f, y - 0.13f, 0.93f, y, affordable);
                 button.interactable = affordable;
             }
-            Label("Notice", _screen, notice ?? "These fittings improve your fleet in Burning Seas. Earn supplies by completing campaign missions.", 27, Parchment, 0.05f, 0.055f, 0.95f, 0.20f);
+            Label("Notice", _screen, notice ?? "These fittings improve your fleet throughout the campaign. Earn supplies by completing missions.", 27, Parchment, 0.05f, 0.055f, 0.95f, 0.20f);
         }
 
         public void Initialize(Sprite harborArt)

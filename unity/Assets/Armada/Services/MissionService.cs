@@ -72,7 +72,9 @@ namespace Armada.Client.Services
         Task<ServiceResult<MissionCompleteResponse>> CompleteAsync(string code, MissionCompleteRequest request);
     }
 
-    public sealed class MissionService : IMission01Client, IMission02Client, IMission03Client, IMission04Client, IMission05Client, IMission06Client, IMission07Client, IMission08Client, IMission09Client, IMission10Client, IMissionCompletionClient
+    public interface ICampaignMissionService : IMission01Client, IMission02Client, IMission03Client, IMission04Client, IMission05Client, IMission06Client, IMission07Client, IMission08Client, IMission09Client, IMission10Client, IMissionCompletionClient { }
+
+    public sealed class MissionService : ICampaignMissionService
     {
         private readonly ApiClient _client;
         private readonly FeatureFlags _flags;

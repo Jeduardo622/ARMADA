@@ -99,6 +99,8 @@ namespace Armada.Client.Core
         // against the player's owned upgrades before granting rewards.
         [JsonProperty("upgrades", NullValueHandling = NullValueHandling.Ignore)]
         public SimShipUpgrades Upgrades { get; set; }
+        [JsonProperty("loadout", NullValueHandling = NullValueHandling.Ignore)]
+        public CampaignCombatLoadout Loadout { get; set; }
     }
 
     [Serializable]
@@ -423,10 +425,11 @@ namespace Armada.Client.Core
         [JsonProperty("schemaVersion")] public int SchemaVersion { get; set; } = 1;
         public int Seed { get; set; }
         public List<List<SimOrder>> Turns { get; set; }
-        // Only accepted by missions that support upgrades (07 onward); leave
-        // null elsewhere so the payload matches the strict backend schemas.
+        // Optional frozen owned tiers, supported by all campaign missions.
         [JsonProperty("upgrades", NullValueHandling = NullValueHandling.Ignore)]
         public SimShipUpgrades Upgrades { get; set; }
+        [JsonProperty("loadout", NullValueHandling = NullValueHandling.Ignore)]
+        public CampaignCombatLoadout Loadout { get; set; }
     }
 
     [Serializable]
