@@ -31,6 +31,7 @@ namespace Armada.Client.Playback
 
         private Color _baseColor = Color.white;
         private Color? _accentColor;
+        private Color? _sailCosmetic;
         private bool _onFire;
         private bool _slowed;
 
@@ -115,6 +116,23 @@ namespace Armada.Client.Playback
             ApplyResting();
         }
 
+        /// <summary>Presentation only. Null restores faction sails; hull, flags and combined rig meshes keep their colors.</summary>
+        public void SetSailCosmetic(Color? color)
+        {
+            _sailCosmetic = color;
+            ApplyResting();
+        }
+
+        private Color AccentSurfaceColor(Renderer surface, Color authored)
+        {
+            // SourcedShipPrefabBuilder wires named sail and flag meshes as accents.
+            // Combined greybox Rig meshes are intentionally excluded: they contain masts.
+            var isSail = surface.name.IndexOf("sail", System.StringComparison.OrdinalIgnoreCase) >= 0
+                && surface.name.IndexOf("flag", System.StringComparison.OrdinalIgnoreCase) < 0;
+            return !IsSunk && isSail && _sailCosmetic.HasValue
+                ? ApplyStatusTints(_sailCosmetic.Value) : authored;
+        }
+
         /// <summary>
         /// Sink presentation (irreversible): deep-sea tint, hull settles
         /// below the waterline, accent cue dims with it.
@@ -146,7 +164,7 @@ namespace Armada.Client.Playback
                     : Color.Lerp(resting, Color.white, AccentLightening);
             if (accentRenderer != null)
             {
-                accentRenderer.material.color = accent;
+                accentRenderer.material.color = AccentSurfaceColor(accentRenderer, accent);
             }
 
             if (extraAccentRenderers != null)
@@ -155,7 +173,7 @@ namespace Armada.Client.Playback
                 {
                     if (extra != null)
                     {
-                        extra.material.color = accent;
+                        extra.material.color = AccentSurfaceColor(extra, accent);
                     }
                 }
             }
