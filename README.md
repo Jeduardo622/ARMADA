@@ -65,6 +65,7 @@ focused tests, rollback evidence, and human review.
 - Harness design/plans: `docs/superpowers/specs/`, `docs/superpowers/plans/`
 - Ops/CI: `docs/ops/`, `docs/ci/`, `docker-compose.yml`, `.env.example`
 - Content: `docs/content/` (missions, AI profiles, balance tables)
+- Playable client: `docs/campaign.md` (all ten missions), `docs/demo.md` (Mission 10), `docs/pvp.md` (PvP)
 
 ## Local Claude Code Harness
 

@@ -6,7 +6,7 @@ using UnityEngine;
 /// One-shot rebuild of every generated scene, in the order they are
 /// documented. Scenes are never hand-edited (docs/pvp.md); any builder or
 /// serialized-default change regenerates them all with a single Unity
-/// launch instead of four:
+/// launch instead of five:
 /// -batchmode -quit -executeMethod RebuildAllGeneratedScenes.BuildAll
 /// </summary>
 public static class RebuildAllGeneratedScenes
@@ -18,7 +18,8 @@ public static class RebuildAllGeneratedScenes
         Mission10PlayDemoSceneBuilder.Build();
         PvPHotseatDemoSceneBuilder.Build();
         PvPNetplayDemoSceneBuilder.Build();
-        Debug.Log("[RebuildAllGeneratedScenes] All four generated scenes rebuilt.");
+        CampaignSceneBuilder.Build();
+        Debug.Log("[RebuildAllGeneratedScenes] All five generated scenes rebuilt.");
     }
 }
 #endif

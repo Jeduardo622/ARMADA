@@ -88,6 +88,24 @@ describe('mission 06 scenario', () => {
     expect(mission06OnTurnStart(spawned, MISSION_06_REINFORCEMENT_TURN)).toBe(spawned);
   });
 
+  it('pins the reinforcement the Unity play loop mirrors (Mission06Scenario.BuildReinforcement)', () => {
+    // No event announces the arrival, so the client splices this exact ship
+    // into its battle snapshot before authoring the reinforcement turn. The
+    // EditMode suite pins the C# mirror against the same literals.
+    const spawned = mission06OnTurnStart(createMission06State(), MISSION_06_REINFORCEMENT_TURN);
+    const reinforcement = spawned.ships.find((ship) => ship.id === MISSION_06_REINFORCEMENT_ID);
+    expect(reinforcement).toEqual({
+      id: 'enemy-reinforcement',
+      side: 'enemy',
+      position: { x: 300, y: 80 },
+      heading: 200,
+      speed: 3,
+      hp: 108,
+      sail: 70,
+      crew: 40
+    });
+  });
+
   it('enrages the boss with an accuracy bonus below 30% hull', () => {
     const healthy = createMission06State();
     expect(mission06Modifiers(healthy).accuracyBonus).toBeUndefined();

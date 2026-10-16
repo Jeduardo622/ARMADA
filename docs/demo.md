@@ -2,6 +2,9 @@
 
 > Looking for the two-player battle? The PvP demo (hot-seat and
 > two-client netplay) lives in [pvp.md](pvp.md).
+>
+> Looking for all ten missions? The campaign scene (mission select, every
+> mission player-authored) lives in [campaign.md](campaign.md).
 
 Mission 10 ships as two scenes, both driven by `Mission10Bootstrap` and
 differing only by its `mode`:

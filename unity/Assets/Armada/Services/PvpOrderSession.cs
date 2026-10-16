@@ -7,7 +7,8 @@ namespace Armada.Client.Services
     /// <summary>
     /// Editable order draft for one ship. The v1 PvP order surface is
     /// maneuver (turn delta) + speed delta + optional broadside target +
-    /// ammo (round/chain); ramming, boarding, and status flags are deferred.
+    /// ammo (round/chain). Mission play may also enable boarding, which
+    /// turns the target into a boarding attempt instead of a broadside.
     /// </summary>
     public sealed class PvpOrderDraft
     {
@@ -18,6 +19,9 @@ namespace Armada.Client.Services
         public string TargetShipId { get; set; }
         /// <summary>"round" or "chain"; only sent when a target is set.</summary>
         public string Ammo { get; set; } = "round";
+        /// <summary>True when the set target is boarded rather than fired
+        /// on; only reachable when the session allows boarding.</summary>
+        public bool Board { get; set; }
     }
 
     /// <summary>
@@ -28,7 +32,10 @@ namespace Armada.Client.Services
     /// Shared by the PvP hot-seat loop (a session per side per turn) and the
     /// playable Mission 10 loop (one session per turn for the player's
     /// sloops): both author the same v1 order surface, and mission 10's
-    /// ammo toggle is the same chain/round selection.
+    /// ammo toggle is the same chain/round selection. The campaign's
+    /// mission-agnostic loop gates the optional surfaces per mission: ammo
+    /// only where the mission runs chain shot, boarding only where the
+    /// server's win proof accepts it (missions 03–10).
     /// </summary>
     public sealed class PvpOrderSession
     {
@@ -48,14 +55,26 @@ namespace Armada.Client.Services
         /// talk about "sides".</summary>
         public string Headline { get; }
 
+        /// <summary>Whether the ammo toggle does anything; defaults on so
+        /// PvP and Mission 10 keep their existing surface.</summary>
+        public bool AllowChainShot { get; }
+
+        /// <summary>Whether a target can be boarded; defaults off so PvP
+        /// (which defers boarding) never emits a boarding order.</summary>
+        public bool AllowBoarding { get; }
+
         public PvpOrderSession(
             string sideLabel,
             IReadOnlyList<SimShip> ownShips,
             IReadOnlyList<SimShip> enemyShips,
-            string headline = null)
+            string headline = null,
+            bool allowChainShot = true,
+            bool allowBoarding = false)
         {
             SideLabel = sideLabel;
             Headline = headline ?? $"Side {sideLabel} orders:";
+            AllowChainShot = allowChainShot;
+            AllowBoarding = allowBoarding;
             _enemyShips = enemyShips != null ? new List<SimShip>(enemyShips) : new List<SimShip>();
             if (ownShips == null)
             {
@@ -136,33 +155,48 @@ namespace Armada.Client.Services
         public void ToggleAmmo()
         {
             var draft = CurrentDraft;
-            if (draft != null)
+            if (draft != null && AllowChainShot)
             {
                 draft.Ammo = draft.Ammo == "chain" ? "round" : "chain";
+            }
+        }
+
+        /// <summary>Swaps the current draft between firing on and boarding
+        /// its target. A no-op when the session does not allow boarding.</summary>
+        public void ToggleBoarding()
+        {
+            var draft = CurrentDraft;
+            if (draft != null && AllowBoarding)
+            {
+                draft.Board = !draft.Board;
             }
         }
 
         /// <summary>
         /// Builds the side's order list. Every order carries the maneuver
         /// deltas (the engine applies them for any action); a set target
-        /// makes it a broadside, otherwise it stays a pure maneuver. Round
+        /// makes it a broadside (or a boarding attempt, when boarding is
+        /// allowed and chosen), otherwise it stays a pure maneuver. Round
         /// shot omits the ammo key so payloads stay byte-identical to the
-        /// legacy shape.
+        /// legacy shape; boarding orders carry neither side nor ammo.
         /// </summary>
         public List<SimOrder> BuildOrders()
         {
             var orders = new List<SimOrder>(_drafts.Count);
             foreach (var draft in _drafts)
             {
+                var hasTarget = draft.TargetShipId != null;
+                var boarding = hasTarget && AllowBoarding && draft.Board;
+                var broadside = hasTarget && !boarding;
                 orders.Add(new SimOrder
                 {
                     ShipId = draft.ShipId,
-                    Action = draft.TargetShipId != null ? "broadside" : "maneuver",
+                    Action = boarding ? "boarding" : broadside ? "broadside" : "maneuver",
                     TargetShipId = draft.TargetShipId,
-                    Side = draft.TargetShipId != null ? "starboard" : null,
+                    Side = broadside ? "starboard" : null,
                     TurnDelta = draft.TurnDelta,
                     SpeedDelta = draft.SpeedDelta,
-                    Ammo = draft.TargetShipId != null && draft.Ammo == "chain" ? "chain" : null
+                    Ammo = broadside && AllowChainShot && draft.Ammo == "chain" ? "chain" : null
                 });
             }
 
@@ -184,7 +218,7 @@ namespace Armada.Client.Services
                     .Append(", speed ").Append(draft.SpeedDelta >= 0 ? "+" : string.Empty).Append(draft.SpeedDelta);
                 if (draft.TargetShipId != null)
                 {
-                    builder.Append(", fire ").Append(draft.Ammo).Append(" at ").Append(draft.TargetShipId);
+                    builder.Append(", ").Append(DescribeAttack(draft));
                 }
                 else
                 {
@@ -193,6 +227,23 @@ namespace Armada.Client.Services
             }
 
             return builder.ToString();
+        }
+
+        /// <summary>Attack clause for a targeted draft ("fire round at X" or
+        /// "board X"); shared by the text blob and the structured rows.</summary>
+        public string DescribeAttack(PvpOrderDraft draft)
+        {
+            if (draft?.TargetShipId == null)
+            {
+                return "hold fire";
+            }
+
+            if (AllowBoarding && draft.Board)
+            {
+                return $"board {draft.TargetShipId}";
+            }
+
+            return $"fire {(AllowChainShot ? draft.Ammo : "round")} at {draft.TargetShipId}";
         }
 
         private static int Clamp(int value, int min, int max)

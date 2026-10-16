@@ -70,7 +70,7 @@ namespace Armada.Client.UI
                     $"{(active ? "▶ " : "   ")}{draft.ShipId}   " +
                     $"turn {draft.TurnDelta:+0;-0;0}°   " +
                     $"speed {draft.SpeedDelta:+0;-0;0}   " +
-                    $"{(draft.TargetShipId != null ? $"fire {draft.Ammo} at {draft.TargetShipId}" : "hold fire")}";
+                    session.DescribeAttack(draft);
                 row.fontStyle = active ? FontStyles.Bold : FontStyles.Normal;
                 row.color = active ? activeRowColor : rowColor;
                 row.gameObject.SetActive(true);

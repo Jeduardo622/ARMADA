@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -103,6 +104,29 @@ namespace Armada.Client.Core
                         }
                     }
                 }
+            };
+        }
+
+        /// <summary>
+        /// Mirror of reinforcementShip() in src/sim/mission06.ts: the frigate
+        /// mission06OnTurnStart splices into the state at the start of
+        /// <see cref="ReinforcementTurn"/>. No event announces it, so the
+        /// playable loop adds it to its snapshot before authoring that turn.
+        /// Pinned on both sides (tests/mission06.test.ts and the EditMode
+        /// suite) because it is not part of the start fingerprint.
+        /// </summary>
+        public static SimShip BuildReinforcement()
+        {
+            return new SimShip
+            {
+                Id = EnemyShipIds[1],
+                Side = "enemy",
+                Position = new SimVector2 { X = 300, Y = 80 },
+                Heading = 200,
+                Speed = 3,
+                Hp = (int)Math.Floor(120 * ReinforcementHpScale),
+                Sail = 70,
+                Crew = 40
             };
         }
 

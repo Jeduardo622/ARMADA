@@ -115,6 +115,24 @@ namespace Armada.Client.UI
             ReportCompletion(Mission10Scenario.MissionCode, progressResult);
         }
 
+        // Campaign completions go through the playable runner, which re-sends
+        // the exact seed and turns the winning resolve used (and, for
+        // Mission 07, the upgrade tiers its flow resolved with). Returns the
+        // task so the campaign can record the saved result.
+        public async Task<ServiceResult<MissionCompleteResponse>> CompletePlayableAsync(string code, IPlayableMissionRunner runner, Dictionary<string, object> result, int? bestScore = null)
+        {
+            var player = authService?.CurrentPlayer;
+            if (player == null)
+            {
+                SetStatus("Player not authed.");
+                return new ServiceResult<MissionCompleteResponse> { Success = false, ErrorReason = "not_authed" };
+            }
+
+            var progressResult = await runner.CompleteAsync(player.Id, result);
+            ReportCompletion(code, progressResult);
+            return progressResult;
+        }
+
         private void ReportCompletion(string code, ServiceResult<MissionCompleteResponse> progressResult)
         {
             if (!progressResult.Success || progressResult.FeatureDisabled)
